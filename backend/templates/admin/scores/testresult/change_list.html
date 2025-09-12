@@ -1,0 +1,11 @@
+{% extends "admin/change_list.html" %}
+{% load i18n admin_urls static %}
+
+{% block object-tools-items %}
+    {{ block.super }}
+    <li>
+        <a href="/admin/scores/testresult/summary/" class="addlink">
+            📊 テスト結果集計
+        </a>
+    </li>
+{% endblock %}

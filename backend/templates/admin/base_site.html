@@ -1,0 +1,35 @@
+{% extends "admin/base.html" %}
+{% load static %}
+
+{% block title %}{% if subtitle %}{{ subtitle }} | {% endif %}{{ title }} | 全国学力向上テスト管理システム{% endblock %}
+
+{% block branding %}
+<div id="branding">
+<h1 id="site-name"><a href="{% url 'admin:index' %}">全国学力向上テスト 管理システム</a></h1>
+</div>
+{% endblock %}
+
+{% block nav-global %}{% endblock %}
+
+{% block extrahead %}
+{{ block.super }}
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="{% static 'admin/css/custom_admin.css' %}">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+{% endblock %}
+
+{% block footer %}
+<div id="footer" style="background: var(--gray-50); border-top: 1px solid var(--gray-200); padding: 2rem; text-align: center; color: var(--gray-500); font-size: 0.875rem;">
+    <div style="max-width: 1200px; margin: 0 auto;">
+        <p style="margin: 0 0 1rem 0; font-weight: 500;">📊 全国学力向上テスト管理システム</p>
+        <p style="margin: 0; opacity: 0.8;">
+            効率的な成績管理とデータ分析で、すべての生徒の学習を支援します。
+            <br>
+            <small style="opacity: 0.6;">© 2025 全国学力向上テスト. All rights reserved.</small>
+        </p>
+    </div>
+</div>
+{% endblock %}
+
+{% block bodyclass %}{{ block.super }} modern-admin{% endblock %}

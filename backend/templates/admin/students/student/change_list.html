@@ -1,0 +1,16 @@
+{% extends "admin/change_list.html" %}
+{% load i18n admin_urls static %}
+
+{% block object-tools-items %}
+    {{ block.super }}
+    <li>
+        <a href="/admin/students/student/import-students/" class="addlink">
+            👥 生徒インポート
+        </a>
+    </li>
+    <li>
+        <a href="/admin/students/student/export-students/" class="addlink">
+            📤 生徒エクスポート
+        </a>
+    </li>
+{% endblock %}
