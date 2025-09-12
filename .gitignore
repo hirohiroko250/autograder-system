@@ -21,6 +21,9 @@ media/
 
 # Node.js
 node_modules/
+**/node_modules/
+**node_modules*/
+*node_modules*/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
@@ -30,6 +33,7 @@ lerna-debug.log*
 .next/
 out/
 build/
+**/.next/
 
 # Environment files
 .env
