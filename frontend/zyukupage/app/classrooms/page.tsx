@@ -198,7 +198,7 @@ export default function ClassroomsPage() {
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold">教室管理</h1>
+            <h1 className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold whitespace-nowrap">教室管理</h1>
             <p className="text-muted-foreground">
               教室の登録・管理を行います
             </p>

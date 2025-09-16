@@ -1,0 +1,32 @@
+{% extends "admin/change_list.html" %}
+{% load i18n admin_urls static admin_list %}
+
+{% block object-tools-items %}
+{% if show_bulk_add %}
+<li>
+    <a href="{% url 'bulk_add_school_billing' %}" class="addlink">
+        📊 課金レポート一括追加
+    </a>
+</li>
+{% endif %}
+{% endblock %}
+
+{% block extrahead %}
+{{ block.super }}
+<style>
+.addlink {
+    background: #28a745 !important;
+    color: white !important;
+    font-weight: bold;
+    padding: 8px 15px !important;
+    border-radius: 4px !important;
+    text-decoration: none !important;
+    border: none !important;
+}
+
+.addlink:hover {
+    background: #218838 !important;
+    color: white !important;
+}
+</style>
+{% endblock %}

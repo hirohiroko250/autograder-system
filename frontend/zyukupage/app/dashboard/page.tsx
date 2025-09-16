@@ -37,7 +37,7 @@ export default function DashboardPage() {
   const { data: schedules } = useQuery({
     queryKey: ['test-schedule-info'],
     queryFn: async () => {
-      const response = await fetch('http://localhost:8000/api/test-schedules-info/', {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL || 'http://162.43.55.80:8000/api'}/test-schedules-info/`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
         },
@@ -69,7 +69,8 @@ export default function DashboardPage() {
 
   const stats = [
     {
-      title: '受講生徒数',
+      title: '生徒数',
+      fullTitle: '受講生徒数',
       value: enrolledStudents?.length.toLocaleString() || '0',
       icon: Users,
       change: `${selectedYear}年度`,

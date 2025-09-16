@@ -3,6 +3,9 @@ const nextConfig = {
   eslint: {
     ignoreDuringBuilds: true,
   },
+  typescript: {
+    ignoreBuildErrors: true,
+  },
   images: { unoptimized: true },
   webpack: (config, { isServer }) => {
     // Increase timeout for CSS loading

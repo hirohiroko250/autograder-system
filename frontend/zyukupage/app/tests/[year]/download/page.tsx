@@ -209,7 +209,10 @@ function TestDownloadContent() {
       <div className="space-y-6 animate-fade-in">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold">テストファイルダウンロード</h1>
+            <h1 className="text-3xl font-bold">
+              <span className="hidden sm:inline">テストファイルダウンロード</span>
+              <span className="sm:hidden">テストDL</span>
+            </h1>
             <p className="text-muted-foreground mt-1">
               {selectedYear}年度 {getPeriodLabel(selectedPeriod)} テスト
             </p>

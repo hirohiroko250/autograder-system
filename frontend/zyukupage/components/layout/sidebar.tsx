@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
@@ -23,60 +23,74 @@ import {
 const menuItems = [
   { 
     title: 'ダッシュボード', 
+    mobileTitle: 'ダッシュ',
     href: '/dashboard', 
     icon: BarChart3 
   },
   { 
     title: '教室管理', 
+    mobileTitle: '教室',
     href: '/classrooms', 
     icon: GraduationCap 
   },
   { 
     title: '生徒管理', 
+    mobileTitle: '生徒',
     href: '/students', 
     icon: Users 
   },
   {
     title: 'テスト管理',
+    mobileTitle: 'テスト',
     icon: FileText,
     children: [
-      { title: 'テスト一覧', href: '/tests', icon: FileText },
-      { title: 'ダウンロード', href: '/tests/2025/download', icon: Download },
-      { title: '結果・データ出力', href: '/tests/results', icon: TrendingUp },
+      { title: 'テスト一覧', mobileTitle: '一覧', href: '/tests', icon: FileText },
+      { title: 'ダウンロード', mobileTitle: 'DL', href: '/tests/2025/download', icon: Download },
+      { title: '結果・データ出力', mobileTitle: '結果', href: '/tests/results', icon: TrendingUp },
     ]
   },
   {
     title: '設定',
+    mobileTitle: '設定',
     icon: Settings,
     children: [
-      { title: 'テスト日程', href: '/settings/test-schedule', icon: Calendar },
-      { title: 'コメントテンプレート', href: '/settings/comment-templates', icon: MessageSquare },
+      { title: 'テスト日程', mobileTitle: '日程', href: '/settings/test-schedule', icon: Calendar },
+      { title: 'コメントテンプレート', mobileTitle: 'ｺﾒﾝﾄ', href: '/settings/comment-templates', icon: MessageSquare },
     ]
   },
 ];
 
 export function Sidebar() {
   const [collapsed, setCollapsed] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
   const pathname = usePathname();
+
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 768);
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   return (
     <div className={cn(
       "flex flex-col h-screen bg-card border-r transition-all duration-300",
-      collapsed ? "w-16" : "w-64"
+      "w-64 md:w-64", // Fixed width for mobile, responsive for desktop
+      collapsed ? "md:w-16" : "md:w-64" // Only apply collapse on desktop
     )}>
-      <div className="p-4 border-b">
+      <div className="p-3 md:p-4 border-b">
         <div className="flex items-center justify-between">
-          {!collapsed && (
-            <div className="flex items-center gap-2">
-              <GraduationCap className="w-8 h-8 text-primary" />
-              <h1 className="text-xl font-bold">全国学力向上テスト</h1>
-            </div>
-          )}
+          <div className="flex items-center gap-2">
+            <GraduationCap className="w-8 h-8 text-primary" />
+            {(!collapsed || isMobile) && (
+              <h1 className="text-lg md:text-xl font-bold">{isMobile ? '学力テスト' : '全国学力向上テスト'}</h1>
+            )}
+          </div>
           <Button
             variant="ghost"
             size="icon"
             onClick={() => setCollapsed(!collapsed)}
-            className="hover:bg-primary/10"
+            className="hover:bg-primary/10 hidden md:flex"
           >
             {collapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
           </Button>
@@ -94,7 +108,7 @@ export function Sidebar() {
                     collapsed ? "justify-center" : "justify-start"
                   )}>
                     <item.icon className="w-5 h-5" />
-                    {!collapsed && <span>{item.title}</span>}
+                    {!collapsed && <span className="whitespace-nowrap truncate text-xs sm:text-sm">{isMobile ? item.mobileTitle || item.title : item.title}</span>}
                   </div>
                   {!collapsed && (
                     <div className="ml-4 space-y-1">
@@ -110,7 +124,7 @@ export function Sidebar() {
                           )}
                         >
                           <child.icon className="w-4 h-4" />
-                          <span>{child.title}</span>
+                          <span className="whitespace-nowrap truncate text-xs sm:text-sm">{isMobile ? child.mobileTitle || child.title : child.title}</span>
                         </Link>
                       ))}
                     </div>
@@ -128,7 +142,7 @@ export function Sidebar() {
                   )}
                 >
                   <item.icon className="w-5 h-5" />
-                  {!collapsed && <span>{item.title}</span>}
+                  {!collapsed && <span className="whitespace-nowrap truncate text-xs sm:text-sm">{isMobile ? item.mobileTitle || item.title : item.title}</span>}
                 </Link>
               )}
             </div>

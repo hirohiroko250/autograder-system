@@ -169,9 +169,9 @@ function TestResultsContent({ year, period }: { year: string; period: string }) 
       if (response.success) {
         // ファイルダウンロード処理
         const link = document.createElement('a');
-        const downloadUrl = response.download_url.startsWith('http') 
-          ? response.download_url 
-          : `http://localhost:8000${response.download_url}`;
+        const downloadUrl = response.download_url.startsWith('http')
+          ? response.download_url
+          : `${process.env.NEXT_PUBLIC_API_BASE_URL?.replace('/api', '') || 'http://162.43.55.80:8000'}${response.download_url}`;
         link.href = downloadUrl;
         link.download = `${student.student_name}_成績表_${year}年度${getPeriodLabel(period)}.docx`;
         link.target = '_blank';  // 新しいタブで開く
@@ -208,9 +208,9 @@ function TestResultsContent({ year, period }: { year: string; period: string }) 
       if (response.success) {
         // ZIPファイルダウンロード処理
         const link = document.createElement('a');
-        const downloadUrl = response.download_url.startsWith('http') 
-          ? response.download_url 
-          : `http://localhost:8000${response.download_url}`;
+        const downloadUrl = response.download_url.startsWith('http')
+          ? response.download_url
+          : `${process.env.NEXT_PUBLIC_API_BASE_URL?.replace('/api', '') || 'http://162.43.55.80:8000'}${response.download_url}`;
         link.href = downloadUrl;
         link.download = `成績表一括_${year}年度${getPeriodLabel(period)}_${selectedStudents.length}名.zip`;
         link.target = '_blank';
@@ -388,7 +388,11 @@ function TestResultsContent({ year, period }: { year: string; period: string }) 
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
-            <CardTitle>生徒管理 ({filteredResults.length}名)</CardTitle>
+            <CardTitle>
+              <span className="hidden sm:inline">生徒管理</span>
+              <span className="sm:hidden">生徒</span>
+              {" "}({filteredResults.length}名)
+            </CardTitle>
             <div className="flex items-center gap-2">
               <Checkbox
                 id="select-all"

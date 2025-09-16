@@ -485,7 +485,11 @@ export function ResultsClient({ year }: ResultsClientProps) {
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between">
-                <CardTitle>生徒管理 ({filteredResults.length}名)</CardTitle>
+                <CardTitle>
+                  <span className="hidden sm:inline">生徒管理</span>
+                  <span className="sm:hidden">生徒</span>
+                  {" "}({filteredResults.length}名)
+                </CardTitle>
                 <div className="flex items-center gap-2">
                   <Checkbox
                     id="select-all"

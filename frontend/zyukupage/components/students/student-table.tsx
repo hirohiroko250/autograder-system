@@ -61,78 +61,92 @@ export function StudentTable({ students, onEditStudent }: StudentTableProps) {
 
   return (
     <div className="rounded-xl border overflow-hidden">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>生徒</TableHead>
-            <TableHead>学年</TableHead>
-            <TableHead>教室</TableHead>
-            <TableHead>最終受講履歴</TableHead>
-            <TableHead className="text-right">操作</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {students.map((student) => (
-            <TableRow key={student.id}>
-              <TableCell>
-                <div className="flex items-center gap-3">
-                  <Avatar className="h-8 w-8">
-                    <AvatarImage src={`/students/${student.id}.jpg`} alt={student.name} />
-                    <AvatarFallback>{student.name.charAt(0)}</AvatarFallback>
-                  </Avatar>
-                  <div>
-                    <div className="font-medium">{student.name}</div>
-                    <div className="text-sm text-muted-foreground">ID: {student.student_id}</div>
+      {/* Mobile responsive table with horizontal scroll */}
+      <div className="overflow-x-auto">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="min-w-[140px] sm:min-w-[180px]">生徒</TableHead>
+              <TableHead className="min-w-[50px] sm:min-w-[60px] whitespace-nowrap text-xs sm:text-sm">学年</TableHead>
+              <TableHead className="min-w-[80px] sm:min-w-[100px] hidden md:table-cell whitespace-nowrap text-xs sm:text-sm">教室</TableHead>
+              <TableHead className="min-w-[100px] sm:min-w-[120px] hidden lg:table-cell whitespace-nowrap text-xs sm:text-sm">最終受講履歴</TableHead>
+              <TableHead className="min-w-[80px] sm:min-w-[100px] text-right whitespace-nowrap text-xs sm:text-sm">操作</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {students.map((student) => (
+              <TableRow key={student.id}>
+                <TableCell className="min-w-[140px] sm:min-w-[180px]">
+                  <div className="flex items-center gap-2 md:gap-3">
+                    <Avatar className="h-8 w-8">
+                      <AvatarImage src={`/students/${student.id}.jpg`} alt={student.name} />
+                      <AvatarFallback>{student.name.charAt(0)}</AvatarFallback>
+                    </Avatar>
+                    <div className="min-w-0 flex-1">
+                      <div className="font-medium truncate">{student.name}</div>
+                      <div className="text-xs md:text-sm text-muted-foreground truncate">
+                        ID: {student.student_id}
+                        {/* Show classroom on mobile */}
+                        <span className="md:hidden ml-2">• {student.classroom_name || '未設定'}</span>
+                      </div>
+                    </div>
                   </div>
-                </div>
-              </TableCell>
-              <TableCell>{formatGrade(student.grade)}</TableCell>
-              <TableCell>{student.classroom_name || '未設定'}</TableCell>
-              <TableCell>
-                <div className="flex items-center gap-2">
-                  <History className="h-3 w-3 text-muted-foreground" />
-                  <span className="text-sm">
-                    {student.latest_enrollment 
-                      ? `${student.latest_enrollment.year}年${student.latest_enrollment.period === 'spring' ? '春期' : student.latest_enrollment.period === 'summer' ? '夏期' : '冬期'}`
-                      : '未設定'
-                    }
-                  </span>
-                </div>
-              </TableCell>
-              <TableCell className="text-right">
-                <div className="flex items-center justify-end gap-2">
-                  <Link href={`/students/${student.student_id}`}>
+                </TableCell>
+                <TableCell className="min-w-[60px] sm:min-w-[80px] whitespace-nowrap">
+                  <span className="text-xs sm:text-sm font-medium">{formatGrade(student.grade)}</span>
+                </TableCell>
+                <TableCell className="min-w-[80px] sm:min-w-[100px] hidden md:table-cell whitespace-nowrap">
+                  <span className="text-xs sm:text-sm truncate max-w-[100px]">{student.classroom_name || '未設定'}</span>
+                </TableCell>
+                <TableCell className="min-w-[100px] sm:min-w-[120px] hidden lg:table-cell whitespace-nowrap">
+                  <div className="flex items-center gap-2">
+                    <History className="h-3 w-3 text-muted-foreground" />
+                    <span className="text-xs sm:text-sm truncate max-w-[100px]">
+                      {student.latest_enrollment 
+                        ? `${student.latest_enrollment.year}年${student.latest_enrollment.period === 'spring' ? '春期' : student.latest_enrollment.period === 'summer' ? '夏期' : '冬期'}`
+                        : '未設定'
+                      }
+                    </span>
+                  </div>
+                </TableCell>
+                <TableCell className="min-w-[80px] sm:min-w-[100px] text-right whitespace-nowrap">
+                  <div className="flex items-center justify-end gap-1">
+                    <Link href={`/students/${student.student_id}`}>
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="h-8 w-8 p-0"
+                        title="詳細"
+                      >
+                        <Eye className="h-4 w-4" />
+                      </Button>
+                    </Link>
                     <Button 
                       variant="ghost" 
                       size="sm" 
                       className="h-8 w-8 p-0"
+                      onClick={() => handleEdit(student)}
+                      title="編集"
                     >
-                      <Eye className="h-4 w-4" />
+                      <Edit className="h-4 w-4" />
                     </Button>
-                  </Link>
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    className="h-8 w-8 p-0"
-                    onClick={() => handleEdit(student)}
-                  >
-                    <Edit className="h-4 w-4" />
-                  </Button>
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    className="h-8 w-8 p-0 text-red-500 hover:text-red-700"
-                    onClick={() => handleDelete(student)}
-                    disabled={deleteStudentMutation.isPending}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="h-8 w-8 p-0 text-red-500 hover:text-red-700"
+                      onClick={() => handleDelete(student)}
+                      disabled={deleteStudentMutation.isPending}
+                      title="削除"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
     </div>
   );
 }

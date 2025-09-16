@@ -6,7 +6,7 @@ from django.contrib.auth import get_user_model
 from django.db import transaction
 from django.db.models import Count, Sum, F, Q
 from django.utils import timezone
-from .models import Classroom, ClassroomPermission, AttendanceRecord, BillingReport
+from .models import Classroom, ClassroomPermission, AttendanceRecord
 from .serializers import ClassroomSerializer
 from .utils import get_billing_student_count, get_classroom_attendance_summary
 from schools.models import School

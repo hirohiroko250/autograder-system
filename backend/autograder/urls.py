@@ -4,6 +4,7 @@ from django.shortcuts import redirect
 from django.http import HttpResponse
 from django.conf import settings
 from django.conf.urls.static import static
+from django.contrib.admin.views.decorators import staff_member_required
 from rest_framework.routers import DefaultRouter
 from schools.views import SchoolViewSet
 from students.views import StudentViewSet, StudentEnrollmentViewSet
@@ -23,7 +24,7 @@ import pandas as pd
 
 def redirect_to_frontend(request):
     """管理画面の「サイトを表示」ボタンで塾ページにリダイレクト"""
-    return redirect('http://localhost:3000')
+    return redirect('http://172.20.10.2:3000')
 
 def download_school_template(request):
     """塾登録テンプレートを直接ダウンロード"""
@@ -70,11 +71,94 @@ def csv_import_launcher(request):
     from django.shortcuts import render
     return render(request, 'admin/csv_import_launcher.html')
 
+def bulk_add_school_billing(request):
+    """課金レポート一括追加ページ"""
+    from django.shortcuts import render, redirect
+    from django.contrib import messages
+    from django.contrib.admin.views.decorators import staff_member_required
+    from classrooms.utils import generate_school_billing_report
+    from schools.models import School
+    from datetime import datetime
+
+    if request.method == 'POST':
+        year = request.POST.get('year')
+        period = request.POST.get('period')
+
+        if not year or not period:
+            messages.error(request, '年度と期間を選択してください。')
+        else:
+            try:
+                year = int(year)
+                schools = School.objects.all()
+                generated_count = 0
+                error_count = 0
+
+                for school in schools:
+                    try:
+                        generate_school_billing_report(school, year, period)
+                        generated_count += 1
+                    except Exception as e:
+                        error_count += 1
+                        messages.warning(request, f'{school.name}: {str(e)}')
+
+                if generated_count > 0:
+                    messages.success(request, f'{generated_count}個の塾の課金レポートを生成しました。（{year}年度 {period}期）')
+                if error_count > 0:
+                    messages.warning(request, f'{error_count}個の塾でエラーが発生しました。')
+
+            except ValueError:
+                messages.error(request, '有効な年度を入力してください。')
+            except Exception as e:
+                messages.error(request, f'処理中にエラーが発生しました: {str(e)}')
+
+        return redirect('admin:classrooms_schoolbillingreport_changelist')
+
+    # GET リクエストの場合、フォームを表示
+    current_year = datetime.now().year
+    years = list(range(current_year - 2, current_year + 3))  # 前後2年の範囲
+    periods = [
+        ('spring', '春期'),
+        ('summer', '夏期'),
+        ('winter', '冬期'),
+    ]
+
+    context = {
+        'title': '課金レポート一括追加',
+        'years': years,
+        'periods': periods,
+    }
+    return render(request, 'admin/bulk_add_billing.html', context)
+
+bulk_add_school_billing = staff_member_required(bulk_add_school_billing)
+
 # テスト結果集計機能は削除されました
 
-urlpatterns = [
+def redirect_billing_to_school_billing(request, **kwargs):
+    """教室ベース課金レポートへのアクセスを塾ベース課金レポートにリダイレクト"""
+    from django.shortcuts import redirect
+    from django.contrib import messages
+
+    # add/ が含まれている場合は一括追加ページに、そうでなければリストページに
+    if 'add' in request.path:
+        messages.info(request, '課金レポートは一括追加機能をご利用ください。')
+        return redirect('bulk_add_school_billing')
+    else:
+        messages.info(request, '課金レポートは塾ベースの管理に統一されました。')
+        return redirect('admin:classrooms_schoolbillingreport_changelist')
+
+# 教室ベース課金レポートへのアクセスを強制的に塾ベースにリダイレクト（admin URLより優先）
+billing_redirect_patterns = [
+    path('admin/classrooms/billingreport/', redirect_billing_to_school_billing, name='billing_redirect_list'),
+    path('admin/classrooms/billingreport/add/', redirect_billing_to_school_billing, name='billing_redirect_add'),
+    path('admin/classrooms/billingreport/<int:id>/', redirect_billing_to_school_billing, name='billing_redirect_detail'),
+    path('admin/classrooms/billingreport/<int:id>/change/', redirect_billing_to_school_billing, name='billing_redirect_change'),
+    path('admin/classrooms/billingreport/<int:id>/delete/', redirect_billing_to_school_billing, name='billing_redirect_delete'),
+]
+
+urlpatterns = billing_redirect_patterns + [
     path('admin/scores/csv-import-launcher/', csv_import_launcher, name='csv_import_launcher'),
     path('admin/scores/import-csv/', import_csv_scores, name='admin_import_csv_scores'),
+    path('admin/bulk-add-school-billing/', bulk_add_school_billing, name='bulk_add_school_billing'),
     path('admin/', admin.site.urls),
     path('api/auth/', include('accounts.urls')),
     path('api/', include(router.urls)),
@@ -87,4 +171,9 @@ urlpatterns = [
 
 # メディアファイルの配信設定（開発環境用）
 if settings.DEBUG:
-    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+    from .media_views import secure_media_serve
+    from django.urls import re_path
+    # カスタムメディアファイル配信（エラーハンドリング付き）
+    urlpatterns += [
+        re_path(r'^media/(?P<path>.*)$', secure_media_serve, name='secure_media'),
+    ]

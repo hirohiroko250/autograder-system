@@ -40,7 +40,13 @@ export default function RootLayout({
                     message.includes('layout.css') ||
                     message.includes('MediaSession') ||
                     message.includes('enterpictureinpicture') ||
-                    message.includes('autoPip')
+                    message.includes('autoPip') ||
+                    message.includes('setActionHandler') ||
+                    message.includes('MediaSessionAction') ||
+                    message.includes('Failed to execute') ||
+                    message.includes('autoPip.js') ||
+                    message.includes('The provided value') ||
+                    message.includes('is not a valid enum value')
                   ) {
                     return;
                   }
@@ -53,7 +59,9 @@ export default function RootLayout({
                     message.includes('Extra attributes') ||
                     message.includes('hydrat') ||
                     message.includes('preload') ||
-                    message.includes('React DevTools')
+                    message.includes('React DevTools') ||
+                    message.includes('setActionHandler') ||
+                    message.includes('MediaSessionAction')
                   ) {
                     return;
                   }
@@ -66,7 +74,13 @@ export default function RootLayout({
                     e.message.includes('MediaSession') ||
                     e.message.includes('enterpictureinpicture') ||
                     e.message.includes('Failed to load resource') ||
-                    e.message.includes('layout.css')
+                    e.message.includes('layout.css') ||
+                    e.message.includes('setActionHandler') ||
+                    e.message.includes('MediaSessionAction') ||
+                    e.message.includes('Failed to execute') ||
+                    e.message.includes('autoPip.js') ||
+                    e.message.includes('The provided value') ||
+                    e.message.includes('is not a valid enum value')
                   )) {
                     e.preventDefault();
                     return false;
@@ -77,7 +91,9 @@ export default function RootLayout({
                 window.addEventListener('unhandledrejection', function(e) {
                   if (e.reason && e.reason.message && (
                     e.reason.message.includes('autoPip') ||
-                    e.reason.message.includes('MediaSession')
+                    e.reason.message.includes('MediaSession') ||
+                    e.reason.message.includes('setActionHandler') ||
+                    e.reason.message.includes('MediaSessionAction')
                   )) {
                     e.preventDefault();
                     return false;

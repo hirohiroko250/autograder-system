@@ -4,7 +4,7 @@ from django.contrib.admin import AdminSite
 from django import forms
 from accounts.models import User
 from schools.models import School
-from classrooms.models import Classroom, ClassroomPermission, MembershipType, BillingReport
+from classrooms.models import Classroom, ClassroomPermission, MembershipType, SchoolBillingReport
 from students.models import Student
 from scores.models import Score, TestResult, CommentTemplate, TestSummary, SchoolTestSummary
 from tests.models import TestSchedule, TestDefinition, QuestionGroup, Question, AnswerKey
@@ -194,7 +194,7 @@ def custom_get_app_list(self, request, app_label=None):
             # モデルをカテゴリ別に分類
             if model.__name__ == 'User':
                 app_dict['ユーザー管理']['models'].append(model_dict)
-            elif model.__name__ in ['School', 'Classroom', 'Student', 'Score', 'TestResult', 'CommentTemplate', 'MembershipType', 'BillingReport']:
+            elif model.__name__ in ['School', 'Classroom', 'Student', 'Score', 'TestResult', 'CommentTemplate', 'MembershipType', 'SchoolBillingReport']:
                 app_dict['塾管理']['models'].append(model_dict)
             elif model.__name__ in ['TestSchedule', 'TestDefinition', 'QuestionGroup', 'Question', 'AnswerKey']:
                 app_dict['テスト問題']['models'].append(model_dict)
@@ -1838,12 +1838,13 @@ class MembershipTypeAdmin(admin.ModelAdmin):
         }),
     )
 
-class BillingReportAdmin(admin.ModelAdmin):
-    list_display = ('classroom', 'year', 'period', 'billed_students', 'price_per_student', 'total_amount', 'generated_at')
-    list_filter = ('year', 'period', 'generated_at')
-    search_fields = ('classroom__name', 'classroom__school__name')
-    readonly_fields = ('generated_at', 'updated_at')
-    actions = ['export_billing_reports', 'export_all_billing_data']
+# BillingReportAdminクラスは廃止（教室ベース課金レポートの代わりに塾ベースを使用）
+# class BillingReportAdmin(admin.ModelAdmin):
+#     list_display = ('classroom', 'year', 'period', 'billed_students', 'price_per_student', 'total_amount', 'generated_at')
+#     list_filter = ('year', 'period', 'generated_at')
+#     search_fields = ('classroom__name', 'classroom__school__name')
+#     readonly_fields = ('generated_at', 'updated_at')
+#     actions = ['export_billing_reports', 'export_all_billing_data']
     
     def export_billing_reports(self, request, queryset):
         """課金レポートをエクスポート"""
@@ -2182,7 +2183,7 @@ class BillingReportAdmin(admin.ModelAdmin):
         
         return render(request, 'admin/export_billing_data.html', context)
     
-    export_all_billing_data.short_description = "📊 請求情報を一括エクスポート（年度・期間選択）"
+#     export_all_billing_data.short_description = "📊 請求情報を一括エクスポート（年度・期間選択）"
     
     fieldsets = (
         ('基本情報', {
@@ -2202,7 +2203,194 @@ class BillingReportAdmin(admin.ModelAdmin):
     )
 
 admin.site.register(MembershipType, MembershipTypeAdmin)
-admin.site.register(BillingReport, BillingReportAdmin)
+# 教室ベースの課金レポートは非表示（塾ベースに統一）
+# admin.site.register(BillingReport, BillingReportAdmin)
+
+# BillingReportモデルは完全に廃止（コメントアウト）
+
+# 課金レポート管理（塾ベース）
+class SchoolBillingReportAdmin(admin.ModelAdmin):
+    list_display = ('school', 'year', 'period', 'total_classrooms', 'billed_students', 'price_per_student', 'total_amount', 'average_per_classroom', 'generated_at')
+    list_filter = ('year', 'period', 'generated_at', 'school__membership_type')
+    search_fields = ('school__name', 'school__school_id')
+    readonly_fields = ('generated_at', 'updated_at')
+    actions = ['export_school_billing_reports', 'export_school_billing_data']
+
+    # 手動での課金レポート作成を無効化（自動生成のみ）
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False  # 読み取り専用
+
+    def changelist_view(self, request, extra_context=None):
+        """一括追加機能付きの課金レポートリスト画面"""
+        from django.urls import reverse
+        from django.utils.html import format_html
+
+        extra_context = extra_context or {}
+        # カスタム追加ボタンのURL
+        extra_context['custom_add_url'] = reverse('bulk_add_school_billing')
+        extra_context['show_bulk_add'] = True  # 一括追加ボタンを表示するフラグ
+        return super().changelist_view(request, extra_context)
+
+
+    def has_delete_permission(self, request, obj=None):
+        return True  # 削除は可能
+
+    def average_per_classroom(self, obj):
+        avg = obj.get_average_per_classroom()
+        return f"{avg:.0f}円/教室" if avg > 0 else "0円/教室"
+    average_per_classroom.short_description = '教室あたり平均'
+
+    def export_school_billing_reports(self, request, queryset):
+        """塾別課金レポートをExcelエクスポート"""
+        from django.http import HttpResponse
+        import io
+        import pandas as pd
+        from datetime import datetime
+
+        data = []
+        for report in queryset:
+            data.append({
+                '塾ID': report.school.school_id,
+                '塾名': report.school.name,
+                '年度': report.year,
+                '期': report.get_period_display(),
+                '会員種別': report.school.get_membership_type_display(),
+                '教室数': report.total_classrooms,
+                '総生徒数': report.total_students,
+                '課金対象生徒数': report.billed_students,
+                '単価（円）': report.price_per_student,
+                '合計金額（円）': report.total_amount,
+                '教室あたり平均（円）': round(report.get_average_per_classroom()),
+                '生成日': report.generated_at.strftime('%Y-%m-%d %H:%M'),
+            })
+
+        df = pd.DataFrame(data)
+        output = io.BytesIO()
+
+        with pd.ExcelWriter(output, engine='openpyxl') as writer:
+            df.to_excel(writer, index=False, sheet_name='塾別課金レポート')
+
+        output.seek(0)
+        response = HttpResponse(
+            output.getvalue(),
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        response['Content-Disposition'] = f'attachment; filename="school_billing_reports_{timestamp}.xlsx"'
+        return response
+
+    export_school_billing_reports.short_description = "💼 塾別課金レポートをExcelエクスポート"
+
+    def export_school_billing_data(self, request, queryset):
+        """年度・期間を選択して塾別請求情報を一括エクスポート"""
+        from django.shortcuts import render
+        from django.contrib import messages
+        from classrooms.models import SchoolBillingReport
+        import pandas as pd
+        from django.http import HttpResponse
+        import io
+        from datetime import datetime
+
+        # POSTリクエストの場合、エクスポート実行
+        if request.method == 'POST':
+            year = request.POST.get('year')
+            period = request.POST.get('period')
+
+            if not year or not period:
+                messages.error(request, '年度と期間を選択してください')
+                return
+
+            try:
+                year = int(year)
+                reports = SchoolBillingReport.objects.filter(year=year, period=period)
+
+                if not reports.exists():
+                    messages.warning(request, f'{year}年度{period}期の課金レポートが見つかりません')
+                    return
+
+                # データを準備
+                export_data = []
+                total_amount_all = 0
+                total_students_all = 0
+
+                for report in reports:
+                    export_data.append({
+                        '塾ID': report.school.school_id,
+                        '塾名': report.school.name,
+                        '会員種別': report.school.get_membership_type_display(),
+                        '教室数': report.total_classrooms,
+                        '課金対象生徒数': report.billed_students,
+                        '単価': report.price_per_student,
+                        '合計金額': report.total_amount,
+                        '教室あたり平均': round(report.get_average_per_classroom()),
+                    })
+
+                    total_amount_all += report.total_amount
+                    total_students_all += report.billed_students
+
+                period_display = {'spring': '春期', 'summer': '夏期', 'winter': '冬期'}.get(period, period)
+
+                # Excelエクスポート
+                df = pd.DataFrame(export_data)
+                output = io.BytesIO()
+
+                with pd.ExcelWriter(output, engine='openpyxl') as writer:
+                    df.to_excel(writer, index=False, sheet_name=f'{year}年度{period_display}')
+
+                output.seek(0)
+                response = HttpResponse(
+                    output.getvalue(),
+                    content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+                )
+
+                filename = f'school_billing_report_{year}_{period_display}.xlsx'
+                response['Content-Disposition'] = f'attachment; filename="{filename}"'
+
+                messages.success(
+                    request,
+                    f'塾別請求情報をエクスポートしました: {year}年度 {period_display} - {len(export_data)}塾、{total_students_all}名、{total_amount_all:,}円'
+                )
+
+                return response
+
+            except Exception as e:
+                messages.error(request, f'エクスポート中にエラーが発生しました: {str(e)}')
+
+        # GETリクエストの場合、フォーム表示
+        return render(request, 'admin/export_billing_data.html', {
+            'title': '塾別請求情報一括エクスポート',
+            'opts': self.model._meta,
+            'years': SchoolBillingReport.objects.values_list('year', flat=True).distinct().order_by('-year'),
+            'periods': [('spring', '春期'), ('summer', '夏期'), ('winter', '冬期')],
+            'action_name': 'export_school_billing_data',
+        })
+
+    export_school_billing_data.short_description = "📊 塾別請求情報を一括エクスポート（年度・期間選択）"
+
+    fieldsets = (
+        ('基本情報', {
+            'fields': ('school', 'year', 'period')
+        }),
+        ('集計情報', {
+            'fields': ('total_classrooms', 'total_students', 'billed_students', 'price_per_student', 'total_amount')
+        }),
+        ('詳細情報', {
+            'fields': ('classroom_details', 'student_details'),
+            'classes': ('collapse',)
+        }),
+        ('システム情報', {
+            'fields': ('generated_at', 'updated_at'),
+            'classes': ('collapse',)
+        }),
+    )
+
+from classrooms.models import SchoolBillingReport
+admin.site.register(SchoolBillingReport, SchoolBillingReportAdmin)
+
 # Django管理画面のカスタマイズ
 admin.site.site_header = '全国学力向上テスト 管理画面'
 admin.site.site_title = '全国学力向上テスト'

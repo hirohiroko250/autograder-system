@@ -36,9 +36,10 @@ const CardTitle = React.forwardRef<
   <h3
     ref={ref}
     className={cn(
-      'text-2xl font-semibold leading-none tracking-tight',
+      'text-sm sm:text-lg md:text-xl lg:text-2xl font-semibold leading-tight tracking-tight whitespace-nowrap overflow-hidden text-ellipsis',
       className
     )}
+    style={{ wordBreak: 'keep-all' }}
     {...props}
   />
 ));

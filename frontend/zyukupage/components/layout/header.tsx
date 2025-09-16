@@ -10,7 +10,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Moon, Sun, LogOut, User, Settings } from 'lucide-react';
+import { Moon, Sun, LogOut, User, Settings, Menu } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
@@ -19,7 +19,11 @@ import { useState } from 'react';
 import { ProfileModal } from '@/components/profile/profile-modal';
 import { NotificationBell } from '@/components/notifications/notification-bell';
 
-export function Header() {
+interface HeaderProps {
+  onMenuClick?: () => void;
+}
+
+export function Header({ onMenuClick }: HeaderProps = {}) {
   const { theme, setTheme } = useTheme();
   const router = useRouter();
   const { user, logout } = useAuth();
@@ -37,9 +41,23 @@ export function Header() {
 
   return (
     <header className="border-b bg-card">
-      <div className="flex items-center justify-between px-6 py-4">
+      <div className="flex items-center justify-between px-3 md:px-6 py-4">
         <div className="flex items-center gap-4">
-          <h2 className="text-xl font-semibold">管理ダッシュボード</h2>
+          {/* Mobile menu button */}
+          {onMenuClick && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="md:hidden"
+              onClick={onMenuClick}
+            >
+              <Menu className="h-5 w-5" />
+            </Button>
+          )}
+          <h2 className="text-sm sm:text-lg md:text-xl font-semibold whitespace-nowrap">
+            <span className="hidden sm:inline">管理ダッシュボード</span>
+            <span className="sm:hidden">管理画面</span>
+          </h2>
         </div>
         
         <div className="flex items-center gap-4">

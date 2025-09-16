@@ -33,6 +33,65 @@ class ScoreViewSet(viewsets.ModelViewSet):
         return Score.objects.all().select_related('student', 'test', 'question_group')
     
     @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated])
+    def bulk_recalculate_results(self, request):
+        """テスト結果一括再計算"""
+        try:
+            test_id = request.data.get('test_id')
+            year = request.data.get('year')
+            period = request.data.get('period')
+
+            if test_id:
+                # 特定のテストのみ再計算
+                from tests.models import TestDefinition
+                test = TestDefinition.objects.get(id=test_id)
+                from .utils import bulk_calculate_test_results
+                count = bulk_calculate_test_results(test)
+
+                return Response({
+                    'success': True,
+                    'message': f'{test}の{count}件の結果を再計算しました',
+                    'processed_count': count
+                })
+
+            elif year and period:
+                # 年度・期間指定で一括再計算
+                from tests.models import TestDefinition
+                tests = TestDefinition.objects.filter(
+                    schedule__year=year,
+                    schedule__period=period
+                )
+
+                total_count = 0
+                processed_tests = []
+
+                for test in tests:
+                    from .utils import bulk_calculate_test_results
+                    count = bulk_calculate_test_results(test)
+                    total_count += count
+                    processed_tests.append({
+                        'test_name': str(test),
+                        'processed_count': count
+                    })
+
+                return Response({
+                    'success': True,
+                    'message': f'{year}年度{period}期の{total_count}件の結果を再計算しました',
+                    'total_processed_count': total_count,
+                    'processed_tests': processed_tests
+                })
+            else:
+                return Response({
+                    'success': False,
+                    'error': 'test_id または year と period の指定が必要です'
+                }, status=400)
+
+        except Exception as e:
+            return Response({
+                'success': False,
+                'error': str(e)
+            }, status=500)
+
+    @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated])
     def submit_score(self, request):
         """個別の大問スコアを保存"""
         try:
@@ -83,33 +142,16 @@ class ScoreViewSet(viewsets.ModelViewSet):
                 }
             )
             
-            # スコア保存後、TestResultを更新
-            from django.db.models import Sum
-            total_score = Score.objects.filter(
-                student=student,
-                test=test,
-                attendance=True
-            ).aggregate(total=Sum('score'))['total'] or 0
-            
-            # 正答率の計算（テストの満点に対する割合）
-            correct_rate = (total_score / test.max_score * 100) if test.max_score > 0 else 0
-            
-            # TestResultの更新または作成
-            test_result, result_created = TestResult.objects.update_or_create(
-                student=student,
-                test=test,
-                defaults={
-                    'total_score': total_score,
-                    'correct_rate': correct_rate
-                }
-            )
+            # スコア保存後、TestResultを更新（統一されたロジックを使用）
+            from .utils import calculate_test_results
+            test_result = calculate_test_results(student, test)
             
             return Response({
                 'success': True,
                 'score_id': score_obj.id,
                 'created': created,
-                'total_score': total_score,
-                'correct_rate': correct_rate,
+                'total_score': test_result.total_score,
+                'correct_rate': float(test_result.correct_rate),
                 'message': 'スコアを保存しました'
             })
             
@@ -353,18 +395,18 @@ class ScoreViewSet(viewsets.ModelViewSet):
                     warnings.append(f'行{index+2}: エラー - {str(e)}')
                     error_count += 1
             
-            # CSVにない大問を0点で補完し、TestResultを更新
-            from django.db.models import Sum
+            # CSVにない大問を0点で補完し、TestResultを統一ロジックで更新
+            from .utils import calculate_test_results
             for student_id in df['生徒ID'].dropna().unique():
                 try:
                     student = Student.objects.get(student_id=str(student_id))
-                    
+
                     # 各テストの合計点を計算してTestResultを更新
                     tests = TestDefinition.objects.filter(
                         schedule__year=2025,
                         schedule__period='summer'
                     )
-                    
+
                     for test in tests:
                         # CSVにない大問を0点で補完
                         all_question_groups = test.question_groups.all()
@@ -374,7 +416,7 @@ class ScoreViewSet(viewsets.ModelViewSet):
                                 test=test,
                                 question_group=question_group
                             ).exists()
-                            
+
                             if not score_exists:
                                 # CSVにない大問は0点で補完
                                 Score.objects.create(
@@ -384,25 +426,10 @@ class ScoreViewSet(viewsets.ModelViewSet):
                                     score=0,
                                     attendance=True
                                 )
-                        
-                        # 合計点を再計算
-                        total_score = Score.objects.filter(
-                            student=student,
-                            test=test,
-                            attendance=True
-                        ).aggregate(Sum('score'))['score__sum'] or 0
-                        
-                        if total_score >= 0:  # 0点でも更新
-                            correct_rate = (total_score / test.max_score * 100) if test.max_score > 0 else 0
-                            
-                            TestResult.objects.update_or_create(
-                                student=student,
-                                test=test,
-                                defaults={
-                                    'total_score': total_score,
-                                    'correct_rate': correct_rate
-                                }
-                            )
+
+                        # 統一されたロジックでTestResultを計算・更新
+                        calculate_test_results(student, test)
+
                 except Exception as e:
                     warnings.append(f'TestResult更新エラー (生徒ID: {student_id}): {str(e)}')
             

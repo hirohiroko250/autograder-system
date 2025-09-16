@@ -64,25 +64,60 @@ def calculate_test_results(student, test, force_temporary=False):
     
     return result
 
+def calculate_rankings_unified(student, test, total_score, is_final=False):
+    """統一された順位計算ロジック"""
+    from django.db.models import Count
+
+    school = student.classroom.school if student.classroom else None
+
+    # 出席者のみを対象とした基本クエリ
+    base_queryset = TestResult.objects.filter(
+        test=test,
+        student__scores__test=test,
+        student__scores__attendance=True
+    ).distinct()
+
+    # 塾内順位
+    school_rank, school_total = None, 0
+    if school:
+        school_queryset = base_queryset.filter(student__classroom__school=school)
+        school_rank = school_queryset.filter(total_score__gt=total_score).count() + 1
+        school_total = school_queryset.count()
+
+        # 自分が新規の場合は総数に追加
+        if not school_queryset.filter(student=student).exists():
+            school_total += 1
+
+    # 学年順位
+    grade_queryset = base_queryset.filter(student__grade=student.grade)
+    grade_rank = grade_queryset.filter(total_score__gt=total_score).count() + 1
+    grade_total = grade_queryset.count()
+
+    # 自分が新規の場合は総数に追加
+    if not grade_queryset.filter(student=student).exists():
+        grade_total += 1
+
+    # 全国順位
+    national_rank = base_queryset.filter(total_score__gt=total_score).count() + 1
+    national_total = base_queryset.count()
+
+    # 自分が新規の場合は総数に追加
+    if not base_queryset.filter(student=student).exists():
+        national_total += 1
+
+    return {
+        'school_rank': school_rank,
+        'school_total': school_total,
+        'grade_rank': grade_rank,
+        'grade_total': grade_total,
+        'national_rank': national_rank,
+        'national_total': national_total
+    }
+
 def calculate_school_rank_enhanced(student, test, total_score, is_final=False):
     """塾内順位を計算（拡張版：一時的・確定後に対応）"""
-    school = student.classroom.school
-    
-    # 同じ塾の学生のテスト結果を取得
-    school_results = TestResult.objects.filter(
-        test=test,
-        student__classroom__school=school
-    ).exclude(student=student).order_by('-total_score')
-    
-    # 順位計算（同点の場合は同順位）
-    rank = 1
-    for result in school_results:
-        if result.total_score > total_score:
-            rank += 1
-    
-    total_participants = school_results.count() + 1  # 自分を含める
-    
-    return rank, total_participants
+    rankings = calculate_rankings_unified(student, test, total_score, is_final)
+    return rankings['school_rank'], rankings['school_total']
 
 def calculate_school_rank(student, test, total_score):
     """塾内順位を計算（後方互換性のため維持）"""
@@ -90,26 +125,11 @@ def calculate_school_rank(student, test, total_score):
 
 def calculate_national_rank_enhanced(test, total_score, is_final=False):
     """全国順位を計算（拡張版：一時的・確定後に対応）"""
-    
-    # 全国のテスト結果を取得
-    national_results = TestResult.objects.filter(
-        test=test
-    ).order_by('-total_score')
-    
-    # 順位計算（同点の場合は同順位）
-    rank = 1
-    for result in national_results:
-        if result.total_score > total_score:
-            rank += 1
-    
-    total_participants = national_results.count() + 1  # 自分を含める（新規の場合）
-    
-    # 既存の結果がある場合は参加者数を調整
-    existing_count = national_results.filter(total_score=total_score).count()
-    if existing_count > 0:
-        total_participants = national_results.count()
-    
-    return rank, total_participants
+    # ダミー学生オブジェクトを使って統一ロジックを呼び出し
+    from students.models import Student
+    dummy_student = Student(grade='1', classroom=None)
+    rankings = calculate_rankings_unified(dummy_student, test, total_score, is_final)
+    return rankings['national_rank'], rankings['national_total']
 
 def calculate_national_rank(test, total_score):
     """全国順位を計算（後方互換性のため維持）"""
@@ -117,27 +137,8 @@ def calculate_national_rank(test, total_score):
 
 def calculate_grade_rank_enhanced(student, test, total_score, is_final=False):
     """学年順位を計算（拡張版：一時的・確定後に対応）"""
-    
-    # 同じ学年のテスト結果を取得
-    grade_results = TestResult.objects.filter(
-        test=test,
-        student__grade=student.grade
-    ).order_by('-total_score')
-    
-    # 順位計算（同点の場合は同順位）
-    rank = 1
-    for result in grade_results:
-        if result.total_score > total_score:
-            rank += 1
-    
-    total_participants = grade_results.count() + 1  # 自分を含める（新規の場合）
-    
-    # 既存の結果がある場合は参加者数を調整
-    existing_count = grade_results.filter(total_score=total_score).count()
-    if existing_count > 0:
-        total_participants = grade_results.count()
-    
-    return rank, total_participants
+    rankings = calculate_rankings_unified(student, test, total_score, is_final)
+    return rankings['grade_rank'], rankings['grade_total']
 
 def calculate_grade_rank(student, test, total_score):
     """学年順位を計算"""
@@ -252,771 +253,237 @@ def generate_comment(school, subject, score):
 
 # SchoolStatistics機能は削除されました
 
-def bulk_calculate_test_results(test, force_create=False):
-    """指定されたテストの全学生の結果を一括計算（改善版）"""
+def bulk_calculate_test_results(test, force_recalculate=False):
+    """指定されたテストの全学生の結果を一括計算・更新（最適化版）"""
     from django.utils import timezone
     from django.db import transaction
+    from django.db.models import Sum, F
     from students.models import Student
-    
+
     print(f"=== 一括集計開始: {test} ===")
-    
-    # 点数が入力されている学生を取得
-    students_with_scores = Score.objects.filter(test=test).values_list('student', flat=True).distinct()
-    
-    # 各学生の合計点を計算
-    student_totals = []
-    
+
     with transaction.atomic():
-        for student_id in students_with_scores:
-            student = Student.objects.get(id=student_id)
-            
-            # 各学生の合計点を計算
-            scores = Score.objects.filter(student=student, test=test)
-            total_score = scores.aggregate(total=Sum('score'))['total'] or 0
-            
-            # 正答率を計算
-            max_possible_score = test.max_score
-            correct_rate = (total_score / max_possible_score * 100) if max_possible_score > 0 else 0
-            
-            student_totals.append({
-                'student': student,
-                'total_score': total_score,
-                'correct_rate': correct_rate
-            })
-            
-            print(f"学生: {student.name} - 合計点: {total_score}")
-        
-        # 合計点でソート（降順）
-        student_totals.sort(key=lambda x: x['total_score'], reverse=True)
-        
-        # 全国順位を計算
-        print("=== 全国順位計算 ===")
-        national_ranks = calculate_bulk_national_ranks(student_totals)
-        
-        # 塾別順位を計算
-        print("=== 塾別順位計算 ===")
-        school_ranks = calculate_bulk_school_ranks(student_totals)
-        
-        # 平均点を計算
-        total_scores = [item['total_score'] for item in student_totals]
-        average_score = sum(total_scores) / len(total_scores) if total_scores else 0
-        print(f"全体平均点: {average_score:.1f}")
-        
-        # 締切状況を確認
-        is_deadline_passed = timezone.now() > test.schedule.deadline_at
-        is_final_calculation = is_deadline_passed
-        
-        # TestResultを更新
-        results = []
-        for i, item in enumerate(student_totals):
-            student = item['student']
-            total_score = item['total_score']
-            correct_rate = item['correct_rate']
-            
-            # 全国順位と塾内順位を取得
-            national_rank = national_ranks.get(student.id, len(student_totals))
-            school_rank = school_ranks.get(student.id, 1)
-            
-            # コメント生成
-            comment = generate_comment(student.classroom.school, test.subject, total_score)
-            
-            # TestResultを作成または更新
-            defaults = {
-                'total_score': total_score,
-                'correct_rate': correct_rate,
-                'comment': comment,
-            }
-            
-            if is_final_calculation:
-                # 確定後の順位更新
-                defaults.update({
-                    'school_rank_final': school_rank,
-                    'national_rank_final': national_rank,
-                    'school_total_final': len([s for s in student_totals if s['student'].classroom.school == student.classroom.school]),
-                    'national_total_final': len(student_totals),
-                    'is_rank_finalized': True,
-                    'rank_finalized_at': timezone.now(),
-                })
-            else:
-                # 一時的な順位更新
-                defaults.update({
-                    'school_rank_temporary': school_rank,
-                    'national_rank_temporary': national_rank,
-                    'school_total_temporary': len([s for s in student_totals if s['student'].classroom.school == student.classroom.school]),
-                    'national_total_temporary': len(student_totals),
-                })
-            
-            result, created = TestResult.objects.update_or_create(
-                student=student,
-                test=test,
-                defaults=defaults
-            )
-            
-            results.append(result)
-            print(f"更新: {student.name} - 全国順位: {national_rank}/{len(student_totals)}, 塾内順位: {school_rank}")
-        
-        print(f"=== 一括集計完了: {len(results)}件 ===")
-        return results
+        # 出席者のスコアを一括取得
+        student_scores = Score.objects.filter(
+            test=test,
+            attendance=True
+        ).values('student').annotate(
+            total_score=Sum('score')
+        ).select_related('student')
 
-def calculate_bulk_national_ranks(student_totals):
-    """全国順位を一括計算"""
-    ranks = {}
-    current_rank = 1
-    
-    for i, item in enumerate(student_totals):
-        student = item['student']
-        total_score = item['total_score']
-        
-        # 前の学生より点数が低い場合、順位を更新
-        if i > 0 and student_totals[i-1]['total_score'] > total_score:
-            current_rank = i + 1
-        
-        ranks[student.id] = current_rank
-    
-    return ranks
+        # 学生別の合計点辞書を作成
+        score_dict = {}
+        students_data = []
 
-def calculate_bulk_school_ranks(student_totals):
-    """塾別順位を一括計算"""
-    # 塾ごとに学生をグループ化
-    schools_data = {}
-    
-    for item in student_totals:
-        student = item['student']
-        school = student.classroom.school
-        
-        if school.id not in schools_data:
-            schools_data[school.id] = []
-        
-        schools_data[school.id].append(item)
-    
-    # 各塾内での順位を計算
-    school_ranks = {}
-    
-    for school_id, school_students in schools_data.items():
-        # 塾内で合計点順にソート（降順）
-        school_students.sort(key=lambda x: x['total_score'], reverse=True)
-        
-        current_rank = 1
-        for i, item in enumerate(school_students):
-            student = item['student']
-            total_score = item['total_score']
-            
-            # 前の学生より点数が低い場合、順位を更新
-            if i > 0 and school_students[i-1]['total_score'] > total_score:
-                current_rank = i + 1
-            
-            school_ranks[student.id] = current_rank
-            print(f"塾内順位: {student.name} - {current_rank}位 (点数: {total_score})")
-    
-    return school_ranks
+        for score_data in student_scores:
+            student_id = score_data['student']
+            total_score = score_data['total_score'] or 0
 
-def get_test_template_structure(year, period, subject, grade_level=None):
-    """
-    指定された年度・時期・科目・学年のテスト構造を取得
-    """
-    try:
-        query = TestDefinition.objects.filter(
-            schedule__year=year,
-            schedule__period=period,
-            subject=subject
-        )
-        
-        if grade_level:
-            query = query.filter(grade_level=grade_level)
-        
-        test = query.first()
-        
-        if not test:
-            return None
-            
-        question_groups = QuestionGroup.objects.filter(test=test).order_by('group_number')
-        
-        structure = {
-            'test': test,
-            'question_groups': []
-        }
-        
-        for group in question_groups:
-            structure['question_groups'].append({
-                'id': group.id,
-                'group_number': group.group_number,
-                'title': group.title,
-                'max_score': group.max_score,
-                'questions_count': group.questions.count()
-            })
-        
-        return structure
-        
-    except Exception as e:
-        return None
-
-def generate_score_template(year, period, subject, grade_level=None):
-    """
-    指定された年度・時期・科目・学年の得点入力用テンプレートを生成
-    生徒登録と同様の形式（塾ID・塾名・教室ID・教室名・生徒ID・生徒名・学年・年度・時期）に統一
-    """
-    structure = get_test_template_structure(year, period, subject, grade_level)
-    
-    if not structure:
-        period_display = {'spring': '春季', 'summer': '夏季', 'winter': '冬季'}.get(period, period)
-        subject_display = {'japanese': '国語', 'math': '算数', 'english': '英語', 'mathematics': '数学'}.get(subject, subject)
-        grade_display = {'elementary': '小学生', 'middle_school': '中学生'}.get(grade_level, grade_level) if grade_level else ''
-        raise ValidationError(f"{year}年度{period_display}{grade_display}{subject_display}テストが見つかりません")
-    
-    # 基本情報列（生徒登録と同じ形式）
-    columns = [
-        '塾ID', '塾名', '教室ID', '教室名', 
-        '生徒ID', '生徒名', '学年', '年度', '期間',
-        '出席'  # 出席状況
-    ]
-    
-    # 大問ごとの列を追加
-    for group in structure['question_groups']:
-        column_name = f"大問{group['group_number']}"
-        columns.append(column_name)
-    
-    # 合計点列
-    columns.append('合計点')
-    
-    # サンプルデータ
-    sample_data = {col: [] for col in columns}
-    
-    # 期間表示を変換
-    period_display_jp = {'spring': '春期', 'summer': '夏期', 'winter': '冬期'}.get(period, period)
-    
-    # サンプル行を3つ作成
-    sample_names = ['田中太郎', '佐藤花子', '鈴木次郎']
-    sample_grades = ['小6', '小5', '中1']
-    
-    for i in range(3):
-        sample_data['塾ID'].append('100001')
-        sample_data['塾名'].append('サンプル学習塾')
-        sample_data['教室ID'].append('001001')
-        sample_data['教室名'].append('メイン教室')
-        sample_data['生徒ID'].append(f'{123456 + i}')
-        sample_data['生徒名'].append(sample_names[i])
-        sample_data['学年'].append(sample_grades[i])
-        sample_data['年度'].append(str(year))
-        sample_data['期間'].append(period_display_jp)
-        sample_data['出席'].append('出席')
-        
-        total = 0
-        for group in structure['question_groups']:
-            # サンプル点数（満点から徐々に減らす）
-            score = max(0, group['max_score'] - i * 2)
-            column_name = f"大問{group['group_number']}"
-            sample_data[column_name].append(score)
-            total += score
-        
-        sample_data['合計点'].append(total)
-    
-    # 空行を追加（データ入力用）
-    for _ in range(3):
-        for col in columns:
-            if col in ['年度', '期間']:
-                sample_data[col].append(str(year) if col == '年度' else period_display_jp)
-            else:
-                sample_data[col].append('')
-    
-    df = pd.DataFrame(sample_data)
-    return df, structure
-
-def generate_individual_report_template(student_id, year, period, format_type='word'):
-    """
-    個別成績表帳票生成
-    A3サイズの美しいデザイン（Word/HTMLテンプレート対応）
-    """
-    try:
-        from students.models import StudentEnrollment
-        from tests.models import TestDefinition, TestSchedule
-        # CommentTemplateはscores.modelsに移動済み
-        from django.db.models import Avg
-        import tempfile
-        import os
-        from datetime import datetime
-        from docx import Document
-        from docx.shared import Inches, Cm, Pt
-        from docx.enum.text import WD_ALIGN_PARAGRAPH
-        from docx.enum.table import WD_TABLE_ALIGNMENT
-        from docx.oxml.shared import OxmlElement, qn
-        from docx.shared import RGBColor
-        
-        # 生徒情報取得
-        print(f"生徒情報検索: student_id={student_id}, year={year}, period={period}")
-        try:
-            student_enrollment = StudentEnrollment.objects.get(
-                student__student_id=student_id,
-                year=year,
-                period=period,
-                is_active=True
-            )
-            student = student_enrollment.student
-            print(f"生徒情報取得成功: {student.name}")
-        except StudentEnrollment.DoesNotExist:
-            print(f"生徒受講情報が見つかりません: {student_id}")
-            return {
-                'success': False,
-                'error': f'生徒ID {student_id} の{year}年度{period}期の受講情報が見つかりません'
-            }
-        
-        # 学年に応じた教科を決定
-        grade = student.grade
-        
-        # 数字だけの場合は小学生として扱う
-        is_elementary = grade.startswith('小') or (isinstance(grade, str) and grade.isdigit())
-        
-        if is_elementary:
-            subjects = ['japanese', 'math']  # 国語、算数
-            subject_names = {'japanese': '国語', 'math': '算数'}
-        else:
-            subjects = ['english', 'mathematics']  # 英語、数学
-            subject_names = {'english': '英語', 'mathematics': '数学'}
-        
-        # テストスケジュール取得
-        try:
-            schedule = TestSchedule.objects.get(year=year, period=period)
-        except TestSchedule.DoesNotExist:
-            return {
-                'success': False,
-                'error': f'{year}年度{period}期のテストスケジュールが見つかりません'
-            }
-        
-        # 各教科のテスト結果と統計を取得
-        report_data = {
-            'student_info': {
-                'name': student.name,
-                'id': student.student_id,
-                'grade': student.grade,
-                'school_name': student.classroom.school.name if student.classroom and student.classroom.school else '不明',
-                'classroom_name': student.classroom.name if student.classroom else '不明'
-            },
-            'test_info': {
-                'year': year,
-                'period': period,
-                'date': schedule.actual_date or schedule.planned_date
-            },
-            'subjects': {},
-            'subject_results': {},
-            'combined_results': {
-                'total_score': 0,
-                'grade_rank': '-',
-                'grade_total': '-',
-                'school_rank': '-',
-                'school_total': '-'
-            }
-        }
-        
-        for subject in subjects:
-            # 実際にスコアが記録されているテストを取得（学年に関係なく）
-            student_tests_with_scores = Score.objects.filter(
-                student=student,
-                test__schedule=schedule,
-                test__subject=subject
-            ).select_related('test').values_list('test', flat=True).distinct()
-            
-            if not student_tests_with_scores:
-                # スコアが記録されていない場合は、学年に応じたテストを試す
-                # 学年に応じてTestDefinitionを検索
-                grade_level_filter = convert_student_grade_to_test_grade_level(student.grade)
-                
-                if grade_level_filter:
-                    test_def = TestDefinition.objects.filter(
-                        schedule=schedule,
-                        subject=subject,
-                        grade_level=grade_level_filter
-                    ).first()
-                else:
-                    # フォールバック：小学生/中学生で大きく分ける
-                    test_def = TestDefinition.objects.filter(
-                        schedule=schedule,
-                        subject=subject,
-                        grade_level__startswith='elementary_' if is_elementary else 'middle_'
-                    ).first()
-                
-                if not test_def:
-                    continue
-            else:
-                # 最初に見つかったテストを使用（通常は1つのテストのみ）
-                test_def = TestDefinition.objects.get(id=student_tests_with_scores[0])
-            
-            # 生徒の得点取得
-            student_scores = Score.objects.filter(
-                student=student,
-                test=test_def
-            ).select_related('question_group')
-            
-            # テスト定義から全ての大問を取得（0点の問題も含める）
-            all_question_groups = test_def.question_groups.all().order_by('group_number')
-            question_scores = []
-            total_score = 0
-            
-            for question_group in all_question_groups:
-                # 生徒の得点を検索
-                student_score_obj = student_scores.filter(question_group=question_group).first()
-                score = student_score_obj.score if student_score_obj else 0
-                
-                question_scores.append({
-                    'question_number': question_group.group_number,
-                    'title': question_group.title,
-                    'score': score,
-                    'max_score': question_group.max_score
-                })
-                total_score += score or 0
-            
-            # 全国統計計算
-            all_students = Score.objects.filter(test=test_def).values('student').distinct()
-            all_scores = []
-            for student_data in all_students:
-                student_total = Score.objects.filter(
-                    test=test_def,
-                    student_id=student_data['student']
-                ).aggregate(total=Sum('score'))['total'] or 0
-                all_scores.append(student_total)
-            
-            # 学年順位計算（全国を学年別に修正）
-            grade_scores = []
-            grade_students = Score.objects.filter(
-                test=test_def,
-                student__grade=student.grade
-            ).values('student').distinct()
-            
-            for grade_student_data in grade_students:
-                grade_student_total = Score.objects.filter(
-                    test=test_def,
-                    student_id=grade_student_data['student']
-                ).aggregate(total=Sum('score'))['total'] or 0
-                grade_scores.append(grade_student_total)
-            
-            grade_scores.sort(reverse=True)
-            grade_rank = grade_scores.index(total_score) + 1 if total_score in grade_scores else len(grade_scores)
-            grade_total = len(grade_scores)
-            
-            # 全国順位計算（参考用）
-            all_scores.sort(reverse=True)
-            national_rank = all_scores.index(total_score) + 1 if total_score in all_scores else len(all_scores)
-            
-            # 塾内順位計算
-            school_scores = []
-            school_students = Score.objects.filter(
-                test=test_def,
-                student__classroom__school=student.classroom.school
-            ).values('student').distinct()
-            
-            for school_student_data in school_students:
-                school_student_total = Score.objects.filter(
-                    test=test_def,
-                    student_id=school_student_data['student']
-                ).aggregate(total=Sum('score'))['total'] or 0
-                school_scores.append(school_student_total)
-            
-            school_scores.sort(reverse=True)
-            school_rank = school_scores.index(total_score) + 1 if total_score in school_scores else len(school_scores)
-            school_total = len(school_scores)
-            
-            # 平均点計算
-            grade_average = sum(grade_scores) / len(grade_scores) if grade_scores else 0
-            school_average = sum(school_scores) / len(school_scores) if school_scores else 0
-            
-            # 偏差値計算
-            import statistics
-            grade_deviation = 50.0     # デフォルト偏差値（学年）
-            school_deviation = 50.0    # デフォルト偏差値（塾内）
-            
-            if len(grade_scores) > 1:
-                try:
-                    std_dev = statistics.stdev(grade_scores)
-                    if std_dev > 0:
-                        grade_deviation = 50 + (total_score - grade_average) / std_dev * 10
-                        grade_deviation = max(25, min(75, grade_deviation))  # 25-75の範囲に制限
-                except:
-                    grade_deviation = 50.0
-            
-            if len(school_scores) > 1:
-                try:
-                    school_std_dev = statistics.stdev(school_scores)
-                    if school_std_dev > 0:
-                        school_deviation = 50 + (total_score - school_average) / school_std_dev * 10
-                        school_deviation = max(25, min(75, school_deviation))  # 25-75の範囲に制限
-                except:
-                    school_deviation = 50.0
-            
-            # 大問別平均点
-            question_averages = []
-            for q_score in question_scores:
-                q_avg = Score.objects.filter(
-                    test=test_def,
-                    question_group__group_number=q_score['question_number']
-                ).aggregate(avg=Avg('score'))['avg'] or 0
-                question_averages.append({
-                    'question_number': q_score['question_number'],
-                    'average': round(q_avg, 1)
-                })
-            
-            # コメント取得・生成
             try:
-                # TestResultからコメントを取得
-                test_result = TestResult.objects.filter(student=student, test=test_def).first()
-                if test_result and test_result.comment:
-                    comment = test_result.comment
+                student = Student.objects.get(id=student_id)
+                score_dict[student_id] = total_score
+
+                # 正答率計算
+                correct_rate = (total_score / test.max_score * 100) if test.max_score > 0 else 0
+
+                students_data.append({
+                    'student': student,
+                    'total_score': total_score,
+                    'correct_rate': correct_rate
+                })
+
+            except Student.DoesNotExist:
+                continue
+
+        print(f"対象学生数: {len(students_data)}")
+
+        # 一括順位計算
+        rankings_data = calculate_bulk_rankings(students_data, test)
+
+        # TestResult一括更新
+        test_results_to_update = []
+        test_results_to_create = []
+
+        for student_data in students_data:
+            student = student_data['student']
+            total_score = student_data['total_score']
+            correct_rate = student_data['correct_rate']
+
+            # 順位データを取得
+            rankings = rankings_data.get(student.id, {})
+
+            # コメント生成
+            comment = generate_comment(
+                student.classroom.school if student.classroom else None,
+                test.subject,
+                total_score
+            )
+
+            # 締切状況確認
+            is_deadline_passed = timezone.now() > test.schedule.deadline_at
+
+            # TestResultの既存レコードを確認
+            try:
+                test_result = TestResult.objects.get(student=student, test=test)
+                # 既存レコードを更新
+                test_result.total_score = total_score
+                test_result.correct_rate = correct_rate
+                test_result.comment = comment
+
+                if is_deadline_passed:
+                    # 確定後の順位
+                    test_result.school_rank_final = rankings.get('school_rank')
+                    test_result.national_rank_final = rankings.get('national_rank')
+                    test_result.grade_rank = rankings.get('grade_rank')
+                    test_result.school_total_final = rankings.get('school_total')
+                    test_result.national_total_final = rankings.get('national_total')
+                    test_result.grade_total = rankings.get('grade_total')
+                    test_result.is_rank_finalized = True
+                    test_result.rank_finalized_at = timezone.now()
                 else:
-                    # スコアに基づいたコメント生成
-                    score_percentage = (total_score / test_def.max_score * 100) if test_def.max_score > 0 else 0
-                    if score_percentage >= 90:
-                        comment = f"素晴らしい成績です。{subject_names[subject]}での理解度が非常に高く、継続した努力の成果が現れています。"
-                    elif score_percentage >= 80:
-                        comment = f"よく頑張りました。{subject_names[subject]}の基礎は身についています。さらなる向上を目指しましょう。"
-                    elif score_percentage >= 70:
-                        comment = f"{subject_names[subject]}の基本的な内容は理解できています。苦手分野の復習に重点を置きましょう。"
-                    elif score_percentage >= 60:
-                        comment = f"{subject_names[subject]}の基礎固めが重要です。復習を重ね、理解を深めていきましょう。"
-                    else:
-                        comment = f"{subject_names[subject]}の基本から丁寧に復習し、一歩ずつ理解を深めていきましょう。"
-            except:
-                comment = "よく頑張りました。継続して学習を続けましょう。"
-            
-            report_data['subjects'][subject] = {
-                'name': subject_names[subject],
-                'total_score': total_score,
-                'max_score': test_def.max_score,
-                'average_score': round(grade_average, 1),
-                'school_average': round(school_average, 1),
-                'grade_rank': grade_rank,
-                'grade_total': grade_total,
-                'school_rank': school_rank,
-                'school_total': school_total,
-                'grade_deviation': round(grade_deviation, 1),
-                'school_deviation': round(school_deviation, 1),
-                'question_scores': question_scores,
-                'question_averages': question_averages,
-                'comment': comment
-            }
-            
-            # PDF用のsubject_resultsにも追加
-            report_data['subject_results'][subject_names[subject]] = {
-                'total_score': total_score,
-                'rankings': {
-                    'grade_rank': grade_rank,
-                    'school_rank': school_rank
-                },
-                'comment': comment
-            }
-            
-            # 合計点を累積
-            report_data['combined_results']['total_score'] += total_score
-        
-        # 合計成績の順位計算
-        if report_data['combined_results']['total_score'] > 0:
-            # 国語と算数の合計で全体順位を計算
-            combined_total = report_data['combined_results']['total_score']
-            
-            # 全体の順位情報をsubjectsから取得
-            total_national_rank = 1
-            total_school_rank = 1
-            total_students = 1
-            total_school_students = 1
-            
-            if 'japanese' in report_data['subjects'] and 'math' in report_data['subjects']:
-                # 簡易的に国語と算数の平均順位を使用（学年順位）
-                jp_rank = report_data['subjects']['japanese']['grade_rank']
-                math_rank = report_data['subjects']['math']['grade_rank']
-                total_national_rank = int((jp_rank + math_rank) / 2)
-                
-                jp_school_rank = report_data['subjects']['japanese']['school_rank']
-                math_school_rank = report_data['subjects']['math']['school_rank']
-                total_school_rank = int((jp_school_rank + math_school_rank) / 2)
-                
-                total_students = max(
-                    report_data['subjects']['japanese']['grade_total'],
-                    report_data['subjects']['math']['grade_total']
-                )
-                total_school_students = max(
-                    report_data['subjects']['japanese']['school_total'],
-                    report_data['subjects']['math']['school_total']
-                )
-            
-            report_data['combined_results'].update({
-                'grade_rank': total_national_rank,
-                'grade_total': total_students,
-                'school_rank': total_school_rank,
-                'school_total': total_school_students
-            })
-        
-        # レポート生成処理を実行
-        
-        # 帳票ファイル生成
-        if format_type == 'pdf':
-            result = create_beautiful_pdf_report(report_data)
-            return result
-        elif format_type in ['word', 'a4_portrait']:
-            file_path = create_a4_portrait_report(report_data)
-            file_extension = '.docx'
-        else:
-            file_path = generate_excel_report(report_data)
-            file_extension = '.xlsx'
-        
-        # ファイル名生成
-        from datetime import datetime
-        filename = f"{student.name}_成績表_{year}年度{period}期{file_extension}"
-        
-        return {
-            'success': True,
-            'download_url': f'/media/reports/{os.path.basename(file_path)}',
-            'filename': filename,
-            'student_name': student.name,
-            'file_path': file_path  # デバッグ用
-        }
-        
-    except Exception as e:
-        print(f"個別帳票生成エラー: {str(e)}")
-        import traceback
-        traceback.print_exc()
-        return {
-            'success': False,
-            'error': str(e)
+                    # 一時的順位
+                    test_result.school_rank_temporary = rankings.get('school_rank')
+                    test_result.national_rank_temporary = rankings.get('national_rank')
+                    test_result.grade_rank = rankings.get('grade_rank')
+                    test_result.school_total_temporary = rankings.get('school_total')
+                    test_result.national_total_temporary = rankings.get('national_total')
+                    test_result.grade_total = rankings.get('grade_total')
+
+                test_results_to_update.append(test_result)
+
+            except TestResult.DoesNotExist:
+                # 新規レコードを作成
+                test_result_data = {
+                    'student': student,
+                    'test': test,
+                    'total_score': total_score,
+                    'correct_rate': correct_rate,
+                    'comment': comment,
+                    'grade_rank': rankings.get('grade_rank'),
+                    'grade_total': rankings.get('grade_total')
+                }
+
+                if is_deadline_passed:
+                    test_result_data.update({
+                        'school_rank_final': rankings.get('school_rank'),
+                        'national_rank_final': rankings.get('national_rank'),
+                        'school_total_final': rankings.get('school_total'),
+                        'national_total_final': rankings.get('national_total'),
+                        'is_rank_finalized': True,
+                        'rank_finalized_at': timezone.now()
+                    })
+                else:
+                    test_result_data.update({
+                        'school_rank_temporary': rankings.get('school_rank'),
+                        'national_rank_temporary': rankings.get('national_rank'),
+                        'school_total_temporary': rankings.get('school_total'),
+                        'national_total_temporary': rankings.get('national_total')
+                    })
+
+                test_results_to_create.append(TestResult(**test_result_data))
+
+        # 一括更新・作成実行
+        if test_results_to_update:
+            TestResult.objects.bulk_update(
+                test_results_to_update,
+                ['total_score', 'correct_rate', 'comment', 'grade_rank', 'grade_total',
+                 'school_rank_temporary', 'national_rank_temporary',
+                 'school_total_temporary', 'national_total_temporary',
+                 'school_rank_final', 'national_rank_final',
+                 'school_total_final', 'national_total_final',
+                 'is_rank_finalized', 'rank_finalized_at']
+            )
+            print(f"更新済み: {len(test_results_to_update)}件")
+
+        if test_results_to_create:
+            TestResult.objects.bulk_create(test_results_to_create)
+            print(f"新規作成: {len(test_results_to_create)}件")
+
+    print(f"=== 一括集計完了: {test} ===")
+    return len(students_data)
+
+def calculate_bulk_rankings(students_data, test):
+    """学生データから一括で順位を計算"""
+    rankings_data = {}
+
+    # 学生を点数順にソート
+    sorted_students = sorted(students_data, key=lambda x: x['total_score'], reverse=True)
+
+    # 塾別グループ化
+    school_groups = {}
+    grade_groups = {}
+
+    for student_data in students_data:
+        student = student_data['student']
+        school = student.classroom.school if student.classroom else None
+        grade = student.grade
+
+        # 塾別グループ
+        if school:
+            if school.id not in school_groups:
+                school_groups[school.id] = []
+            school_groups[school.id].append(student_data)
+
+        # 学年別グループ
+        if grade not in grade_groups:
+            grade_groups[grade] = []
+        grade_groups[grade].append(student_data)
+
+    # 全国順位計算
+    for i, student_data in enumerate(sorted_students):
+        student = student_data['student']
+        total_score = student_data['total_score']
+
+        # 全国順位（同点は同順位）
+        national_rank = 1
+        for other_data in sorted_students:
+            if other_data['total_score'] > total_score:
+                national_rank += 1
+            else:
+                break
+
+        rankings_data[student.id] = {
+            'national_rank': national_rank,
+            'national_total': len(sorted_students)
         }
 
-def create_a4_portrait_report(report_data):
-    """
-    A4縦向きの成績表レポートを生成（グラフ付き）
-    """
-    try:
-        import tempfile
-        import os
-        from datetime import datetime
-        try:
-            from docx import Document
-            from docx.shared import Inches, Cm, Pt, RGBColor
-            from docx.enum.text import WD_ALIGN_PARAGRAPH
-            from docx.enum.table import WD_TABLE_ALIGNMENT
-            from docx.oxml.shared import OxmlElement, qn
-            from docx.enum.section import WD_SECTION
-            from docx.enum.section import WD_ORIENT
-            import matplotlib.pyplot as plt
-            import matplotlib
-            matplotlib.use('Agg')  # GUI不要のバックエンドを使用
-        except ImportError as import_error:
-            print(f"ライブラリのインポートエラー: {import_error}")
-            return create_fallback_text_report(report_data)
-        
-        # 新しいドキュメントを作成
-        doc = Document()
-        
-        # A4縦向きに設定（2枚に収めるため余白を小さく）
-        section = doc.sections[0]
-        section.orientation = WD_ORIENT.PORTRAIT
-        section.page_width = Cm(21)   # A4縦向き幅
-        section.page_height = Cm(29.7) # A4縦向き高さ
-        section.left_margin = Cm(1.0)  # 左余白縮小
-        section.right_margin = Cm(1.0) # 右余白縮小
-        section.top_margin = Cm(1.0)   # 上余白縮小
-        section.bottom_margin = Cm(1.0) # 下余白縮小
-        
-        # ヘッダー部分（コンパクト化）
-        header = doc.add_heading('', level=0)
-        header_run = header.runs[0] if header.runs else header.add_run()
-        header_run.text = '個別成績表'
-        header_run.font.size = Pt(18)  # サイズ縮小
-        header_run.font.color.rgb = RGBColor(31, 73, 125)
-        header_run.bold = True
-        header.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        
-        # 生徒情報テーブル
-        student_info = report_data['student_info']
-        test_info = report_data['test_info']
-        
-        info_table = doc.add_table(rows=2, cols=4)
-        info_table.style = 'Light Grid Accent 1'
-        
-        # ヘッダー行
-        info_cells = info_table.rows[0].cells
-        info_cells[0].text = '生徒氏名'
-        info_cells[1].text = '生徒ID'
-        info_cells[2].text = '学年・教室'
-        info_cells[3].text = 'テスト実施日'
-        
-        # データ行
-        data_cells = info_table.rows[1].cells
-        data_cells[0].text = student_info['name']
-        data_cells[1].text = student_info['id']
-        data_cells[2].text = f"{student_info['grade']}年生 {student_info['classroom_name']}"
-        data_cells[3].text = f"2025-07-15"  # テスト実施日
-        
-        # テーブルのスタイル設定
-        for row in info_table.rows:
-            for cell in row.cells:
-                cell.paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
-                for paragraph in cell.paragraphs:
-                    for run in paragraph.runs:
-                        run.font.size = Pt(11)
-        
-        doc.add_paragraph()  # 空行
-        
-        # 科目別結果
-        subjects = report_data.get('subjects', {})
-        
-        for subject_code, subject_data in subjects.items():
-            if 'math' in subject_code.lower() or '算数' in subject_data.get('name', ''):
-                # 算数のみ表示（小学生）
-                create_a4_subject_section(doc, subject_data)
-            elif subject_data.get('name') == '国語':
-                # 国語も表示
-                create_a4_subject_section(doc, subject_data)
-        
-        # 総合コメント欄
-        doc.add_paragraph()
-        comment_header = doc.add_heading('総合所見', level=2)
-        comment_header.runs[0].font.color.rgb = RGBColor(31, 73, 125)
-        comment_header.runs[0].font.size = Pt(14)
-        
-        # コメントテーブル
-        comment_table = doc.add_table(rows=1, cols=1)
-        comment_table.style = 'Light Grid Accent 1'
-        comment_cell = comment_table.cell(0, 0)
-        
-        # 各科目のコメントを統合
-        all_comments = []
-        for subject_data in subjects.values():
-            if subject_data.get('comment'):
-                all_comments.append(f"【{subject_data['name']}】{subject_data['comment']}")
-        
-        comment_text = '\n\n'.join(all_comments) if all_comments else "よく頑張りました。引き続き学習を継続してください。"
-        
-        # コメントを段落として追加
-        comment_paragraph = comment_cell.paragraphs[0]
-        comment_run = comment_paragraph.add_run(comment_text)
-        comment_run.font.size = Pt(10)
-        comment_paragraph.alignment = WD_ALIGN_PARAGRAPH.LEFT
-        
-        # フッター
-        doc.add_paragraph()
-        footer = doc.add_paragraph()
-        footer_run = footer.add_run(f"作成日時: {datetime.now().strftime('%Y年%m月%d日 %H:%M')}")
-        footer_run.font.size = Pt(9)
-        footer_run.font.color.rgb = RGBColor(128, 128, 128)
-        footer.alignment = WD_ALIGN_PARAGRAPH.RIGHT
-        
-        # ファイル保存
-        from django.conf import settings
-        media_reports_dir = os.path.join(settings.MEDIA_ROOT, 'reports')
-        os.makedirs(media_reports_dir, exist_ok=True)
-        
-        filename = f"report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.docx"
-        file_path = os.path.join(media_reports_dir, filename)
-        doc.save(file_path)
-        
-        import stat
-        os.chmod(file_path, stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP | stat.S_IROTH)
-        
-        print(f"A4縦向き帳票生成完了: {file_path}")
-        return file_path
-        
-    except Exception as e:
-        print(f"A4縦向き帳票生成エラー: {str(e)}")
-        import traceback
-        traceback.print_exc()
-        # フォールバック: 古い横向き形式を使用
-        return create_beautiful_word_report(report_data)
+    # 塾別順位計算
+    for school_id, school_students in school_groups.items():
+        school_sorted = sorted(school_students, key=lambda x: x['total_score'], reverse=True)
 
+        for student_data in school_students:
+            student = student_data['student']
+            total_score = student_data['total_score']
+
+            school_rank = 1
+            for other_data in school_sorted:
+                if other_data['total_score'] > total_score:
+                    school_rank += 1
+                else:
+                    break
+
+            rankings_data[student.id]['school_rank'] = school_rank
+            rankings_data[student.id]['school_total'] = len(school_sorted)
+
+    # 学年順位計算
+    for grade, grade_students in grade_groups.items():
+        grade_sorted = sorted(grade_students, key=lambda x: x['total_score'], reverse=True)
+
+        for student_data in grade_students:
+            student = student_data['student']
+            total_score = student_data['total_score']
+
+            grade_rank = 1
+            for other_data in grade_sorted:
+                if other_data['total_score'] > total_score:
+                    grade_rank += 1
+                else:
+                    break
+
+            rankings_data[student.id]['grade_rank'] = grade_rank
+            rankings_data[student.id]['grade_total'] = len(grade_sorted)
+
+    return rankings_data
 def create_beautiful_word_report(report_data):
     """
     美しいデザインのWordレポートを生成
@@ -1250,279 +717,6 @@ def create_beautiful_word_report(report_data):
         traceback.print_exc()
         raise e
 
-# 既存のコードとの互換性のためのエイリアス
-def generate_word_report(report_data):
-    """既存コードとの互換性のため、新しい美しい帳票生成関数を呼び出す"""
-    return create_beautiful_word_report(report_data)
-
-def create_subject_section(cell, subject_data):
-    """
-    科目別セクションを作成
-    """
-    try:
-        from docx.shared import Pt, RGBColor
-        from docx.enum.text import WD_ALIGN_PARAGRAPH
-        
-        # 科目名ヘッダー
-        subject_header = cell.add_paragraph()
-        subject_run = subject_header.add_run(subject_data['name'])
-        subject_run.font.size = Pt(16)
-        subject_run.font.bold = True
-        subject_run.font.color.rgb = RGBColor(31, 73, 125)
-        subject_header.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        
-        # 得点サマリー
-        summary_p = cell.add_paragraph()
-        summary_run = summary_p.add_run(
-            f"得点: {subject_data['total_score']}/{subject_data['max_score']}点 "
-            f"(平均: {subject_data['average_score']}点)"
-        )
-        summary_run.font.size = Pt(14)
-        summary_run.font.bold = True
-        summary_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        
-        # 順位情報
-        rank_p = cell.add_paragraph()
-        rank_run = rank_p.add_run(
-            f"全国順位: {subject_data['national_rank']}/{subject_data['total_students']}位"
-        )
-        rank_run.font.size = Pt(12)
-        rank_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        
-        # 大問別詳細
-        if subject_data.get('question_scores'):
-            cell.add_paragraph()
-            detail_header = cell.add_paragraph()
-            detail_run = detail_header.add_run('大問別得点')
-            detail_run.font.size = Pt(12)
-            detail_run.font.bold = True
-            detail_run.font.color.rgb = RGBColor(68, 114, 196)  # 青色
-            
-            # 大問別得点を表形式で表示
-            question_table = cell.add_table(rows=len(subject_data['question_scores']) + 1, cols=3)
-            question_table.style = 'Light Grid Accent 1'
-            
-            # ヘッダー行
-            header_cells = question_table.rows[0].cells
-            header_cells[0].text = '大問'
-            header_cells[1].text = '得点'
-            header_cells[2].text = '平均'
-            
-            for header_cell in header_cells:
-                for paragraph in header_cell.paragraphs:
-                    for run in paragraph.runs:
-                        run.font.bold = True
-                        run.font.size = Pt(9)
-                    paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
-            
-            # データ行
-            for i, q in enumerate(subject_data['question_scores']):
-                # question_averagesはリスト形式なので、question_numberで検索
-                q_avg = 0
-                question_averages = subject_data.get('question_averages', [])
-                for avg_data in question_averages:
-                    if avg_data.get('question_number') == q['question_number']:
-                        q_avg = avg_data.get('average', 0)
-                        break
-                
-                data_cells = question_table.rows[i + 1].cells
-                data_cells[0].text = f"{q.get('title', f'第{q['question_number']}問')}"
-                data_cells[1].text = f"{q['score']}/{q['max_score']}"
-                data_cells[2].text = f"{q_avg:.1f}"
-                
-                for data_cell in data_cells:
-                    for paragraph in data_cell.paragraphs:
-                        for run in paragraph.runs:
-                            run.font.size = Pt(9)
-                        paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        
-    except Exception as e:
-        print(f"科目セクション作成エラー: {str(e)}")
-
-def create_a4_subject_section(doc, subject_data):
-    """
-    A4縦向き用の科目別セクションを作成（グラフ付き）
-    """
-    try:
-        from docx.shared import Pt, RGBColor, Cm
-        from docx.enum.text import WD_ALIGN_PARAGRAPH
-        from docx.enum.table import WD_TABLE_ALIGNMENT
-        import matplotlib.pyplot as plt
-        import matplotlib
-        matplotlib.use('Agg')
-        import numpy as np
-        import os
-        from django.conf import settings
-        
-        # 科目名ヘッダー（コンパクト化）
-        subject_header = doc.add_heading(subject_data['name'], level=2)
-        subject_header.runs[0].font.color.rgb = RGBColor(31, 73, 125)
-        subject_header.runs[0].font.size = Pt(14)  # サイズ縮小
-        
-        # メイン統計テーブル
-        stats_table = doc.add_table(rows=3, cols=4)
-        stats_table.style = 'Light Grid Accent 1'
-        
-        # ヘッダー行
-        headers = ['項目', '得点', '順位', '偏差値']
-        for i, header in enumerate(headers):
-            cell = stats_table.cell(0, i)
-            cell.text = header
-            cell.paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
-            for run in cell.paragraphs[0].runs:
-                run.font.bold = True
-                run.font.size = Pt(11)
-        
-        # 全国データ行
-        row1_cells = stats_table.rows[1].cells
-        row1_cells[0].text = '全国'
-        row1_cells[1].text = f"{subject_data['total_score']}/{subject_data['max_score']}点 (平均{subject_data['average_score']}点)"
-        row1_cells[2].text = f"{subject_data['national_rank']}/{subject_data['total_students']}位"
-        row1_cells[3].text = f"{subject_data['national_deviation']}"
-        
-        # 塾内データ行
-        row2_cells = stats_table.rows[2].cells
-        row2_cells[0].text = '塾内'
-        row2_cells[1].text = f"{subject_data['total_score']}/{subject_data['max_score']}点 (平均{subject_data['school_average']}点)"
-        row2_cells[2].text = f"{subject_data['school_rank']}/{subject_data['school_total']}位"
-        row2_cells[3].text = f"{subject_data['school_deviation']}"
-        
-        # テーブルの中央揃え
-        for row in stats_table.rows[1:]:
-            for cell in row.cells:
-                cell.paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
-                for run in cell.paragraphs[0].runs:
-                    run.font.size = Pt(10)
-        
-        # 大問別詳細テーブル
-        if subject_data.get('question_scores'):
-            doc.add_paragraph()
-            detail_header = doc.add_paragraph()
-            detail_run = detail_header.add_run('大問別得点詳細')
-            detail_run.font.size = Pt(11)  # サイズ縮小
-            detail_run.font.bold = True
-            detail_run.font.color.rgb = RGBColor(68, 114, 196)
-            
-            question_table = doc.add_table(rows=len(subject_data['question_scores']) + 1, cols=4)
-            question_table.style = 'Light List Accent 1'
-            
-            # ヘッダー行
-            q_headers = ['大問', 'タイトル', '得点', '平均点']
-            for i, header in enumerate(q_headers):
-                cell = question_table.cell(0, i)
-                cell.text = header
-                cell.paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
-                for run in cell.paragraphs[0].runs:
-                    run.font.bold = True
-                    run.font.size = Pt(10)
-            
-            # データ行
-            for i, q in enumerate(subject_data['question_scores']):
-                q_avg = 0
-                question_averages = subject_data.get('question_averages', [])
-                for avg_data in question_averages:
-                    if avg_data.get('question_number') == q['question_number']:
-                        q_avg = avg_data.get('average', 0)
-                        break
-                
-                data_cells = question_table.rows[i + 1].cells
-                data_cells[0].text = f"第{q['question_number']}問"
-                data_cells[1].text = f"{q.get('title', '')}"
-                data_cells[2].text = f"{q['score']}/{q['max_score']}"
-                data_cells[3].text = f"{q_avg:.1f}"
-                
-                for cell in data_cells:
-                    cell.paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
-                    for run in cell.paragraphs[0].runs:
-                        run.font.size = Pt(9)
-            
-            # レーダーチャート生成（大問数に応じて）
-            if len(subject_data['question_scores']) >= 3:
-                create_radar_chart(doc, subject_data)
-            
-            # 棒グラフ生成
-            create_bar_chart(doc, subject_data)
-        
-        doc.add_paragraph()  # 空行
-        
-    except Exception as e:
-        print(f"A4科目セクション作成エラー: {str(e)}")
-        import traceback
-        traceback.print_exc()
-
-def create_radar_chart(doc, subject_data):
-    """
-    大問別成績のレーダーチャートを生成してWordに挿入
-    """
-    try:
-        import matplotlib.pyplot as plt
-        import matplotlib
-        matplotlib.use('Agg')
-        import numpy as np
-        import os
-        from django.conf import settings
-        from docx.shared import Cm
-        from docx.enum.text import WD_ALIGN_PARAGRAPH
-        
-        # 日本語フォント設定
-        matplotlib.rcParams['font.family'] = ['DejaVu Sans', 'Hiragino Sans', 'Yu Gothic', 'Meiryo', 'Takao', 'IPAexGothic', 'IPAPGothic', 'VL PGothic', 'Noto Sans CJK JP']
-        
-        # データ準備
-        questions = subject_data['question_scores']
-        if len(questions) < 3:
-            return
-        
-        categories = [f"大問{q['question_number']}" for q in questions]
-        scores = [(q['score'] / q['max_score']) * 100 for q in questions]  # パーセンテージ化
-        
-        # 円形にするため最初の値を最後に追加
-        scores += scores[:1]
-        categories += categories[:1]
-        
-        # 角度計算
-        N = len(categories) - 1
-        angles = [n / float(N) * 2 * np.pi for n in range(N)]
-        angles += angles[:1]
-        
-        # グラフ作成
-        fig, ax = plt.subplots(figsize=(6, 6), subplot_kw=dict(projection='polar'))
-        ax.plot(angles, scores, 'o-', linewidth=2, label='得点率', color='#1f73b5')
-        ax.fill(angles, scores, alpha=0.25, color='#1f73b5')
-        
-        # 軸設定
-        ax.set_xticks(angles[:-1])
-        ax.set_xticklabels(categories[:-1])
-        ax.set_ylim(0, 100)
-        ax.set_yticks([20, 40, 60, 80, 100])
-        ax.set_yticklabels(['20%', '40%', '60%', '80%', '100%'])
-        ax.grid(True)
-        
-        # タイトル
-        plt.title(f'{subject_data["name"]} 大問別成績レーダーチャート', size=12, color='#1f73b5', y=1.1)
-        
-        # 保存
-        media_reports_dir = os.path.join(settings.MEDIA_ROOT, 'reports')
-        os.makedirs(media_reports_dir, exist_ok=True)
-        chart_path = os.path.join(media_reports_dir, f'radar_{subject_data["name"]}_{np.random.randint(1000, 9999)}.png')
-        
-        plt.savefig(chart_path, dpi=150, bbox_inches='tight')
-        plt.close()
-        
-        # Wordに挿入
-        paragraph = doc.add_paragraph()
-        run = paragraph.runs[0] if paragraph.runs else paragraph.add_run()
-        run.add_picture(chart_path, width=Cm(10))  # チャートサイズ縮小
-        paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        
-        # 一時ファイル削除
-        try:
-            os.remove(chart_path)
-        except:
-            pass
-            
-    except Exception as e:
-        print(f"レーダーチャート生成エラー: {str(e)}")
-
 def create_bar_chart(doc, subject_data):
     """
     得点と平均点の比較棒グラフを生成してWordに挿入
@@ -1596,310 +790,6 @@ def create_bar_chart(doc, subject_data):
             
     except Exception as e:
         print(f"棒グラフ生成エラー: {str(e)}")
-
-def set_cell_background(cell, color):
-    """
-    セルの背景色を設定
-    """
-    # 背景色設定は複雑なため、現在はスキップ
-    # 報告書の機能性に影響しないため、このままでOK
-    pass
-
-def create_beautiful_pdf_report(report_data):
-    """
-    美しいデザインのPDFレポートを生成 A3横向きサイズで見やすいレイアウト
-    """
-    try:
-        import os
-        from datetime import datetime
-        from reportlab.pdfgen import canvas
-        from reportlab.lib.pagesizes import A3, landscape
-        from reportlab.lib.units import mm
-        from reportlab.lib.colors import HexColor, Color
-        from reportlab.pdfbase import pdfutils
-        from reportlab.pdfbase.ttfonts import TTFont
-        from reportlab.pdfbase import pdfmetrics
-        from django.conf import settings
-        
-        # レポートディレクトリの作成
-        media_root = getattr(settings, 'MEDIA_ROOT', '/tmp')
-        reports_dir = os.path.join(media_root, 'reports')
-        os.makedirs(reports_dir, exist_ok=True)
-        
-        # ファイル名生成
-        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        filename = f'report_{timestamp}.pdf'
-        file_path = os.path.join(reports_dir, filename)
-        
-        # A3横向きキャンバス作成
-        page_width, page_height = landscape(A3)
-        c = canvas.Canvas(file_path, pagesize=landscape(A3))
-        
-        # 日本語フォント設定（CIDフォントを使用）  
-        japanese_font = 'Helvetica'  # デフォルトはHelvetica
-        try:
-            from reportlab.pdfbase.cidfonts import UnicodeCIDFont
-            # HeiseiKakuGo-W5フォント（日本語対応）
-            pdfmetrics.registerFont(UnicodeCIDFont('HeiseiKakuGo-W5'))
-            japanese_font = 'HeiseiKakuGo-W5'
-            print('HeiseiKakuGo-W5フォント登録成功')
-        except Exception as e:
-            print(f'日本語フォント登録失敗: {e}')
-            try:
-                from reportlab.pdfbase.cidfonts import UnicodeCIDFont
-                pdfmetrics.registerFont(UnicodeCIDFont('HeiseiMin-W3'))
-                japanese_font = 'HeiseiMin-W3'
-                print('HeiseiMin-W3フォント登録成功')
-            except Exception as e2:
-                print(f'HeiseiMin-W3フォント登録失敗: {e2}')
-                print('Helveticaフォントを使用')
-        
-        # カラーパレット
-        primary_blue = HexColor('#1f497d')
-        light_blue = HexColor('#bdd7ee')
-        gray = HexColor('#808080')
-        light_gray = HexColor('#f8f8f8')
-        
-        # データ抽出
-        student_info = report_data.get('student_info', {})
-        test_info = report_data.get('test_info', {})
-        subject_results = report_data.get('subject_results', {})
-        
-        # デバッグ情報
-        print(f'PDF生成データ確認:')
-        print(f'  student_info: {student_info}')
-        print(f'  test_info: {test_info}')
-        print(f'  subject_results: {subject_results}')
-        
-        # ヘッダー
-        c.setFont(japanese_font, 24)
-        c.setFillColor(primary_blue)
-        c.drawString(50*mm, page_height - 30*mm, '個別成績表')
-        
-        # 生徒情報
-        y_pos = page_height - 50*mm
-        c.setFont(japanese_font, 14)
-        c.setFillColor(Color(0, 0, 0))
-        
-        student_info_list = [
-            f"生徒名: {student_info.get('name', 'N/A')}",
-            f"生徒ID: {student_info.get('id', 'N/A')}",
-            f"学年: {student_info.get('grade', 'N/A')}",
-            f"クラス: {student_info.get('classroom_name', 'N/A')}",
-            f"テスト期間: {test_info.get('year', 'N/A')}年度 {test_info.get('period', 'N/A')}"
-        ]
-        
-        for info in student_info_list:
-            c.drawString(50*mm, y_pos, info)
-            y_pos -= 8*mm
-        
-        # 科目別成績表（2列レイアウト）
-        y_pos -= 10*mm
-        c.setFont(japanese_font, 16)
-        c.setFillColor(primary_blue)
-        c.drawString(50*mm, y_pos, '科目別成績')
-        
-        y_pos -= 20*mm
-        
-        # 左右に分けて科目を表示
-        left_x = 50*mm  # 左側（算数/数学）
-        right_x = 220*mm  # 右側（国語/英語）
-        column_width = 150*mm
-        
-        # 科目を分類
-        math_subjects = []
-        language_subjects = []
-        
-        if subject_results:
-            for subject, data in subject_results.items():
-                if '算数' in subject or '数学' in subject or 'math' in subject.lower():
-                    math_subjects.append((subject, data))
-                else:  # 国語、英語など
-                    language_subjects.append((subject, data))
-        
-        # 左側：算数/数学
-        c.setFont(japanese_font, 14)
-        c.setFillColor(primary_blue)
-        c.drawString(left_x, y_pos, '算数・数学')
-        
-        y_left = y_pos - 15*mm
-        y_left = draw_subject_section(c, japanese_font, math_subjects, left_x, y_left, column_width, light_blue, light_gray, primary_blue)
-        
-        # 右側：国語/英語
-        c.setFillColor(primary_blue)
-        c.drawString(right_x, y_pos, '国語・英語')
-        
-        y_right = y_pos - 15*mm
-        y_right = draw_subject_section(c, japanese_font, language_subjects, right_x, y_right, column_width, light_blue, light_gray, primary_blue)
-        
-        # Y座標を調整（両方のセクションが終わったところまで）
-        y_pos = min(y_left, y_right) - 20*mm
-        
-        # 総合成績
-        y_pos -= 10*mm
-        c.setFont(japanese_font, 16)
-        c.setFillColor(primary_blue)
-        c.drawString(50*mm, y_pos, '総合成績')
-        
-        y_pos -= 15*mm
-        c.setFont(japanese_font, 14)
-        c.setFillColor(Color(0, 0, 0))
-        
-        combined_results = report_data.get('combined_results', {})
-        total_info = [
-            f"合計点: {combined_results.get('total_score', 'N/A')}点",
-            f"学年順位: {combined_results.get('grade_rank', 'N/A')}位 / {combined_results.get('grade_total', 'N/A')}名",
-            f"塾内順位: {combined_results.get('school_rank', 'N/A')}位 / {combined_results.get('school_total', 'N/A')}名"
-        ]
-        
-        for info in total_info:
-            c.drawString(50*mm, y_pos, info)
-            y_pos -= 10*mm
-        
-        # フッター
-        c.setFont(japanese_font, 10)
-        c.setFillColor(gray)
-        c.drawString(50*mm, 20*mm, f"作成日時: {datetime.now().strftime('%Y年%m月%d日 %H:%M')}")
-        
-        # PDF保存
-        c.save()
-        
-        # ファイル権限設定
-        os.chmod(file_path, 0o644)
-        
-        print(f"PDF帳票生成完了: {file_path}")
-        
-        return {
-            'success': True,
-            'download_url': f'/media/reports/{filename}',
-            'filename': f"{student_info.get('name', 'report')}_{test_info.get('year', '')}年度{test_info.get('period', '')}.pdf",
-            'student_name': student_info.get('name', 'N/A'),
-            'file_path': file_path
-        }
-        
-    except Exception as e:
-        print(f"PDF帳票生成エラー: {str(e)}")
-        import traceback
-        traceback.print_exc()
-        return create_fallback_text_report(report_data)
-
-def create_fallback_text_report(report_data):
-    """
-    python-docxが利用できない場合のフォールバック
-    シンプルなテキストファイルを生成
-    """
-    try:
-        import tempfile
-        import os
-        from datetime import datetime
-        from django.conf import settings
-        
-        # メディアディレクトリに保存
-        media_reports_dir = os.path.join(settings.MEDIA_ROOT, 'reports')
-        os.makedirs(media_reports_dir, exist_ok=True)
-        
-        filename = f"report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
-        file_path = os.path.join(media_reports_dir, filename)
-        
-        student_info = report_data['student_info']
-        test_info = report_data['test_info']
-        
-        with open(file_path, 'w', encoding='utf-8') as f:
-            f.write("=" * 50 + "\n")
-            f.write("個別成績表\n")
-            f.write("=" * 50 + "\n\n")
-            
-            f.write(f"生徒氏名: {student_info['name']}\n")
-            f.write(f"生徒ID: {student_info['id']}\n")
-            f.write(f"学年・教室: {student_info['grade']} {student_info['classroom_name']}\n")
-            f.write(f"テスト実施日: {test_info.get('date', '')}\n\n")
-            
-            subjects = report_data.get('subjects', {})
-            for subject_code, subject_data in subjects.items():
-                f.write("-" * 30 + "\n")
-                f.write(f"{subject_data['name']}\n")
-                f.write("-" * 30 + "\n")
-                f.write(f"得点: {subject_data['total_score']}/{subject_data['max_score']}点\n")
-                f.write(f"平均: {subject_data['average_score']}点\n")
-                f.write(f"全国順位: {subject_data['national_rank']}/{subject_data['total_students']}位\n\n")
-                
-                if subject_data.get('question_scores'):
-                    f.write("大問別得点:\n")
-                    for q in subject_data['question_scores']:
-                        q_avg = subject_data.get('question_averages', {}).get(q['question_number'], 0)
-                        f.write(f"  大問{q['question_number']}: {q['score']}/{q['max_score']}点 (平均: {q_avg:.1f}点)\n")
-                    f.write("\n")
-                
-                if subject_data.get('comment'):
-                    f.write(f"コメント: {subject_data['comment']}\n\n")
-            
-            f.write(f"作成日時: {datetime.now().strftime('%Y年%m月%d日 %H:%M')}\n")
-        
-        return file_path
-        
-    except Exception as e:
-        print(f"フォールバックレポート生成エラー: {str(e)}")
-        raise e
-
-def generate_bulk_reports_template(student_ids, year, period, format_type='word'):
-    """
-    一括成績表帳票生成
-    複数の生徒の成績表をZIPファイルにまとめて生成
-    """
-    try:
-        import zipfile
-        import tempfile
-        import os
-        from datetime import datetime
-        
-        # 一時ディレクトリ作成
-        temp_dir = tempfile.mkdtemp()
-        zip_path = os.path.join(temp_dir, f'成績表一括_{year}年度{period}期_{len(student_ids)}名.zip')
-        
-        generated_files = []
-        
-        with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
-            for student_id in student_ids:
-                # 各生徒の個別帳票を生成
-                result = generate_individual_report_template(
-                    student_id=student_id,
-                    year=year,
-                    period=period,
-                    format_type=format_type
-                )
-                
-                if result.get('success'):
-                    # ZIPファイルに追加
-                    from django.conf import settings
-                    file_path = result['download_url'].replace('/media/reports/', '')
-                    zipf.write(
-                        os.path.join(settings.MEDIA_ROOT, 'reports', file_path),
-                        result['filename']
-                    )
-                    generated_files.append(result['filename'])
-        
-        if not generated_files:
-            return {
-                'success': False,
-                'error': '生成できた帳票がありませんでした'
-            }
-        
-        return {
-            'success': True,
-            'download_url': f'/media/reports/{os.path.basename(zip_path)}',
-            'filename': os.path.basename(zip_path),
-            'generated_count': len(generated_files),
-            'total_requested': len(student_ids)
-        }
-        
-    except Exception as e:
-        print(f"一括帳票生成エラー: {str(e)}")
-        import traceback
-        traceback.print_exc()
-        return {
-            'success': False,
-            'error': str(e)
-        }
 
 def generate_word_report_old(report_data):
     """Word形式の成績表を生成（A3横向き二つ折り）"""
@@ -1986,49 +876,6 @@ def generate_word_report_old(report_data):
     except Exception as e:
         print(f"Word帳票生成エラー: {str(e)}")
         raise e
-
-def add_subject_content(cell, subject_data):
-    """教科別コンテンツをセルに追加"""
-    from docx.shared import Pt
-    from docx.enum.text import WD_ALIGN_PARAGRAPH
-    
-    # セル内の段落をクリア
-    cell.text = ""
-    
-    # 教科名
-    p = cell.add_paragraph()
-    run = p.add_run(f"{subject_data['name']} ({subject_data['total_score']}/{subject_data['max_score']}点)")
-    run.bold = True
-    run.font.size = Pt(16)
-    p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    
-    # 順位・平均点
-    cell.add_paragraph(f"全国順位: {subject_data['national_rank']}位 / {subject_data['total_students']}名")
-    cell.add_paragraph(f"全国平均: {subject_data['average_score']}点")
-    
-    # 大問別成績
-    cell.add_paragraph("【大問別成績】")
-    
-    for q_score in subject_data['question_scores']:
-        q_avg = next((qa['average'] for qa in subject_data['question_averages'] 
-                     if qa['question_number'] == q_score['question_number']), 0)
-        cell.add_paragraph(
-            f"大問{q_score['question_number']}: {q_score['score']}/{q_score['max_score']}点 "
-            f"(平均: {q_avg}点)"
-        )
-    
-    # コメント
-    cell.add_paragraph()
-    cell.add_paragraph("【コメント】")
-    cell.add_paragraph(subject_data['comment'])
-
-def generate_excel_report(report_data):
-    """Excel形式の成績表を生成"""
-    # 簡単な実装（Word版を優先）
-    import tempfile
-    temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.xlsx')
-    # TODO: Excel生成の詳細実装
-    return temp_file.name
 
 def get_grade_level_from_student_grade(student_grade):
     """生徒の学年から対応するテスト学年レベルを取得"""
@@ -2412,66 +1259,6 @@ def import_scores_from_excel(file_path, year, period, subject=None, grade_level=
             'error': str(e)
         }
 
-def export_scores_template_by_test(year, period, subject, school_id=None):
-    """
-    指定されたテストの得点エクスポート用テンプレートを生成
-    """
-    try:
-        structure = get_test_template_structure(year, period, subject)
-        if not structure:
-            period_display = {'spring': '春季', 'summer': '夏季', 'winter': '冬季'}.get(period, period)
-            subject_display = {'japanese': '国語', 'math': '算数', 'english': '英語', 'mathematics': '数学'}.get(subject, subject)
-            raise ValidationError(f"{year}年度{period_display}{subject_display}テストが見つかりません")
-        
-        test = structure['test']
-        
-        # 生徒データを取得
-        students_query = Student.objects.all()
-        if school_id:
-            students_query = students_query.filter(classroom__school__school_id=school_id)
-        
-        students = students_query.select_related('classroom').order_by('classroom', 'student_id')
-        
-        if not students.exists():
-            raise ValidationError("対象の生徒が見つかりません")
-        
-        # データを構築
-        data = []
-        for student in students:
-            row = {
-                '生徒ID': student.student_id,
-                '生徒名': student.name,
-                '教室ID': student.classroom.classroom_id,
-                '教室名': student.classroom.name,
-            }
-            
-            total_score = 0
-            for group_info in structure['question_groups']:
-                column_name = f"大問{group_info['group_number']}({group_info['title']})"
-                
-                # 既存の得点があるかチェック
-                try:
-                    score_obj = Score.objects.get(
-                        student=student,
-                        test=test,
-                        question_group_id=group_info['id']
-                    )
-                    score_value = score_obj.score
-                    total_score += score_value
-                except Score.DoesNotExist:
-                    score_value = ''  # 未入力
-                
-                row[column_name] = score_value
-            
-            row['合計点'] = total_score if total_score > 0 else ''
-            data.append(row)
-        
-        df = pd.DataFrame(data)
-        return df
-        
-    except Exception as e:
-        raise ValidationError(str(e))
-
 def generate_unified_score_template(year, period, grade_level):
     """
     指定された学年のすべての教科を含む統合テンプレートを生成
@@ -2583,246 +1370,6 @@ def generate_unified_score_template(year, period, grade_level):
     df = pd.DataFrame(sample_data)
     return df, all_structures
 
-def _format_grade_display(grade):
-    """学年を「小6」「中1」形式で表示する"""
-    if not grade:
-        return '未設定'
-    
-    try:
-        grade_num = int(grade)
-        if 1 <= grade_num <= 6:
-            return f'小{grade_num}'
-        elif 7 <= grade_num <= 9:
-            return f'中{grade_num - 6}'
-        else:
-            return str(grade)
-    except (ValueError, TypeError):
-        return str(grade)
-
-def generate_all_grades_unified_template(year, period):
-    """
-    全学年対応の統合テンプレートを生成（小学生・中学生両方の全教科を含む）
-    """
-    # 利用可能なテストを直接データベースから取得
-    from tests.models import TestDefinition
-    
-    # 2025年夏期のテストを取得
-    tests = TestDefinition.objects.filter(
-        schedule__year=year,
-        schedule__period=period,
-        is_active=True
-    )
-    
-    if not tests.exists():
-        period_display = {'spring': '春季', 'summer': '夏季', 'winter': '冬季'}.get(period, period)
-        raise ValidationError(f"{year}年度{period_display}のテストが見つかりません")
-    
-    # 教科別にテスト構造を取得
-    all_structures = {}
-    
-    # 小学生の国語・算数を探す
-    elementary_japanese = tests.filter(
-        subject='japanese',
-        grade_level__startswith='elementary_'
-    ).first()
-    if elementary_japanese:
-        structure = get_test_template_structure(year, period, 'japanese', elementary_japanese.grade_level)
-        if structure:
-            all_structures['japanese_elementary'] = structure
-    
-    elementary_math = tests.filter(
-        subject='math',
-        grade_level__startswith='elementary_'
-    ).first()
-    if elementary_math:
-        structure = get_test_template_structure(year, period, 'math', elementary_math.grade_level)
-        if structure:
-            all_structures['math_elementary'] = structure
-    
-    # 中学生の英語・数学を探す（存在する場合）
-    middle_english = tests.filter(
-        subject='english',
-        grade_level__startswith='middle_'
-    ).first()
-    if middle_english:
-        structure = get_test_template_structure(year, period, 'english', middle_english.grade_level)
-        if structure:
-            all_structures['english_middle'] = structure
-    
-    middle_mathematics = tests.filter(
-        subject='mathematics',
-        grade_level__startswith='middle_'
-    ).first()
-    if middle_mathematics:
-        structure = get_test_template_structure(year, period, 'mathematics', middle_mathematics.grade_level)
-        if structure:
-            all_structures['mathematics_middle'] = structure
-    
-    if not all_structures:
-        period_display = {'spring': '春季', 'summer': '夏季', 'winter': '冬季'}.get(period, period)
-        raise ValidationError(f"{year}年度{period_display}のテストが見つかりません")
-    
-    # 基本情報列（生徒登録と同じ形式）
-    columns = [
-        '塾ID', '塾名', '教室ID', '教室名', 
-        '生徒ID', '生徒名', '学年', '年度', '期間',
-        '出席'  # 出席状況
-    ]
-    
-    # 各教科の大問ごとの列を追加
-    subject_mapping = {
-        'japanese_elementary': '国語',
-        'math_elementary': '算数', 
-        'english_middle': '英語',
-        'mathematics_middle': '数学'
-    }
-    
-    for subject_key, structure in all_structures.items():
-        subject_display = subject_mapping.get(subject_key, subject_key)
-        
-        for group in structure['question_groups']:
-            column_name = f"{subject_display}_大問{group['group_number']}"
-            columns.append(column_name)
-        
-        # 教科別合計点列
-        total_column = f"{subject_display}_合計点"
-        columns.append(total_column)
-    
-    # 全体合計点列
-    columns.append('全体合計点')
-    
-    # サンプルデータ
-    sample_data = {col: [] for col in columns}
-    
-    # 期間表示を変換
-    period_display_jp = {'spring': '春期', 'summer': '夏期', 'winter': '冬期'}.get(period, period)
-    
-    # 実際の生徒データを取得
-    from students.models import Student
-    from scores.models import Score
-    
-    # 指定年度・期間の生徒を取得（StudentEnrollment経由）
-    from students.models import StudentEnrollment
-    
-    # 該当期間の受講者を取得
-    enrollments = StudentEnrollment.objects.filter(
-        year=year,
-        period=period,
-        is_active=True
-    ).select_related('student', 'student__classroom', 'student__classroom__school')
-    
-    # 生徒のリストを作成
-    students = [enrollment.student for enrollment in enrollments if enrollment.student.is_active]
-    
-    if students:
-        # 実際の生徒データを使用
-        for student in students:
-            # 学年表示を変換
-            grade_display = _format_grade_display(student.grade)
-            
-            sample_data['塾ID'].append(student.classroom.school.school_id)
-            sample_data['塾名'].append(student.classroom.school.name)
-            sample_data['教室ID'].append(student.classroom.classroom_id)
-            sample_data['教室名'].append(student.classroom.name)
-            sample_data['生徒ID'].append(student.student_id)
-            sample_data['生徒名'].append(student.name)
-            sample_data['学年'].append(grade_display)
-            sample_data['年度'].append(str(year))
-            sample_data['期間'].append(period_display_jp)
-            sample_data['出席'].append('')  # 初期値は空
-            
-            overall_total = 0
-            
-            # 各教科の既存スコアを取得
-            for subject_key, structure in all_structures.items():
-                subject_display = subject_mapping.get(subject_key, subject_key)
-                subject_total = 0
-                
-                # この生徒がこの教科を受講するかどうか判定
-                is_elementary = student.grade and student.grade.startswith('小')
-                should_include = False
-                if is_elementary and subject_key.endswith('_elementary'):
-                    should_include = True
-                elif not is_elementary and subject_key.endswith('_middle'):
-                    should_include = True
-                
-                for group in structure['question_groups']:
-                    column_name = f"{subject_display}_大問{group['group_number']}"
-                    
-                    if should_include:
-                        # 既存スコアを探す
-                        try:
-                            from tests.models import QuestionGroup
-                            question_group = QuestionGroup.objects.get(
-                                test=structure['test'],
-                                group_number=group['group_number']
-                            )
-                            score_obj = Score.objects.get(
-                                student=student,
-                                test=structure['test'],
-                                question_group=question_group
-                            )
-                            score_value = score_obj.score
-                            subject_total += score_value
-                        except (Score.DoesNotExist, QuestionGroup.DoesNotExist):
-                            score_value = ''  # スコア未入力
-                        
-                        sample_data[column_name].append(score_value)
-                    else:
-                        # 該当しない学年の場合は空欄
-                        sample_data[column_name].append('')
-                
-                # 教科別合計点
-                total_column = f"{subject_display}_合計点"
-                if should_include and subject_total > 0:
-                    sample_data[total_column].append(subject_total)
-                    overall_total += subject_total
-                else:
-                    sample_data[total_column].append('')
-            
-            # 全体合計点
-            sample_data['全体合計点'].append(overall_total if overall_total > 0 else '')
-    else:
-        # 生徒が存在しない場合はサンプル行を追加
-        sample_names = ['田中太郎', '佐藤花子', '鈴木次郎']
-        sample_grades = ['小6', '小5', '小4']
-        
-        for i in range(3):
-            sample_data['塾ID'].append('100001')
-            sample_data['塾名'].append('サンプル学習塾')
-            sample_data['教室ID'].append('001001')
-            sample_data['教室名'].append('メイン教室')
-            sample_data['生徒ID'].append(f'{123456 + i}')
-            sample_data['生徒名'].append(sample_names[i])
-            sample_data['学年'].append(sample_grades[i])
-            sample_data['年度'].append(str(year))
-            sample_data['期間'].append(period_display_jp)
-            sample_data['出席'].append('')
-            
-            # 各教科は空欄で初期化
-            for subject_key, structure in all_structures.items():
-                subject_display = subject_mapping.get(subject_key, subject_key)
-                
-                for group in structure['question_groups']:
-                    column_name = f"{subject_display}_大問{group['group_number']}"
-                    sample_data[column_name].append('')
-                
-                total_column = f"{subject_display}_合計点"
-                sample_data[total_column].append('')
-            
-            sample_data['全体合計点'].append('')
-    
-    # 空行を追加（データ入力用）
-    for _ in range(3):
-        for col in columns:
-            if col in ['年度', '期間']:
-                sample_data[col].append(str(year) if col == '年度' else period_display_jp)
-            else:
-                sample_data[col].append('')
-    
-    df = pd.DataFrame(sample_data)
-    return df, all_structures
-
 def get_available_tests():
     """
     利用可能なテスト一覧を取得
@@ -2843,56 +1390,6 @@ def get_available_tests():
         })
     
     return available_tests
-
-def calculate_and_save_test_summary_by_school_type(year, period, school_type):
-    """
-    学校種別（小学生・中学生）でテスト結果を集計して保存
-    """
-    try:
-        from tests.models import TestDefinition
-        from students.models import Student
-        from scores.models import TestResult
-        from django.db.models import Avg, Count, Q
-        
-        # 学校種別に応じて対象科目を決定
-        if school_type == 'elementary':
-            target_subjects = ['japanese', 'math']  # 国語、算数
-            grade_filter = Q(grade__startswith='elementary_')
-        elif school_type == 'middle':
-            target_subjects = ['english', 'mathematics']  # 英語、数学
-            grade_filter = Q(grade__startswith='middle_')
-        else:
-            return {'success': False, 'error': '無効な学校種別です'}
-        
-        # 対象テストを取得
-        tests = TestDefinition.objects.filter(
-            schedule__year=year,
-            schedule__period=period,
-            subject__in=target_subjects
-        )
-        
-        if not tests.exists():
-            return {'success': False, 'error': f'{year}年度{period}期の{school_type}テストが見つかりません'}
-        
-        # 対象学年のテスト結果を取得
-        total_students = TestResult.objects.filter(
-            test__in=tests
-        ).values('student').distinct().count()
-        
-        # 参加している塾数を取得
-        schools_count = TestResult.objects.filter(
-            test__in=tests
-        ).values('student__classroom__school').distinct().count()
-        
-        return {
-            'success': True,
-            'total_students': total_students,
-            'schools_count': schools_count,
-            'school_type': school_type
-        }
-        
-    except Exception as e:
-        return {'success': False, 'error': str(e)}
 
 def get_test_summary_by_school_type(year, period, school_type):
     """
@@ -2935,153 +1432,6 @@ def recalculate_test_results_for_test(test, grade=None):
         results.append(result)
     
     return results
-
-def calculate_and_save_test_summary(year, period, subject, grade_level=None):
-    """
-    テスト集計を実行してデータベースに保存
-    """
-    from .models import TestSummary, SchoolTestSummary, TestResult
-    from tests.models import TestDefinition
-    from students.models import Student
-    from schools.models import School
-    from django.db.models import Avg, Count
-    from decimal import Decimal
-    import json
-    
-    try:
-        # 指定されたテストを取得
-        query = TestDefinition.objects.filter(
-            schedule__year=year,
-            schedule__period=period,
-            subject=subject
-        )
-        
-        if grade_level:
-            query = query.filter(grade_level=grade_level)
-        
-        test = query.first()
-        if not test:
-            return {'success': False, 'error': 'テストが見つかりません'}
-        
-        # テスト結果を取得
-        results = TestResult.objects.filter(test=test).select_related('student', 'student__classroom__school')
-        
-        if not results.exists():
-            return {'success': False, 'error': 'テスト結果が見つかりません'}
-        
-        # 全体統計を計算
-        total_students = results.count()
-        avg_score = results.aggregate(avg=Avg('total_score'))['avg'] or 0
-        avg_correct_rate = results.aggregate(avg=Avg('correct_rate'))['avg'] or 0
-        
-        # 学年別統計を計算
-        grade_stats = {}
-        for grade in range(1, 7):  # 1年生〜6年生
-            grade_results = results.filter(student__grade=grade)
-            if grade_results.exists():
-                grade_avg = grade_results.aggregate(avg=Avg('total_score'))['avg'] or 0
-                grade_correct_rate = grade_results.aggregate(avg=Avg('correct_rate'))['avg'] or 0
-                grade_stats[str(grade)] = {
-                    'count': grade_results.count(),
-                    'average_score': float(grade_avg),
-                    'average_correct_rate': float(grade_correct_rate)
-                }
-        
-        # 塾別統計を計算
-        school_stats = {}
-        schools = School.objects.filter(
-            classrooms__students__test_results__test=test
-        ).distinct()
-        
-        school_rankings = []
-        for school in schools:
-            school_results = results.filter(student__classroom__school=school)
-            if school_results.exists():
-                school_avg = school_results.aggregate(avg=Avg('total_score'))['avg'] or 0
-                school_correct_rate = school_results.aggregate(avg=Avg('correct_rate'))['avg'] or 0
-                
-                # 学年別詳細
-                grade_details = {}
-                for grade in range(1, 7):
-                    grade_school_results = school_results.filter(student__grade=grade)
-                    if grade_school_results.exists():
-                        grade_details[str(grade)] = {
-                            'count': grade_school_results.count(),
-                            'average_score': float(grade_school_results.aggregate(avg=Avg('total_score'))['avg'] or 0),
-                            'students': [
-                                {
-                                    'name': r.student.name,
-                                    'student_id': r.student.student_id,
-                                    'classroom_name': r.student.classroom.name,
-                                    'total_score': r.total_score,
-                                    'correct_rate': float(r.correct_rate),
-                                    'school_rank': r.school_rank,
-                                    'national_rank': r.national_rank
-                                }
-                                for r in grade_school_results.order_by('-total_score')
-                            ]
-                        }
-                
-                school_data = {
-                    'school_id': school.school_id,
-                    'school_name': school.name,
-                    'count': school_results.count(),
-                    'average_score': float(school_avg),
-                    'average_correct_rate': float(school_correct_rate),
-                    'grade_details': grade_details
-                }
-                
-                school_stats[school.school_id] = school_data
-                school_rankings.append((school, float(school_avg), school_data))
-        
-        # 塾を平均点でソート
-        school_rankings.sort(key=lambda x: x[1], reverse=True)
-        
-        # TestSummaryを作成または更新
-        test_summary, created = TestSummary.objects.update_or_create(
-            test=test,
-            defaults={
-                'year': year,
-                'period': period,
-                'subject': subject,
-                'total_students': total_students,
-                'average_score': Decimal(str(avg_score)),
-                'average_correct_rate': Decimal(str(avg_correct_rate)),
-                'max_score': test.max_score,
-                'grade_statistics': grade_stats,
-                'school_statistics': school_stats
-            }
-        )
-        
-        # 既存のSchoolTestSummaryを削除
-        SchoolTestSummary.objects.filter(test_summary=test_summary).delete()
-        
-        # SchoolTestSummaryを作成
-        for rank, (school, avg_score, school_data) in enumerate(school_rankings, 1):
-            SchoolTestSummary.objects.create(
-                test_summary=test_summary,
-                school=school,
-                student_count=school_data['count'],
-                average_score=Decimal(str(school_data['average_score'])),
-                average_correct_rate=Decimal(str(school_data['average_correct_rate'])),
-                rank_among_schools=rank,
-                grade_details=school_data['grade_details']
-            )
-        
-        return {
-            'success': True,
-            'test_summary': test_summary,
-            'created': created,
-            'total_students': total_students,
-            'schools_count': len(school_rankings)
-        }
-        
-    except TestDefinition.DoesNotExist:
-        period_display = {'spring': '春季', 'summer': '夏季', 'winter': '冬季'}.get(period, period)
-        subject_display = {'japanese': '国語', 'math': '算数', 'english': '英語', 'mathematics': '数学'}.get(subject, subject)
-        return {'success': False, 'error': f"{year}年度{period_display}{subject_display}のテストが見つかりません"}
-    except Exception as e:
-        return {'success': False, 'error': str(e)}
 
 def get_test_summary(year, period, subject, grade_level=None):
     """

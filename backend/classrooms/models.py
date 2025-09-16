@@ -182,39 +182,91 @@ class AttendanceRecord(models.Model):
         return f"{self.classroom.name} - {self.student_name} ({self.year}年度 {self.get_period_display()})"
 
 
-class BillingReport(models.Model):
-    """課金レポート（集計用）"""
+# BillingReport（教室ベース）は廃止 - 塾ベースのSchoolBillingReportに統一
+# class BillingReport(models.Model):
+#     """課金レポート（集計用）"""
+#     PERIOD_CHOICES = [
+#         ('spring', '春期'),
+#         ('summer', '夏期'),
+#         ('winter', '冬期'),
+#     ]
+#
+#     classroom = models.ForeignKey(Classroom, on_delete=models.CASCADE, verbose_name='教室')
+#     year = models.IntegerField(verbose_name='年度')
+#     period = models.CharField(max_length=10, choices=PERIOD_CHOICES, verbose_name='期')
+#
+#     # 集計情報
+#     total_students = models.IntegerField(default=0, verbose_name='総生徒数')
+#     billed_students = models.IntegerField(default=0, verbose_name='課金対象生徒数')
+#     price_per_student = models.IntegerField(verbose_name='単価（円）')
+#     total_amount = models.IntegerField(default=0, verbose_name='合計金額（円）')
+#
+#     # 詳細情報（JSON）
+#     student_details = models.JSONField(default=dict, verbose_name='生徒詳細')
+#
+#     generated_at = models.DateTimeField(auto_now_add=True, verbose_name='生成日時')
+#     updated_at = models.DateTimeField(auto_now=True, verbose_name='更新日時')
+#
+#     class Meta:
+#         db_table = 'billing_reports'
+#         verbose_name = '教室別課金レポート（非推奨）'
+#         verbose_name_plural = '教室別課金レポート（非推奨）'
+#         unique_together = ['classroom', 'year', 'period']
+#         indexes = [
+#             models.Index(fields=['year', 'period']),
+#             models.Index(fields=['generated_at']),
+#         ]
+#
+#     def __str__(self):
+#         return f"{self.classroom.name} - {self.year}年度 {self.get_period_display()} - {self.total_amount}円"
+
+
+class SchoolBillingReport(models.Model):
+    """塾ごとの課金レポート（集計用）"""
     PERIOD_CHOICES = [
         ('spring', '春期'),
         ('summer', '夏期'),
         ('winter', '冬期'),
     ]
-    
-    classroom = models.ForeignKey(Classroom, on_delete=models.CASCADE, verbose_name='教室')
+
+    school = models.ForeignKey('schools.School', on_delete=models.CASCADE, verbose_name='塾')
     year = models.IntegerField(verbose_name='年度')
     period = models.CharField(max_length=10, choices=PERIOD_CHOICES, verbose_name='期')
-    
+
     # 集計情報
+    total_classrooms = models.IntegerField(default=0, verbose_name='教室数')
     total_students = models.IntegerField(default=0, verbose_name='総生徒数')
     billed_students = models.IntegerField(default=0, verbose_name='課金対象生徒数')
     price_per_student = models.IntegerField(verbose_name='単価（円）')
     total_amount = models.IntegerField(default=0, verbose_name='合計金額（円）')
-    
+
     # 詳細情報（JSON）
+    classroom_details = models.JSONField(default=dict, verbose_name='教室別詳細')
     student_details = models.JSONField(default=dict, verbose_name='生徒詳細')
-    
+
     generated_at = models.DateTimeField(auto_now_add=True, verbose_name='生成日時')
     updated_at = models.DateTimeField(auto_now=True, verbose_name='更新日時')
-    
+
     class Meta:
-        db_table = 'billing_reports'
+        db_table = 'school_billing_reports'
         verbose_name = '課金レポート'
         verbose_name_plural = '課金レポート'
-        unique_together = ['classroom', 'year', 'period']
+        unique_together = ['school', 'year', 'period']
         indexes = [
             models.Index(fields=['year', 'period']),
             models.Index(fields=['generated_at']),
+            models.Index(fields=['school']),
         ]
-    
+
     def __str__(self):
-        return f"{self.classroom.name} - {self.year}年度 {self.get_period_display()} - {self.total_amount}円"
+        return f"{self.school.name} - {self.year}年度 {self.get_period_display()} - {self.total_amount}円"
+
+    def get_classroom_count(self):
+        """教室数を取得"""
+        return self.total_classrooms
+
+    def get_average_per_classroom(self):
+        """教室あたりの平均金額を計算"""
+        if self.total_classrooms > 0:
+            return self.total_amount / self.total_classrooms
+        return 0

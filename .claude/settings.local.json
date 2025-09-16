@@ -37,7 +37,8 @@
       "mcp__ide__getDiagnostics",
       "Bash(touch:*)",
       "Bash(cp:*)",
-      "Bash(python:*)"
+      "Bash(python:*)",
+      "Bash(ssh:*)"
     ],
     "deny": []
   }

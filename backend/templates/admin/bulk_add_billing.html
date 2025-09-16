@@ -1,0 +1,124 @@
+{% extends "admin/base_site.html" %}
+{% load i18n static admin_urls %}
+
+{% block title %}課金レポート一括追加{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+    <a href="{% url 'admin:index' %}">ホーム</a>
+    &rsaquo; <a href="{% url 'admin:classrooms_schoolbillingreport_changelist' %}">課金レポート</a>
+    &rsaquo; 一括追加
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="add-form">
+    <h1>課金レポート一括追加</h1>
+
+    <p class="help">年度と期間を選択して、全ての塾の課金レポートを一括で生成します。</p>
+
+    <form method="post" id="bulk-add-form" style="margin-top: 2rem;">
+        {% csrf_token %}
+
+        <div class="form-row">
+            <div class="field-box">
+                <label for="id_year" class="required">年度:</label>
+                <select name="year" id="id_year" class="vTextField" required>
+                    <option value="">年度を選択してください</option>
+                    {% for year in years %}
+                        <option value="{{ year }}">{{ year }}年度</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="field-box">
+                <label for="id_period" class="required">期間:</label>
+                <select name="period" id="id_period" class="vTextField" required>
+                    <option value="">期間を選択してください</option>
+                    {% for period_key, period_name in periods %}
+                        <option value="{{ period_key }}">{{ period_name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+
+        <div class="submit-row" style="margin-top: 2rem;">
+            <input type="submit" value="📊 課金レポートを一括生成" class="default" name="_save" style="background: #28a745; color: white; font-weight: bold; padding: 10px 20px; border: none; border-radius: 4px;">
+            <p class="deletelink-box">
+                <a href="{% url 'admin:classrooms_schoolbillingreport_changelist' %}" class="deletelink">キャンセル</a>
+            </p>
+        </div>
+    </form>
+
+    <div class="help-text" style="margin-top: 3rem; padding: 1rem; background: #f8f9fa; border-left: 4px solid #007cba;">
+        <h3>💡 使用方法</h3>
+        <ol>
+            <li><strong>年度</strong>：課金対象の年度を選択してください</li>
+            <li><strong>期間</strong>：春期・夏期・冬期から選択してください</li>
+            <li><strong>実行</strong>：「課金レポートを一括生成」をクリックすると、全ての塾の課金レポートが自動生成されます</li>
+        </ol>
+
+        <div style="margin-top: 1rem; padding: 0.5rem; background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 4px;">
+            <strong>⚠️ 注意事項</strong>
+            <ul style="margin-top: 0.5rem;">
+                <li>既に同じ年度・期間のレポートが存在する場合は上書きされます</li>
+                <li>各塾の会員種別と生徒数に基づいて課金額が計算されます</li>
+                <li>生成には数秒かかる場合があります</li>
+            </ul>
+        </div>
+    </div>
+</div>
+
+<style>
+.add-form {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 2rem;
+}
+
+.form-row {
+    margin-bottom: 1.5rem;
+}
+
+.field-box {
+    margin-bottom: 1rem;
+}
+
+.field-box label {
+    display: block;
+    font-weight: bold;
+    margin-bottom: 0.5rem;
+    color: #333;
+}
+
+.field-box select {
+    width: 100%;
+    max-width: 300px;
+    padding: 8px;
+    font-size: 14px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+}
+
+.help {
+    color: #666;
+    font-size: 14px;
+    margin-bottom: 2rem;
+    padding: 1rem;
+    background: #f0f8ff;
+    border-left: 4px solid #007cba;
+    border-radius: 4px;
+}
+
+.help-text h3 {
+    margin-top: 0;
+    color: #007cba;
+}
+
+.submit-row input[type="submit"]:hover {
+    background: #218838 !important;
+}
+</style>
+{% endblock %}

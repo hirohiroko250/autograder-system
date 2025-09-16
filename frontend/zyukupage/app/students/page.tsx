@@ -269,7 +269,10 @@ export default function StudentsPage() {
     <DashboardLayout>
       <div className="space-y-6 animate-fade-in">
         <div className="flex items-center justify-between">
-          <h1 className="text-3xl font-bold">生徒管理</h1>
+          <h1 className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold whitespace-nowrap">
+            <span className="hidden sm:inline">生徒管理</span>
+            <span className="sm:hidden">生徒</span>
+          </h1>
           <div className="flex items-center gap-2">
             <Button
               variant="outline"
@@ -356,7 +359,10 @@ export default function StudentsPage() {
           <CardHeader className="pb-4">
             <div className="flex items-center justify-between">
               <div>
-                <CardTitle>生徒検索・フィルター</CardTitle>
+                <CardTitle className="text-sm sm:text-base">
+                  <span className="hidden sm:inline">生徒検索・フィルター</span>
+                  <span className="sm:hidden">検索・絞り込み</span>
+                </CardTitle>
                 <CardDescription>
                   生徒を名前、IDなどで検索できます
                 </CardDescription>

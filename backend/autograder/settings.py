@@ -8,7 +8,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # 基本設定
 SECRET_KEY = config('SECRET_KEY', default='django-insecure-your-secret-key-here')
 DEBUG = config('DEBUG', default=True, cast=bool)
-ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,127.0.0.1').split(',')
+ALLOWED_HOSTS = ['*']  # 一時的にすべてを許可
 
 # アプリケーション
 DJANGO_APPS = [
@@ -69,6 +69,7 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                'autograder.context_processors.media_url',
             ],
         },
     },
@@ -128,8 +129,20 @@ CORS_ALLOWED_ORIGINS = [
     "http://127.0.0.1:3000",
     "http://localhost:3001",
     "http://127.0.0.1:3001",
+    "http://162.43.55.80:3000",
+    "http://172.20.10.2:3000",
 ]
 CORS_ALLOW_CREDENTIALS = True
+
+# セキュリティ設定（開発環境用）
+if DEBUG:
+    # 開発環境ではCOOP警告を無効化
+    SECURE_CROSS_ORIGIN_OPENER_POLICY = None
+    SECURE_REFERRER_POLICY = None
+else:
+    # 本番環境用のセキュリティ設定
+    SECURE_CROSS_ORIGIN_OPENER_POLICY = "same-origin"
+    SECURE_REFERRER_POLICY = "same-origin"
 
 # パスワード検証
 AUTH_PASSWORD_VALIDATORS = [
@@ -164,6 +177,12 @@ STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 # メディアファイル
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+
+# 正しいドメインでのURL生成
+USE_TZ = True
+if DEBUG:
+    # 開発環境では正しいIPアドレスを使用
+    MEDIA_URL = 'http://162.43.55.80:8000/media/'
 
 # Celery 設定
 CELERY_BROKER_URL = config('REDIS_URL', default='redis://localhost:6379/0')

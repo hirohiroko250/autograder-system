@@ -162,9 +162,9 @@ function StudentManagementContent({ year, period }: { year: string; period: stri
       if (response.success) {
         // ファイルダウンロード処理
         const link = document.createElement('a');
-        const downloadUrl = response.download_url.startsWith('http') 
-          ? response.download_url 
-          : `http://localhost:8000${response.download_url}`;
+        const downloadUrl = response.download_url.startsWith('http')
+          ? response.download_url
+          : `${process.env.NEXT_PUBLIC_API_BASE_URL?.replace('/api', '') || 'http://162.43.55.80:8000'}${response.download_url}`;
         link.href = downloadUrl;
         link.download = `${student.student_name}_成績表_${year}年度${getPeriodLabel(period)}.docx`;
         link.target = '_blank';  // 新しいタブで開く
@@ -201,9 +201,9 @@ function StudentManagementContent({ year, period }: { year: string; period: stri
       if (response.success) {
         // ZIPファイルダウンロード処理
         const link = document.createElement('a');
-        const downloadUrl = response.download_url.startsWith('http') 
-          ? response.download_url 
-          : `http://localhost:8000${response.download_url}`;
+        const downloadUrl = response.download_url.startsWith('http')
+          ? response.download_url
+          : `${process.env.NEXT_PUBLIC_API_BASE_URL?.replace('/api', '') || 'http://162.43.55.80:8000'}${response.download_url}`;
         link.href = downloadUrl;
         link.download = `成績表一括_${year}年度${getPeriodLabel(period)}_${selectedStudents.length}名.zip`;
         link.target = '_blank';
@@ -364,7 +364,8 @@ function StudentManagementContent({ year, period }: { year: string; period: stri
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-            生徒管理・帳票ダウンロード
+            <span className="hidden sm:inline">生徒管理・帳票ダウンロード</span>
+            <span className="sm:hidden">生徒・DL</span>
           </h1>
           <p className="text-gray-500 dark:text-gray-400 mt-1">
             {year}年度 {getPeriodLabel(period)}テストの生徒管理と成績表ダウンロード
@@ -381,7 +382,11 @@ function StudentManagementContent({ year, period }: { year: string; period: stri
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
-            <CardTitle>生徒管理 ({filteredResults.length}名)</CardTitle>
+            <CardTitle>
+              <span className="hidden sm:inline">生徒管理</span>
+              <span className="sm:hidden">生徒</span>
+              {" "}({filteredResults.length}名)
+            </CardTitle>
             <div className="flex items-center gap-2">
               <Checkbox
                 id="select-all"
