@@ -1,0 +1,22 @@
+[Unit]
+Description=Autograder Django Application
+After=network.target
+
+[Service]
+Type=notify
+User=autograder
+Group=autograder
+RuntimeDirectory=autograder
+WorkingDirectory=/opt/autograder-system/backend
+Environment=DJANGO_SETTINGS_MODULE=autograder.settings_production
+Environment=PYTHONPATH=/opt/autograder-system/backend
+ExecStart=/opt/autograder-system/venv/bin/gunicorn --config gunicorn.conf.py autograder.wsgi:application
+ExecReload=/bin/kill -s HUP $MAINPID
+KillMode=mixed
+TimeoutStopSec=5
+PrivateTmp=true
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
