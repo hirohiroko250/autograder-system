@@ -100,7 +100,7 @@ export default function LoginPage() {
                 variant="outline"
                 size="sm"
                 className="mt-2 text-xs"
-                onClick={() => window.open('http://localhost:3001/login', '_blank')}
+                onClick={() => window.open(`${process.env.NEXT_PUBLIC_CLASSROOM_URL}/login`, '_blank')}
               >
                 教室ページでログイン
               </Button>
