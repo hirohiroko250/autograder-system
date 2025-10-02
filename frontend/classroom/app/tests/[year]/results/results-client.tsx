@@ -50,7 +50,7 @@ export function ResultsClient({ year }: ResultsClientProps) {
   const [selectedStudents, setSelectedStudents] = useState<string[]>([]);
   const [isReportDialogOpen, setIsReportDialogOpen] = useState(false);
   const [reportType, setReportType] = useState<string>('individual');
-  const [reportFormat, setReportFormat] = useState<string>('word');
+  const [reportFormat, setReportFormat] = useState<string>('pdf');
   const [sortOrder, setSortOrder] = useState<string>('rank');
   const [selectedStudent, setSelectedStudent] = useState<any>(null);
   const [filterStatus, setFilterStatus] = useState<string>('all');
@@ -223,15 +223,19 @@ export function ResultsClient({ year }: ResultsClientProps) {
         studentId: studentId,
         year: parseInt(year),
         period: period,
-        format: 'word'
+        format: reportFormat
       });
 
       if (response.success) {
         // ファイルダウンロード処理
         const link = document.createElement('a');
-        link.href = response.download_url;
+        const downloadUrl = response.download_url.startsWith('http')
+          ? response.download_url
+          : `${process.env.NEXT_PUBLIC_API_BASE_URL?.replace('/api', '') || 'http://162.43.55.80:8000'}${response.download_url}`;
+        link.href = downloadUrl;
         const periodLabel = { spring: '春期', summer: '夏期', winter: '冬期' }[period] || period;
-        link.download = `${student.student_name}_成績表_${year}年度${periodLabel}.docx`;
+        const extension = response.format === 'pdf' || reportFormat === 'pdf' ? 'pdf' : 'docx';
+        link.download = `${student.student_name}_成績表_${year}年度${periodLabel}.${extension}`;
         link.click();
         
         toast.success(`${student.student_name}の成績表をダウンロードしました`);
@@ -263,7 +267,10 @@ export function ResultsClient({ year }: ResultsClientProps) {
       if (response.success) {
         // ZIPファイルダウンロード処理
         const link = document.createElement('a');
-        link.href = response.download_url;
+        const downloadUrl = response.download_url.startsWith('http')
+          ? response.download_url
+          : `${process.env.NEXT_PUBLIC_API_BASE_URL?.replace('/api', '') || 'http://162.43.55.80:8000'}${response.download_url}`;
+        link.href = downloadUrl;
         const periodLabel = { spring: '春期', summer: '夏期', winter: '冬期' }[period] || period;
         link.download = `成績表一括_${year}年度${periodLabel}_${selectedStudents.length}名.zip`;
         link.click();
@@ -293,9 +300,8 @@ export function ResultsClient({ year }: ResultsClientProps) {
 
     const formatText = {
       pdf: 'PDF',
-      excel: 'Excel',
-      csv: 'CSV'
-    }[reportFormat];
+      word: 'Word'
+    }[reportFormat] || 'PDF';
 
     // 帳票生成のシミュレーション
     toast.success(`${reportTypeText}を${formatText}形式で生成しました`);
@@ -361,13 +367,13 @@ export function ResultsClient({ year }: ResultsClientProps) {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="word">Word（推奨）</SelectItem>
-                      <SelectItem value="excel">Excel</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <p className="text-xs text-gray-500">
-                    Wordファイルは差し込み済みで出力されます
-                  </p>
+                    <SelectItem value="pdf">PDF（推奨）</SelectItem>
+                    <SelectItem value="word">Word</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-gray-500">
+                  PDFはブラウザ表示・印刷に最適化されています
+                </p>
                 </div>
 
                 <div className="space-y-3">
@@ -671,15 +677,20 @@ export function ResultsClient({ year }: ResultsClientProps) {
                             </p>
                           </div>
                           <div className="flex flex-col gap-1">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleDownloadIndividualReport(result.student_id)}
-                              disabled={inputStatus === 'not_started' || inputStatus === 'absent'}
+                            <Link
+                              href={`/report/${result.student_id}`}
+                              target="_blank"
                             >
-                              <Download className="h-3 w-3 mr-1" />
-                              帳票
-                            </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                disabled={inputStatus === 'not_started' || inputStatus === 'absent'}
+                                className="w-full"
+                              >
+                                <FileText className="h-3 w-3 mr-1" />
+                                帳票
+                              </Button>
+                            </Link>
                             <Button
                               size="sm"
                               variant="ghost"
