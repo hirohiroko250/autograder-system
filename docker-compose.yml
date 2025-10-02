@@ -45,6 +45,9 @@ services:
     build:
       context: ./frontend/zyukupage
       dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_BASE_URL: https://kouzyoutest.com/api
+        NEXT_PUBLIC_CLASSROOM_URL: https://classroom.kouzyoutest.com
     restart: always
     env_file:
       - .env
@@ -63,6 +66,9 @@ services:
     build:
       context: ./frontend/classroom
       dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_BASE_URL: https://kouzyoutest.com/api
+        NEXT_PUBLIC_CLASSROOM_URL: https://classroom.kouzyoutest.com
     restart: always
     env_file:
       - .env
