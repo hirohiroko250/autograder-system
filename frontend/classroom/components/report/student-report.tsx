@@ -100,16 +100,17 @@ export const StudentReport: React.FC<{ data: ReportData }> = ({ data }) => {
     <div id="student-report" className="w-[210mm] h-[297mm] bg-white text-black p-8 print:p-8" style={{ fontFamily: 'sans-serif' }}>
       {/* ヘッダー */}
       <div className="mb-4">
-        <div className="flex items-start justify-between">
-          <div className="w-48">
-            <img src="/logo.png" alt="全国学力向上テスト" className="w-full h-auto" />
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex-1">
+            <img src="/logo.png" alt="全国学力向上テスト" className="h-16 w-auto" />
           </div>
           <div className="text-right">
-            <p className="text-sm mb-1">発行日：{data.issueDate}</p>
+            <p className="text-sm">発行日：{data.issueDate}</p>
+            <p className="text-base font-bold mt-1">{data.year}年度 第{data.periodNumber}回 学年{data.grade}</p>
           </div>
         </div>
-        <div className="flex items-center justify-center mt-2">
-          <h1 className="text-xl font-bold">全国学力向上テスト 個人成績表 {data.year}年度 第{data.periodNumber}回 学年{data.grade}</h1>
+        <div className="text-center">
+          <h1 className="text-2xl font-bold">個人成績表</h1>
         </div>
       </div>
 
