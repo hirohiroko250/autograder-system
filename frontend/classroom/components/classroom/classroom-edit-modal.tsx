@@ -109,9 +109,12 @@ export const ClassroomEditModal: React.FC<ClassroomEditModalProps> = ({
       
       // 現在ログイン中のユーザーが該当教室の管理者の場合、権限情報を即座に更新
       const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
-      if (currentUser.role === 'classroom_admin' && 
-          currentUser.classroom_id && 
-          parseInt(currentUser.classroom_id) === classroom.id) {
+      if (
+        classroom &&
+        currentUser.role === 'classroom_admin' &&
+        currentUser.classroom_id &&
+        parseInt(currentUser.classroom_id) === classroom.id
+      ) {
         
         console.log('Updating current user permissions in real-time');
         currentUser.permissions = data.permissions;

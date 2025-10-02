@@ -4,121 +4,425 @@
 {% block title %}課金レポート一括追加{% endblock %}
 
 {% block breadcrumbs %}
-<div class="breadcrumbs">
-    <a href="{% url 'admin:index' %}">ホーム</a>
-    &rsaquo; <a href="{% url 'admin:classrooms_schoolbillingreport_changelist' %}">課金レポート</a>
-    &rsaquo; 一括追加
+<div class="enhanced-breadcrumbs">
+    <a href="{% url 'admin:index' %}">🏠 ホーム</a>
+    <span class="separator">›</span>
+    <a href="{% url 'admin:classrooms_schoolbillingreport_changelist' %}">💰 課金レポート</a>
+    <span class="separator">›</span>
+    <span class="current">一括追加</span>
 </div>
 {% endblock %}
 
 {% block content %}
-<div class="add-form">
-    <h1>課金レポート一括追加</h1>
+<div class="bulk-add-container">
+    <div class="header-section">
+        <h1 class="page-title">
+            <span class="title-icon">💰</span>
+            課金レポート一括追加
+        </h1>
+        <p class="page-description">
+            年度と期間を選択して、全ての塾の課金レポートを一括で生成します。
+        </p>
+    </div>
 
-    <p class="help">年度と期間を選択して、全ての塾の課金レポートを一括で生成します。</p>
+    <div class="form-container">
+        <form method="post" id="bulk-add-form" class="enhanced-form">
+            {% csrf_token %}
 
-    <form method="post" id="bulk-add-form" style="margin-top: 2rem;">
-        {% csrf_token %}
+            <div class="form-section">
+                <div class="form-group">
+                    <label for="id_year" class="form-label required">
+                        <span class="label-icon">📅</span>
+                        年度
+                    </label>
+                    <select name="year" id="id_year" class="form-select" required>
+                        <option value="">年度を選択してください</option>
+                        {% for year in years %}
+                            <option value="{{ year }}">{{ year }}年度</option>
+                        {% endfor %}
+                    </select>
+                </div>
 
-        <div class="form-row">
-            <div class="field-box">
-                <label for="id_year" class="required">年度:</label>
-                <select name="year" id="id_year" class="vTextField" required>
-                    <option value="">年度を選択してください</option>
-                    {% for year in years %}
-                        <option value="{{ year }}">{{ year }}年度</option>
-                    {% endfor %}
-                </select>
+                <div class="form-group">
+                    <label for="id_period" class="form-label required">
+                        <span class="label-icon">🗓️</span>
+                        期間
+                    </label>
+                    <select name="period" id="id_period" class="form-select" required>
+                        <option value="">期間を選択してください</option>
+                        {% for period_key, period_name in periods %}
+                            <option value="{{ period_key }}">{{ period_name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" name="overwrite" value="1" class="checkbox-input">
+                        <span class="checkmark"></span>
+                        <span class="checkbox-text">
+                            <strong>既存のレポートがある場合は上書きして再生成する</strong>
+                            <small>既にレポートが存在する場合でも再計算を実行します</small>
+                        </span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="action-section">
+                <button type="submit" class="submit-button" name="_save">
+                    <span class="button-icon">🚀</span>
+                    課金レポートを一括生成
+                </button>
+                <a href="{% url 'admin:classrooms_schoolbillingreport_changelist' %}" class="cancel-button">
+                    キャンセル
+                </a>
+            </div>
+        </form>
+    </div>
+
+    <div class="help-section">
+        <div class="help-card">
+            <h3 class="help-title">💡 使用方法</h3>
+            <div class="help-steps">
+                <div class="step">
+                    <span class="step-number">1</span>
+                    <div class="step-content">
+                        <strong>年度選択</strong>
+                        <p>課金対象の年度を選択してください</p>
+                    </div>
+                </div>
+                <div class="step">
+                    <span class="step-number">2</span>
+                    <div class="step-content">
+                        <strong>期間選択</strong>
+                        <p>春期・夏期・冬期から対象期間を選択</p>
+                    </div>
+                </div>
+                <div class="step">
+                    <span class="step-number">3</span>
+                    <div class="step-content">
+                        <strong>実行</strong>
+                        <p>全ての塾の課金レポートが自動生成されます</p>
+                    </div>
+                </div>
             </div>
         </div>
 
-        <div class="form-row">
-            <div class="field-box">
-                <label for="id_period" class="required">期間:</label>
-                <select name="period" id="id_period" class="vTextField" required>
-                    <option value="">期間を選択してください</option>
-                    {% for period_key, period_name in periods %}
-                        <option value="{{ period_key }}">{{ period_name }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-        </div>
-
-        <div class="submit-row" style="margin-top: 2rem;">
-            <input type="submit" value="📊 課金レポートを一括生成" class="default" name="_save" style="background: #28a745; color: white; font-weight: bold; padding: 10px 20px; border: none; border-radius: 4px;">
-            <p class="deletelink-box">
-                <a href="{% url 'admin:classrooms_schoolbillingreport_changelist' %}" class="deletelink">キャンセル</a>
-            </p>
-        </div>
-    </form>
-
-    <div class="help-text" style="margin-top: 3rem; padding: 1rem; background: #f8f9fa; border-left: 4px solid #007cba;">
-        <h3>💡 使用方法</h3>
-        <ol>
-            <li><strong>年度</strong>：課金対象の年度を選択してください</li>
-            <li><strong>期間</strong>：春期・夏期・冬期から選択してください</li>
-            <li><strong>実行</strong>：「課金レポートを一括生成」をクリックすると、全ての塾の課金レポートが自動生成されます</li>
-        </ol>
-
-        <div style="margin-top: 1rem; padding: 0.5rem; background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 4px;">
-            <strong>⚠️ 注意事項</strong>
-            <ul style="margin-top: 0.5rem;">
-                <li>既に同じ年度・期間のレポートが存在する場合は上書きされます</li>
-                <li>各塾の会員種別と生徒数に基づいて課金額が計算されます</li>
-                <li>生成には数秒かかる場合があります</li>
+        <div class="warning-card">
+            <h4 class="warning-title">⚠️ 注意事項</h4>
+            <ul class="warning-list">
+                <li>「上書きして再生成」を有効にすると、既存のレポートも再計算されます</li>
+                <li>各塾の会員種別と課金対象生徒数に基づいて課金額が計算されます</li>
+                <li>生成には数秒～数分かかる場合があります</li>
             </ul>
         </div>
     </div>
 </div>
 
 <style>
-.add-form {
-    max-width: 800px;
+.bulk-add-container {
+    max-width: 900px;
     margin: 0 auto;
     padding: 2rem;
 }
 
-.form-row {
-    margin-bottom: 1.5rem;
-}
-
-.field-box {
-    margin-bottom: 1rem;
-}
-
-.field-box label {
-    display: block;
-    font-weight: bold;
-    margin-bottom: 0.5rem;
-    color: #333;
-}
-
-.field-box select {
-    width: 100%;
-    max-width: 300px;
-    padding: 8px;
-    font-size: 14px;
-    border: 1px solid #ccc;
-    border-radius: 4px;
-}
-
-.help {
-    color: #666;
-    font-size: 14px;
+/* ブレッドクラム */
+.enhanced-breadcrumbs {
+    background: #f8fafc;
+    padding: 1rem 1.5rem;
+    border-radius: 8px;
     margin-bottom: 2rem;
+    font-size: 0.9rem;
+    color: #4b5563;
+}
+
+.enhanced-breadcrumbs a {
+    color: #3b82f6;
+    text-decoration: none;
+    transition: color 0.2s;
+}
+
+.enhanced-breadcrumbs a:hover {
+    color: #1d4ed8;
+}
+
+.separator {
+    margin: 0 0.5rem;
+    color: #9ca3af;
+}
+
+.current {
+    color: #1f2937;
+    font-weight: 500;
+}
+
+/* ヘッダー */
+.header-section {
+    text-align: center;
+    margin-bottom: 3rem;
+}
+
+.page-title {
+    font-size: 2rem;
+    font-weight: 700;
+    color: #111827;
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+}
+
+.title-icon {
+    font-size: 2.5rem;
+    filter: drop-shadow(0 2px 4px rgba(0,0,0,0.1));
+}
+
+.page-description {
+    font-size: 1.1rem;
+    color: #6b7280;
+    margin: 0;
+}
+
+/* フォーム */
+.form-container {
+    background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+    border: 1px solid #e5e7eb;
+    border-radius: 16px;
+    padding: 2.5rem;
+    margin-bottom: 3rem;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+
+.form-section {
+    display: grid;
+    gap: 2rem;
+    margin-bottom: 2.5rem;
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.form-label {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-weight: 600;
+    color: #374151;
+    font-size: 1rem;
+}
+
+.form-label.required::after {
+    content: "*";
+    color: #ef4444;
+    margin-left: 0.25rem;
+}
+
+.label-icon {
+    font-size: 1.1rem;
+}
+
+.form-select {
     padding: 1rem;
-    background: #f0f8ff;
-    border-left: 4px solid #007cba;
-    border-radius: 4px;
+    border: 2px solid #d1d5db;
+    border-radius: 8px;
+    font-size: 1rem;
+    background: white;
+    transition: all 0.2s;
+    min-width: 300px;
 }
 
-.help-text h3 {
-    margin-top: 0;
-    color: #007cba;
+.form-select:focus {
+    outline: none;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
 }
 
-.submit-row input[type="submit"]:hover {
-    background: #218838 !important;
+/* チェックボックス */
+.checkbox-label {
+    display: flex;
+    align-items: flex-start;
+    gap: 1rem;
+    cursor: pointer;
+    padding: 1rem;
+    background: #f9fafb;
+    border-radius: 8px;
+    transition: background 0.2s;
+}
+
+.checkbox-label:hover {
+    background: #f3f4f6;
+}
+
+.checkbox-input {
+    margin: 0;
+    width: 18px;
+    height: 18px;
+    accent-color: #3b82f6;
+}
+
+.checkbox-text {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.checkbox-text small {
+    color: #6b7280;
+    font-size: 0.875rem;
+}
+
+/* ボタン */
+.action-section {
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+    align-items: center;
+}
+
+.submit-button {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    color: white;
+    border: none;
+    padding: 1rem 2rem;
+    border-radius: 12px;
+    font-size: 1.1rem;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 6px -1px rgba(16, 185, 129, 0.3);
+}
+
+.submit-button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 15px -3px rgba(16, 185, 129, 0.4);
+}
+
+.button-icon {
+    font-size: 1.2rem;
+}
+
+.cancel-button {
+    color: #6b7280;
+    text-decoration: none;
+    padding: 1rem 1.5rem;
+    border-radius: 8px;
+    transition: color 0.2s;
+}
+
+.cancel-button:hover {
+    color: #374151;
+    background: #f3f4f6;
+}
+
+/* ヘルプセクション */
+.help-section {
+    display: grid;
+    gap: 2rem;
+}
+
+.help-card, .warning-card {
+    background: white;
+    border-radius: 12px;
+    padding: 2rem;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+
+.help-card {
+    border-left: 4px solid #3b82f6;
+}
+
+.warning-card {
+    border-left: 4px solid #f59e0b;
+}
+
+.help-title, .warning-title {
+    margin: 0 0 1.5rem;
+    color: #111827;
+    font-size: 1.25rem;
+    font-weight: 600;
+}
+
+.help-steps {
+    display: grid;
+    gap: 1.5rem;
+}
+
+.step {
+    display: flex;
+    gap: 1rem;
+    align-items: flex-start;
+}
+
+.step-number {
+    background: #3b82f6;
+    color: white;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    flex-shrink: 0;
+}
+
+.step-content strong {
+    display: block;
+    margin-bottom: 0.25rem;
+    color: #111827;
+}
+
+.step-content p {
+    margin: 0;
+    color: #6b7280;
+    font-size: 0.9rem;
+}
+
+.warning-list {
+    margin: 0;
+    padding-left: 1.5rem;
+}
+
+.warning-list li {
+    color: #6b7280;
+    margin-bottom: 0.5rem;
+}
+
+/* レスポンシブ */
+@media (max-width: 768px) {
+    .bulk-add-container {
+        padding: 1rem;
+    }
+
+    .form-container {
+        padding: 1.5rem;
+    }
+
+    .page-title {
+        font-size: 1.5rem;
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .form-select {
+        min-width: unset;
+        width: 100%;
+    }
+
+    .action-section {
+        flex-direction: column;
+    }
+
+    .help-section {
+        grid-template-columns: 1fr;
+    }
 }
 </style>
 {% endblock %}

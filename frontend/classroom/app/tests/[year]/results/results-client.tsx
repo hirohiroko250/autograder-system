@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, ReactNode } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
@@ -203,7 +203,7 @@ export function ResultsClient({ year }: ResultsClientProps) {
 
   const handleSelectAll = (checked: boolean) => {
     if (checked) {
-      setSelectedStudents(results.map(r => r.id));
+      setSelectedStudents(results.map(r => String(r.student_id ?? r.id)));
     } else {
       setSelectedStudents([]);
     }
@@ -562,13 +562,29 @@ export function ResultsClient({ year }: ResultsClientProps) {
                 ) : (
                   filteredResults.map((result) => {
                     const inputStatus = getScoreInputStatus(result);
-                    const statusConfig = {
-                      complete: { icon: CheckCircle, color: 'text-green-600', bg: 'bg-green-50', border: 'border-green-200', text: '入力完了' },
-                      partial: { icon: Clock, color: 'text-yellow-600', bg: 'bg-yellow-50', border: 'border-yellow-200', text: '部分入力' },
-                      not_started: { icon: XCircle, color: 'text-red-600', bg: 'bg-red-50', border: 'border-red-200', text: '未入力' },
-                      absent: { icon: XCircle, color: 'text-gray-600', bg: 'bg-gray-50', border: 'border-gray-200', text: '欠席' }
-                    }[inputStatus];
-                    const StatusIcon = statusConfig.icon;
+                const statusConfig = {
+                  complete: { icon: CheckCircle, color: 'text-green-600', bg: 'bg-green-50', border: 'border-green-200', text: '入力完了' },
+                  partial: { icon: Clock, color: 'text-yellow-600', bg: 'bg-yellow-50', border: 'border-yellow-200', text: '部分入力' },
+                  not_started: { icon: XCircle, color: 'text-red-600', bg: 'bg-red-50', border: 'border-red-200', text: '未入力' },
+                  absent: { icon: XCircle, color: 'text-gray-600', bg: 'bg-gray-50', border: 'border-gray-200', text: '欠席' }
+                }[inputStatus];
+                const StatusIcon = statusConfig.icon;
+                const improvementRaw = result.improvement;
+                const improvementValue = (() => {
+                  if (typeof improvementRaw === 'number') {
+                    return improvementRaw;
+                  }
+                  if (improvementRaw && typeof improvementRaw === 'object') {
+                    const candidates = ['score_change', 'total_score', 'previous_score'];
+                    for (const key of candidates) {
+                      const candidate = (improvementRaw as Record<string, unknown>)[key];
+                      if (typeof candidate === 'number' && !Number.isNaN(candidate)) {
+                        return candidate;
+                      }
+                    }
+                  }
+                  return 0;
+                })();
 
                     return (
                       <div
@@ -601,14 +617,14 @@ export function ResultsClient({ year }: ResultsClientProps) {
                               <p className="font-medium">{result.student_name}</p>
                               <Badge variant="outline">{result.grade}</Badge>
                               <Badge variant="outline">{result.classroom_name}</Badge>
-                              {result.improvement && result.improvement > 0 && (
+                              {improvementValue > 0 && (
                                 <Badge className="bg-green-100 text-green-800">
-                                  +{result.improvement}
+                                  +{improvementValue}
                                 </Badge>
                               )}
-                              {result.improvement && result.improvement < 0 && (
+                              {improvementValue < 0 && (
                                 <Badge className="bg-red-100 text-red-800">
-                                  {result.improvement}
+                                  {improvementValue}
                                 </Badge>
                               )}
                               {!result.attendance && (
@@ -623,12 +639,30 @@ export function ResultsClient({ year }: ResultsClientProps) {
                         
                         <div className="flex items-center gap-8">
                           <div className={`grid ${gridColsClass} gap-2 text-sm`}>
-                            {Object.entries(result.scores).map(([question, score]) => (
-                              <div key={question} className="text-center">
-                                <p className="text-gray-500 dark:text-gray-400 text-xs">{question.replace('q', '大問')}</p>
-                                <p className="font-medium">{score || '-'}</p>
-                              </div>
-                            ))}
+                            {Object.entries(result.scores).map(([question, score]) => {
+                              let displayScore: ReactNode = '-';
+                              if (typeof score === 'number' || typeof score === 'string') {
+                                displayScore = score;
+                              } else if (Array.isArray(score)) {
+                                displayScore = score
+                                  .map((item) => {
+                                    if (item && typeof item === 'object' && 'score' in item) {
+                                      return (item as { score?: number | string }).score ?? '-';
+                                    }
+                                    return item ?? '-';
+                                  })
+                                  .join(' / ');
+                              } else if (score && typeof score === 'object' && 'score' in score) {
+                                displayScore = (score as { score?: number | string }).score ?? '-';
+                              }
+
+                              return (
+                                <div key={question} className="text-center">
+                                  <p className="text-gray-500 dark:text-gray-400 text-xs">{question.replace('q', '大問')}</p>
+                                  <p className="font-medium">{displayScore}</p>
+                                </div>
+                              );
+                            })}
                           </div>
                           <div className="text-right">
                             <p className="text-2xl font-bold">{result.total_score || '-'}</p>

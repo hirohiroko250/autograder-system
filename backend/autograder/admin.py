@@ -200,7 +200,7 @@ def custom_get_app_list(self, request, app_label=None):
                 app_dict['テスト問題']['models'].append(model_dict)
     
     # 各カテゴリのモデルを順序付け
-    juku_model_order = ['塾', '会員種別', '教室', '生徒', '得点', 'テスト結果', 'コメントテンプレート', '課金レポート']
+    juku_model_order = ['塾', '会員種別', '教室', '生徒', '得点', 'テスト結果', 'コメントテンプレート', '塾別課金レポート']
     app_dict['塾管理']['models'].sort(key=lambda x: juku_model_order.index(x['name']) if x['name'] in juku_model_order else 999)
     
     test_model_order = ['テストスケジュール', 'テスト', '大問', '問題', '解答']
@@ -2210,11 +2210,12 @@ admin.site.register(MembershipType, MembershipTypeAdmin)
 
 # 課金レポート管理（塾ベース）
 class SchoolBillingReportAdmin(admin.ModelAdmin):
+    change_list_template = 'admin/classrooms/schoolbillingreport/change_list.html'
     list_display = ('school', 'year', 'period', 'total_classrooms', 'billed_students', 'price_per_student', 'total_amount', 'average_per_classroom', 'generated_at')
     list_filter = ('year', 'period', 'generated_at', 'school__membership_type')
     search_fields = ('school__name', 'school__school_id')
     readonly_fields = ('generated_at', 'updated_at')
-    actions = ['export_school_billing_reports', 'export_school_billing_data']
+    actions = ['regenerate_school_billing_reports', 'export_school_billing_reports', 'export_school_billing_data']
 
     # 手動での課金レポート作成を無効化（自動生成のみ）
     def has_add_permission(self, request):
@@ -2226,13 +2227,34 @@ class SchoolBillingReportAdmin(admin.ModelAdmin):
     def changelist_view(self, request, extra_context=None):
         """一括追加機能付きの課金レポートリスト画面"""
         from django.urls import reverse
-        from django.utils.html import format_html
 
         extra_context = extra_context or {}
-        # カスタム追加ボタンのURL
         extra_context['custom_add_url'] = reverse('bulk_add_school_billing')
-        extra_context['show_bulk_add'] = True  # 一括追加ボタンを表示するフラグ
-        return super().changelist_view(request, extra_context)
+        extra_context['show_bulk_add'] = True
+
+        response = super().changelist_view(request, extra_context)
+
+        if hasattr(response, 'context_data') and response.context_data:
+            cl = response.context_data.get('cl')
+            if cl is not None:
+                queryset = cl.queryset
+                from django.db.models import Sum, Count
+
+                summary = queryset.aggregate(
+                    total_schools=Count('pk', distinct=True),
+                    total_classrooms=Sum('total_classrooms'),
+                    total_students=Sum('billed_students'),
+                    total_amount=Sum('total_amount'),
+                )
+
+                response.context_data['summary'] = {
+                    'total_schools': summary.get('total_schools') or 0,
+                    'total_classrooms': summary.get('total_classrooms') or 0,
+                    'total_students': summary.get('total_students') or 0,
+                    'total_amount': summary.get('total_amount') or 0,
+                }
+
+        return response
 
 
     def has_delete_permission(self, request, obj=None):
@@ -2242,6 +2264,43 @@ class SchoolBillingReportAdmin(admin.ModelAdmin):
         avg = obj.get_average_per_classroom()
         return f"{avg:.0f}円/教室" if avg > 0 else "0円/教室"
     average_per_classroom.short_description = '教室あたり平均'
+
+    def regenerate_school_billing_reports(self, request, queryset):
+        """選択した塾の課金レポートを再生成"""
+        from django.contrib import messages
+        from classrooms.utils import generate_school_billing_report
+
+        created = updated = skipped = errors = 0
+
+        for report in queryset:
+            try:
+                result = generate_school_billing_report(
+                    school=report.school,
+                    year=report.year,
+                    period=report.period,
+                    force=True,
+                )
+
+                if result.get('created'):
+                    created += 1
+                elif result.get('updated'):
+                    updated += 1
+                else:
+                    skipped += 1
+            except Exception as exc:
+                errors += 1
+                messages.error(request, f"{report.school.name}（{report.year}年度{report.get_period_display()}）: {exc}")
+
+        if created:
+            messages.success(request, f"{created}件の塾別課金レポートを新規作成しました。")
+        if updated:
+            messages.success(request, f"{updated}件の塾別課金レポートを再計算しました。")
+        if skipped and not (created or updated):
+            messages.info(request, f"{skipped}件のレポートを処理しました（変更なし）。")
+        if errors:
+            messages.warning(request, f"{errors}件のレポートでエラーが発生しました。詳細はメッセージをご確認ください。")
+
+    regenerate_school_billing_reports.short_description = "♻️ 選択した塾の課金レポートを再生成"
 
     def export_school_billing_reports(self, request, queryset):
         """塾別課金レポートをExcelエクスポート"""

@@ -83,6 +83,7 @@ def bulk_add_school_billing(request):
     if request.method == 'POST':
         year = request.POST.get('year')
         period = request.POST.get('period')
+        overwrite = bool(request.POST.get('overwrite'))
 
         if not year or not period:
             messages.error(request, '年度と期間を選択してください。')
@@ -90,19 +91,31 @@ def bulk_add_school_billing(request):
             try:
                 year = int(year)
                 schools = School.objects.all()
-                generated_count = 0
+                created_count = 0
+                updated_count = 0
+                skipped_count = 0
                 error_count = 0
 
                 for school in schools:
                     try:
-                        generate_school_billing_report(school, year, period)
-                        generated_count += 1
+                        result = generate_school_billing_report(school, year, period, force=overwrite)
+
+                        if result.get('created'):
+                            created_count += 1
+                        elif result.get('updated'):
+                            updated_count += 1
+                        else:
+                            skipped_count += 1
                     except Exception as e:
                         error_count += 1
                         messages.warning(request, f'{school.name}: {str(e)}')
 
-                if generated_count > 0:
-                    messages.success(request, f'{generated_count}個の塾の課金レポートを生成しました。（{year}年度 {period}期）')
+                if created_count:
+                    messages.success(request, f'{created_count}件の塾別課金レポートを新規生成しました。（{year}年度 {period}期）')
+                if updated_count:
+                    messages.success(request, f'{updated_count}件の塾別課金レポートを再計算しました。')
+                if skipped_count and not overwrite:
+                    messages.info(request, f'{skipped_count}件は既存レポートがあるためスキップしました。再計算する場合は「上書きして再生成」を有効にしてください。')
                 if error_count > 0:
                     messages.warning(request, f'{error_count}個の塾でエラーが発生しました。')
 
@@ -126,6 +139,7 @@ def bulk_add_school_billing(request):
         'title': '課金レポート一括追加',
         'years': years,
         'periods': periods,
+        'overwrite': False,
     }
     return render(request, 'admin/bulk_add_billing.html', context)
 

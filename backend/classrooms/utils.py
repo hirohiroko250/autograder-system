@@ -222,7 +222,7 @@ def generate_classroom_billing_report(classroom, year, period, force=False):
 
 def get_billing_summary(year, period):
     """
-    指定期間の課金サマリーを取得
+    指定期間の課金サマリーを取得（後方互換用API）
 
     Args:
         year: 年度（整数）
@@ -231,18 +231,18 @@ def get_billing_summary(year, period):
     Returns:
         dict: サマリー情報
     """
-    # reports = BillingReport.objects.filter(year=year, period=period)  # 廃止
-    reports = []
+    reports = SchoolBillingReport.objects.filter(year=year, period=period)
 
-    if not reports:  # 空のリストをチェック
+    if not reports.exists():
         return {
             'total_classrooms': 0,
             'total_students': 0,
             'total_amount': 0,
-            'reports': []
+            'total_schools': 0,
+            'reports': [],
         }
 
-    total_classrooms = reports.count()
+    total_classrooms = sum(report.total_classrooms for report in reports)
     total_students = sum(report.billed_students for report in reports)
     total_amount = sum(report.total_amount for report in reports)
 
@@ -250,7 +250,8 @@ def get_billing_summary(year, period):
         'total_classrooms': total_classrooms,
         'total_students': total_students,
         'total_amount': total_amount,
-        'reports': reports
+        'total_schools': reports.count(),
+        'reports': list(reports),
     }
 
 

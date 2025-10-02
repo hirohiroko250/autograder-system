@@ -41,10 +41,12 @@ build/
 .env.development.local
 .env.test.local
 .env.production.local
+.env.production
 
-# IDE
+# IDE / Assistant settings
 .vscode/
 .idea/
+.claude/
 *.swp
 *.swo
 
@@ -55,6 +57,9 @@ Thumbs.db
 # Temporary files
 *.tmp
 *.temp
+*.backup
+*.tar
+*.tar.gz
 
 # Backup files
 backup_*.json

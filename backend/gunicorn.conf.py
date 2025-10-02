@@ -3,6 +3,7 @@ Gunicorn設定ファイル
 """
 import multiprocessing
 import os
+from pathlib import Path
 
 # サーバーソケット
 bind = "0.0.0.0:8000"
@@ -19,15 +20,21 @@ max_requests_jitter = 50
 
 # ログ設定
 loglevel = "info"
-accesslog = "/var/log/autograder/gunicorn_access.log"
-errorlog = "/var/log/autograder/gunicorn_error.log"
+log_dir = os.environ.get("LOG_DIR", "/var/log/autograder")
+os.makedirs(log_dir, exist_ok=True)
+accesslog = f"{log_dir}/gunicorn_access.log"
+errorlog = f"{log_dir}/gunicorn_error.log"
 access_log_format = '%(h)s %(l)s %(u)s %(t)s "%(r)s" %(s)s %(b)s "%(f)s" "%(a)s" %(D)s'
 
 # プロセス設定
 daemon = False
-pidfile = "/run/autograder/gunicorn.pid"
-user = "autograder"
-group = "autograder"
+pidfile_dir = Path("/run/autograder")
+pidfile_dir.mkdir(parents=True, exist_ok=True)
+pidfile = str(pidfile_dir / "gunicorn.pid")
+
+# Allow overriding the user/group via environment variables; default to root inside the container.
+user = os.environ.get("GUNICORN_USER", "root")
+group = os.environ.get("GUNICORN_GROUP", "root")
 tmp_upload_dir = None
 
 # セキュリティ

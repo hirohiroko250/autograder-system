@@ -8,7 +8,21 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # 基本設定
 SECRET_KEY = config('SECRET_KEY', default='django-insecure-your-secret-key-here')
 DEBUG = config('DEBUG', default=True, cast=bool)
-ALLOWED_HOSTS = ['*']  # 一時的にすべてを許可
+ALLOWED_HOSTS = [host.strip() for host in config('ALLOWED_HOSTS', default='*').split(',') if host.strip()]
+if not ALLOWED_HOSTS:
+    ALLOWED_HOSTS = ['*']
+
+DEFAULT_ALLOWED_HOSTS = [
+    'kouzyoutest.com',
+    'www.kouzyoutest.com',
+    'classroom.kouzyoutest.com',
+    'kouzyoutest.xvps.jp',
+    'classroom.kouzyoutest.xvps.jp',
+]
+if '*' not in ALLOWED_HOSTS:
+    for host in DEFAULT_ALLOWED_HOSTS:
+        if host not in ALLOWED_HOSTS:
+            ALLOWED_HOSTS.append(host)
 
 # アプリケーション
 DJANGO_APPS = [
@@ -18,6 +32,7 @@ DJANGO_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'django.contrib.humanize',
 ]
 
 THIRD_PARTY_APPS = [
@@ -124,25 +139,57 @@ SIMPLE_JWT = {
 }
 
 # CORS 設定
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
-    "http://localhost:3001",
-    "http://127.0.0.1:3001",
-    "http://162.43.55.80:3000",
-    "http://172.20.10.2:3000",
+CORS_ALLOW_ALL_ORIGINS = config('CORS_ALLOW_ALL_ORIGINS', default=False, cast=bool)
+_cors_origins = config('CORS_ALLOWED_ORIGINS', default='', cast=str)
+if _cors_origins:
+    CORS_ALLOWED_ORIGINS = [origin.strip() for origin in _cors_origins.split(',') if origin.strip()]
+else:
+    CORS_ALLOWED_ORIGINS = []
+
+DEFAULT_CORS_ORIGINS = [
+    'https://kouzyoutest.com',
+    'https://www.kouzyoutest.com',
+    'https://classroom.kouzyoutest.com',
+    'http://kouzyoutest.com',
+    'http://www.kouzyoutest.com',
+    'http://classroom.kouzyoutest.com',
+    'https://kouzyoutest.xvps.jp',
+    'https://classroom.kouzyoutest.xvps.jp',
+    'http://kouzyoutest.xvps.jp',
+    'http://classroom.kouzyoutest.xvps.jp',
 ]
+for origin in DEFAULT_CORS_ORIGINS:
+    if origin not in CORS_ALLOWED_ORIGINS:
+        CORS_ALLOWED_ORIGINS.append(origin)
 CORS_ALLOW_CREDENTIALS = True
 
 # セキュリティ設定（開発環境用）
-if DEBUG:
-    # 開発環境ではCOOP警告を無効化
-    SECURE_CROSS_ORIGIN_OPENER_POLICY = None
-    SECURE_REFERRER_POLICY = None
+SECURE_SSL_REDIRECT = config('SECURE_SSL_REDIRECT', default=not DEBUG, cast=bool)
+SECURE_CROSS_ORIGIN_OPENER_POLICY = "same-origin" if SECURE_SSL_REDIRECT else None
+SECURE_REFERRER_POLICY = "same-origin" if SECURE_SSL_REDIRECT else None
+SESSION_COOKIE_SECURE = config('SESSION_COOKIE_SECURE', default=SECURE_SSL_REDIRECT, cast=bool)
+CSRF_COOKIE_SECURE = config('CSRF_COOKIE_SECURE', default=SECURE_SSL_REDIRECT, cast=bool)
+_csrf_trusted = config('CSRF_TRUSTED_ORIGINS', default='', cast=str)
+if _csrf_trusted:
+    CSRF_TRUSTED_ORIGINS = [origin.strip() for origin in _csrf_trusted.split(',') if origin.strip()]
 else:
-    # 本番環境用のセキュリティ設定
-    SECURE_CROSS_ORIGIN_OPENER_POLICY = "same-origin"
-    SECURE_REFERRER_POLICY = "same-origin"
+    CSRF_TRUSTED_ORIGINS = []
+
+DEFAULT_CSRF_TRUSTED_ORIGINS = [
+    'https://kouzyoutest.com',
+    'https://www.kouzyoutest.com',
+    'https://classroom.kouzyoutest.com',
+    'http://kouzyoutest.com',
+    'http://www.kouzyoutest.com',
+    'http://classroom.kouzyoutest.com',
+    'https://kouzyoutest.xvps.jp',
+    'https://classroom.kouzyoutest.xvps.jp',
+    'http://kouzyoutest.xvps.jp',
+    'http://classroom.kouzyoutest.xvps.jp',
+]
+for origin in DEFAULT_CSRF_TRUSTED_ORIGINS:
+    if origin not in CSRF_TRUSTED_ORIGINS:
+        CSRF_TRUSTED_ORIGINS.append(origin)
 
 # パスワード検証
 AUTH_PASSWORD_VALIDATORS = [
@@ -164,7 +211,19 @@ AUTH_PASSWORD_VALIDATORS = [
 LANGUAGE_CODE = 'ja'
 TIME_ZONE = 'Asia/Tokyo'
 USE_I18N = True
+USE_L10N = True  # ローカライゼーション（日付・時刻・数値フォーマット）を有効化
 USE_TZ = True
+
+# 利用可能な言語
+LANGUAGES = [
+    ('ja', '日本語'),
+    ('en', 'English'),
+]
+
+# 日付フォーマットをカスタマイズ
+DATE_FORMAT = 'Y年n月j日'
+DATETIME_FORMAT = 'Y年n月j日 G:i'
+SHORT_DATE_FORMAT = 'Y/m/d'
 
 # 静的ファイル
 STATIC_URL = '/static/'

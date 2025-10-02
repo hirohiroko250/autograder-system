@@ -58,7 +58,11 @@ export default function StudentDetailPage({ params }: StudentDetailPageProps) {
     queryKey: ['student-enrollments', params.id],
     queryFn: async () => {
       if (!student) return [];
-      const response = await studentApi.getStudentEnrollments(student.id);
+      const studentId = Number(student.id ?? student.student_id);
+      if (Number.isNaN(studentId)) {
+        throw new Error('生徒IDが不正です');
+      }
+      const response = await studentApi.getStudentEnrollments(studentId);
       return response;
     },
     enabled: !!student,

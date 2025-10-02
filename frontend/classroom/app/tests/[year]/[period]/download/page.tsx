@@ -103,13 +103,27 @@ function StudentManagementContent({ year, period }: { year: string; period: stri
     ? results.filter((result: any) => result.classroom_name === user.classroom_name)
     : results;
 
+  type ScoreInputStatus = 'complete' | 'partial' | 'not_started' | 'absent';
+
   // 生徒の点数入力状況を判定
-  const getScoreInputStatus = (student: any) => {
-    // 統合結果形式に対応
-    if (student.combined_results && student.combined_results.total_score > 0) {
-      return 'complete'; // 完了
+  const getScoreInputStatus = (student: any): ScoreInputStatus => {
+    if (student?.attendance_status === 'absent' || student?.is_absent === true || student?.attendance === false) {
+      return 'absent';
     }
-    return 'not_started'; // 未入力
+
+    if (student?.combined_results && student.combined_results.total_score > 0) {
+      return 'complete';
+    }
+
+    const hasPartialScores = Object.values(student?.subject_results || {}).some((subject: any) => {
+      const total = Number(subject?.total_score ?? 0);
+      return !Number.isNaN(total) && total > 0;
+    });
+    if (hasPartialScores) {
+      return 'partial';
+    }
+
+    return 'not_started';
   };
 
   // フィルターとソートを適用
@@ -503,12 +517,19 @@ function StudentManagementContent({ year, period }: { year: string; period: stri
             ) : (
               filteredResults.map((result: any) => {
                 const inputStatus = getScoreInputStatus(result);
-                const statusConfig = {
+                const statusConfigMap: Record<ScoreInputStatus, {
+                  icon: typeof CheckCircle;
+                  color: string;
+                  bg: string;
+                  border: string;
+                  text: string;
+                }> = {
                   complete: { icon: CheckCircle, color: 'text-green-600', bg: 'bg-green-50', border: 'border-green-200', text: '入力完了' },
                   partial: { icon: Clock, color: 'text-yellow-600', bg: 'bg-yellow-50', border: 'border-yellow-200', text: '部分入力' },
                   not_started: { icon: XCircle, color: 'text-red-600', bg: 'bg-red-50', border: 'border-red-200', text: '未入力' },
                   absent: { icon: XCircle, color: 'text-gray-600', bg: 'bg-gray-50', border: 'border-gray-200', text: '欠席' }
-                }[inputStatus];
+                };
+                const statusConfig = statusConfigMap[inputStatus];
                 const StatusIcon = statusConfig.icon;
 
                 return (

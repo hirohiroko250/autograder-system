@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -15,8 +15,23 @@ export default function LoginPage() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  // サーバーサイドでも判定できるよう、ビルド時の判定を追加
+  const isClassroomBuild = process.env.NEXT_PUBLIC_CLASSROOM_MODE === 'true';
+  const [isClassroomPage, setIsClassroomPage] = useState(isClassroomBuild);
   const router = useRouter();
   const { login } = useAuth();
+  const classroomLoginUrl = `${(process.env.NEXT_PUBLIC_CLASSROOM_URL ?? 'http://162.43.55.80:3001').replace(/\/$/, '')}/login`;
+
+  useEffect(() => {
+    // クライアントサイドでポート番号で教室ページかどうかを判定
+    if (typeof window !== 'undefined') {
+      const port = window.location.port;
+      const isClientClassroom = port === '3001';
+      if (isClientClassroom !== isClassroomPage) {
+        setIsClassroomPage(isClientClassroom);
+      }
+    }
+  }, [isClassroomPage]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -25,7 +40,12 @@ export default function LoginPage() {
     try {
       await login(username, password);
       toast.success('ログインしました');
-      router.push('/dashboard');
+      // ポートに応じて適切なダッシュボードにリダイレクト
+      if (isClassroomPage) {
+        router.push('/classrooms');  // 教室ページ用ダッシュボード
+      } else {
+        router.push('/dashboard');   // 塾ページ用ダッシュボード
+      }
     } catch (error: any) {
       console.error('Login error:', error);
       toast.error('ログインIDまたはパスワードが間違っています');
@@ -43,7 +63,9 @@ export default function LoginPage() {
           </div>
           <CardTitle className="text-2xl font-bold">全国学力向上テスト</CardTitle>
           <CardDescription className="text-muted-foreground">
-            塾管理者・教室管理者としてログインしてください
+            {isClassroomPage
+              ? '教室管理者としてログインしてください'
+              : '塾管理者・教室管理者としてログインしてください'}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -91,19 +113,36 @@ export default function LoginPage() {
               {loading ? 'ログイン中...' : 'ログイン'}
             </Button>
           </form>
-          
+
           <div className="mt-6 pt-4 border-t">
             <div className="text-center text-sm text-muted-foreground">
-              <p className="font-semibold mb-2">教室ページ</p>
-              <p className="text-xs">教室管理者専用のログインページ</p>
-              <Button
-                variant="outline"
-                size="sm"
-                className="mt-2 text-xs"
-                onClick={() => window.open(`${process.env.NEXT_PUBLIC_CLASSROOM_URL}/login`, '_blank')}
-              >
-                教室ページでログイン
-              </Button>
+              {isClassroomPage ? (
+                <>
+                  <p className="font-semibold mb-2">教室管理者専用ページ</p>
+                  <p className="text-xs">このページは教室管理者専用です</p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="mt-2 text-xs"
+                    onClick={() => window.open('http://162.43.55.80:3000/login', '_blank')}
+                  >
+                    塾管理者ページでログイン
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <p className="font-semibold mb-2">教室ページ</p>
+                  <p className="text-xs">教室管理者専用のログインページ</p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="mt-2 text-xs"
+                    onClick={() => window.open(classroomLoginUrl, '_blank')}
+                  >
+                    教室ページでログイン
+                  </Button>
+                </>
+              )}
             </div>
           </div>
         </CardContent>

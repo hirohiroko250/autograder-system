@@ -222,7 +222,7 @@ class AttendanceRecord(models.Model):
 
 
 class SchoolBillingReport(models.Model):
-    """塾ごとの課金レポート（集計用）"""
+    """塾単位の課金レポート（教室集計済み）"""
     PERIOD_CHOICES = [
         ('spring', '春期'),
         ('summer', '夏期'),
@@ -249,8 +249,8 @@ class SchoolBillingReport(models.Model):
 
     class Meta:
         db_table = 'school_billing_reports'
-        verbose_name = '課金レポート'
-        verbose_name_plural = '課金レポート'
+        verbose_name = '塾別課金レポート'
+        verbose_name_plural = '塾別課金レポート'
         unique_together = ['school', 'year', 'period']
         indexes = [
             models.Index(fields=['year', 'period']),

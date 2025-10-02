@@ -15,11 +15,14 @@ import {
   TestSchedule
 } from './types';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000/api';
+const PUBLIC_API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || '/api';
+const INTERNAL_API_BASE_URL = process.env.INTERNAL_API_BASE_URL || process.env.NEXT_PUBLIC_API_BASE_URL || 'http://backend:8000/api';
+
+const resolveBaseURL = () => (typeof window === 'undefined' ? INTERNAL_API_BASE_URL : PUBLIC_API_BASE_URL);
 
 // Axios instance
 const apiClient = axios.create({
-  baseURL: API_BASE_URL,
+  baseURL: resolveBaseURL(),
   headers: {
     'Content-Type': 'application/json',
   },
@@ -68,6 +71,7 @@ if (typeof window !== 'undefined') {
 
 // Request interceptor to add auth header
 apiClient.interceptors.request.use((config) => {
+  config.baseURL = resolveBaseURL();
   if (accessToken) {
     config.headers.Authorization = `Bearer ${accessToken}`;
   }

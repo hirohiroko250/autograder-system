@@ -327,9 +327,9 @@ export default function ScoreEntryClient({ year, period, subject }: ScoreEntryCl
                 <div className="flex justify-between items-center">
                   <Label className="text-lg font-bold">合計点</Label>
                   <span className="text-xl font-bold">
-                    {Object.values(editingScores).reduce((sum, score) => {
+                    {Object.values(editingScores).reduce<number>((sum, score) => {
                       const num = Number(score);
-                      return sum + (isNaN(num) ? 0 : num);
+                      return sum + (Number.isNaN(num) ? 0 : num);
                     }, 0)}点 / 100点
                   </span>
                 </div>

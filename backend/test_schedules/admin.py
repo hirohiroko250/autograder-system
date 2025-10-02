@@ -1,27 +1,56 @@
 from django.contrib import admin
 from django.contrib import messages
 from django.utils import timezone
+from django.utils.html import format_html
 from .models import TestScheduleInfo
 from classrooms.utils import get_billing_summary
 
 @admin.register(TestScheduleInfo)
 class TestScheduleInfoAdmin(admin.ModelAdmin):
-    list_display = ['year', 'period', 'planned_date', 'actual_date', 'deadline', 'status', 'billing_status']
+    list_display = [
+        'year',
+        'period_badge',
+        'planned_date',
+        'actual_date',
+        'deadline',
+        'status_badge',
+        'billing_status',
+    ]
     list_filter = ['year', 'period', 'status']
     search_fields = ['year']
     ordering = ['-year', 'period']
     actions = ['mark_as_completed', 'mark_as_in_progress', 'show_billing_summary']
 
+    @admin.display(description='期間', ordering='period')
+    def period_badge(self, obj):
+        return format_html(
+            '<span class="badge status-{}">{}</span>',
+            obj.period,
+            obj.get_period_display(),
+        )
+
     def billing_status(self, obj):
         """課金レポートの生成状況を表示"""
         if obj.status == 'completed':
             summary = get_billing_summary(int(obj.year), obj.period)
-            if summary['total_classrooms'] > 0:
-                return f"課金レポート生成済み ({summary['total_classrooms']}教室)"
+            if summary['total_schools'] > 0:
+                return (
+                    f"課金レポート生成済み "
+                    f"({summary['total_schools']}塾/{summary['total_classrooms']}教室)"
+                )
             else:
                 return "課金レポート未生成"
         return "-"
     billing_status.short_description = "課金レポート状況"
+
+    @admin.display(description='ステータス', ordering='status')
+    def status_badge(self, obj):
+        css_class = f"status-{obj.status}"
+        return format_html(
+            '<span class="badge {}">{}</span>',
+            css_class,
+            obj.get_status_display(),
+        )
 
     def mark_as_completed(self, request, queryset):
         """選択したテストスケジュールを完了状態にする（課金レポート自動生成）"""
@@ -72,7 +101,7 @@ class TestScheduleInfoAdmin(admin.ModelAdmin):
                 period_display = schedule.get_period_display()
                 summaries.append(
                     f"{schedule.year}年度{period_display}: "
-                    f"{summary['total_classrooms']}教室, "
+                    f"{summary['total_schools']}塾/{summary['total_classrooms']}教室, "
                     f"{summary['total_students']}名, "
                     f"{summary['total_amount']:,}円"
                 )

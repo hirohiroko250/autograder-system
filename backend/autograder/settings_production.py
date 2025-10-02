@@ -3,6 +3,7 @@
 """
 from .settings import *
 import os
+from pathlib import Path
 
 # 本番環境フラグ
 DEBUG = False
@@ -11,6 +12,11 @@ ALLOWED_HOSTS = [
     'localhost',
     '127.0.0.1',
     'autograder-system.com',  # 独自ドメインがある場合
+    'kouzyoutest.xvps.jp',
+    'classroom.kouzyoutest.xvps.jp',
+    'kouzyoutest.com',
+    'www.kouzyoutest.com',
+    'classroom.kouzyoutest.com',
 ]
 
 # セキュリティ設定
@@ -58,6 +64,10 @@ CACHES = {
     }
 }
 
+# ログディレクトリを確保
+LOG_DIR = Path(os.environ.get('LOG_DIR', '/var/log/autograder'))
+LOG_DIR.mkdir(parents=True, exist_ok=True)
+
 # ログ設定（本番用）
 LOGGING = {
     'version': 1,
@@ -76,7 +86,7 @@ LOGGING = {
         'file': {
             'level': 'INFO',
             'class': 'logging.handlers.RotatingFileHandler',
-            'filename': '/var/log/autograder/django.log',
+            'filename': str(LOG_DIR / 'django.log'),
             'maxBytes': 1024*1024*15,  # 15MB
             'backupCount': 10,
             'formatter': 'verbose',
@@ -84,7 +94,7 @@ LOGGING = {
         'error_file': {
             'level': 'ERROR',
             'class': 'logging.handlers.RotatingFileHandler',
-            'filename': '/var/log/autograder/django_error.log',
+            'filename': str(LOG_DIR / 'django_error.log'),
             'maxBytes': 1024*1024*15,  # 15MB
             'backupCount': 10,
             'formatter': 'verbose',
@@ -131,8 +141,30 @@ DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', EMAIL_HOST_USER)
 CORS_ALLOWED_ORIGINS = [
     "https://162.43.55.80",
     "http://162.43.55.80",
+    "http://162.43.55.80:3000",
+    "http://162.43.55.80:3001",
     "https://autograder-system.com",  # 独自ドメインがある場合
     "http://localhost:3000",  # フロントエンド開発用
+    "http://localhost:3001",  # フロントエンド開発用（教室ページ）
+    "https://kouzyoutest.xvps.jp",
+    "https://classroom.kouzyoutest.xvps.jp",
+    "https://kouzyoutest.com",
+    "https://www.kouzyoutest.com",
+    "https://classroom.kouzyoutest.com",
+    "http://kouzyoutest.com",
+    "http://www.kouzyoutest.com",
+    "http://classroom.kouzyoutest.com",
+]
+
+CSRF_TRUSTED_ORIGINS += [
+    "https://kouzyoutest.xvps.jp",
+    "https://classroom.kouzyoutest.xvps.jp",
+    "https://kouzyoutest.com",
+    "https://www.kouzyoutest.com",
+    "https://classroom.kouzyoutest.com",
+    "http://kouzyoutest.com",
+    "http://www.kouzyoutest.com",
+    "http://classroom.kouzyoutest.com",
 ]
 
 # 管理者設定

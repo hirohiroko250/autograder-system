@@ -4,20 +4,30 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django.contrib.auth import get_user_model
 from django.db import transaction
-from django.db.models import Count, Sum, F, Q
 from django.utils import timezone
-from .models import Classroom, ClassroomPermission, AttendanceRecord
+from .models import Classroom, ClassroomPermission, AttendanceRecord, SchoolBillingReport
 from .serializers import ClassroomSerializer
-from .utils import get_billing_student_count, get_classroom_attendance_summary
+from .utils import (
+    get_billing_student_count,
+    get_classroom_attendance_summary,
+    generate_school_billing_report,
+)
 from schools.models import School
-from students.models import Student, StudentEnrollment
 
 User = get_user_model()
 
 class ClassroomViewSet(viewsets.ModelViewSet):
     serializer_class = ClassroomSerializer
     permission_classes = [IsAuthenticated]
-    
+
+    @staticmethod
+    def _get_period_display(period):
+        return {
+            'spring': '春期',
+            'summer': '夏期',
+            'winter': '冬期',
+        }.get(period, period)
+
     def get_queryset(self):
         user = self.request.user
         if user.role == 'school_admin':
@@ -197,283 +207,423 @@ class ClassroomViewSet(viewsets.ModelViewSet):
     
     @action(detail=False, methods=['get'])
     def billing_summary(self, request):
-        """全教室の課金サマリーを取得"""
-        user = request.user
-        year = request.query_params.get('year', 2025)
+        """塾単位の課金サマリーを取得"""
+        year = request.query_params.get('year', timezone.now().year)
         period = request.query_params.get('period', 'summer')
-        
+        force_refresh = request.query_params.get('force') in {'1', 'true', 'True'}
+
         try:
             year = int(year)
         except ValueError:
             return Response(
-                {'error': '年度は数字で指定してください'}, 
+                {'error': '年度は数字で指定してください'},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        
-        # ユーザーの権限に応じて教室を取得
+
         classrooms = self.get_queryset()
-        
-        summary_data = []
-        total_billing_count = 0
-        
-        for classroom in classrooms:
-            billing_count = get_billing_student_count(classroom, year, period)
-            attendance_summary = get_classroom_attendance_summary(classroom, year, period)
-            
-            summary_data.append({
-                'classroom_id': classroom.classroom_id,
-                'classroom_name': classroom.name,
-                'membership_type': classroom.get_membership_type_display(),
-                'billing_student_count': billing_count,
-                'attendance_summary': attendance_summary,
+        school_ids = list(classrooms.values_list('school_id', flat=True).distinct())
+
+        if not school_ids:
+            return Response({
+                'year': year,
+                'period': period,
+                'period_display': self._get_period_display(period),
+                'total_schools': 0,
+                'total_classrooms': 0,
+                'total_billing_students': 0,
+                'total_amount': 0,
+                'schools': [],
             })
-            
-            total_billing_count += billing_count
-        
-        return Response({
+
+        schools = School.objects.filter(id__in=school_ids).order_by('school_id')
+
+        summary_entries = []
+        total_schools = 0
+        total_classrooms = 0
+        total_billing_students = 0
+        total_amount = 0
+        errors = []
+
+        for school in schools:
+            report = SchoolBillingReport.objects.filter(
+                school=school,
+                year=year,
+                period=period,
+            ).first()
+
+            try:
+                if force_refresh or not report:
+                    generate_school_billing_report(
+                        school=school,
+                        year=year,
+                        period=period,
+                        force=True,
+                    )
+                    report = SchoolBillingReport.objects.filter(
+                        school=school,
+                        year=year,
+                        period=period,
+                    ).first()
+            except Exception as exc:
+                errors.append({
+                    'school_id': school.school_id,
+                    'school_name': school.name,
+                    'error': str(exc),
+                })
+                continue
+
+            if not report:
+                continue
+
+            total_schools += 1
+            total_classrooms += report.total_classrooms
+            total_billing_students += report.billed_students
+            total_amount += report.total_amount
+
+            summary_entries.append({
+                'school_id': school.school_id,
+                'school_name': school.name,
+                'membership_type': school.get_membership_type_display(),
+                'price_per_student': report.price_per_student,
+                'total_classrooms': report.total_classrooms,
+                'total_students': report.total_students,
+                'billed_students': report.billed_students,
+                'total_amount': report.total_amount,
+                'average_per_classroom': report.get_average_per_classroom(),
+                'classroom_details': report.classroom_details,
+                'generated_at': report.generated_at.isoformat(),
+                'updated_at': report.updated_at.isoformat(),
+            })
+
+        response_payload = {
             'year': year,
             'period': period,
-            'total_billing_count': total_billing_count,
-            'classrooms': summary_data,
-        })
+            'period_display': self._get_period_display(period),
+            'total_schools': total_schools,
+            'total_classrooms': total_classrooms,
+            'total_billing_students': total_billing_students,
+            'total_amount': total_amount,
+            'schools': summary_entries,
+        }
+
+        if errors:
+            response_payload['errors'] = errors
+
+        return Response(response_payload)
     
     @action(detail=False, methods=['get'])
     def billing_details(self, request):
-        """請求詳細データ取得（出席かつ点数入力済み生徒のみ）"""
-        user = request.user
+        """塾別の請求詳細（生徒・教室内訳）を取得"""
         year = request.query_params.get('year')
         period = request.query_params.get('period')
-        classroom_id = request.query_params.get('classroom_id')
-        
+        school_identifier = request.query_params.get('school_id')
+        force_refresh = request.query_params.get('force') in {'1', 'true', 'True'}
+
         if not year or not period:
             return Response(
-                {'error': '年度と期間を指定してください'}, 
+                {'error': '年度と期間を指定してください'},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        
+
         try:
             year = int(year)
         except ValueError:
             return Response(
-                {'error': '年度は数字で指定してください'}, 
+                {'error': '年度は数字で指定してください'},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        
-        # ユーザーの権限に応じて教室を取得
+
         classrooms = self.get_queryset()
-        if classroom_id:
-            classrooms = classrooms.filter(classroom_id=classroom_id)
-        
-        billing_data = []
-        total_amount = 0
+        accessible_school_ids = list(classrooms.values_list('school_id', flat=True).distinct())
+
+        if not accessible_school_ids:
+            return Response({
+                'year': year,
+                'period': period,
+                'period_display': self._get_period_display(period),
+                'summary': {
+                    'total_schools': 0,
+                    'total_classrooms': 0,
+                    'total_students': 0,
+                    'total_amount': 0,
+                },
+                'schools': [],
+            })
+
+        schools_qs = School.objects.filter(id__in=accessible_school_ids)
+        if school_identifier:
+            schools_qs = schools_qs.filter(school_id=school_identifier)
+
+        schools = list(schools_qs.order_by('school_id'))
+
+        if school_identifier and not schools:
+            return Response(
+                {'error': f'指定された塾ID {school_identifier} の課金情報が見つかりません'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        detailed_entries = []
+        total_classrooms = 0
         total_students = 0
-        
-        for classroom in classrooms:
-            # 出席かつ点数入力済みの生徒を取得
-            billing_records = AttendanceRecord.objects.filter(
-                classroom=classroom,
+        total_amount = 0
+        errors = []
+        latest_generated_at = None
+        latest_updated_at = None
+
+        for school in schools:
+            report = SchoolBillingReport.objects.filter(
+                school=school,
                 year=year,
                 period=period,
-                has_score_input=True  # 点数入力済み = 課金対象
-            ).order_by('student_id', 'subject')
-            
-            # 生徒ごとにグループ化
-            student_billing = {}
-            for record in billing_records:
-                if record.student_id not in student_billing:
-                    student_billing[record.student_id] = {
-                        'student_id': record.student_id,
-                        'student_name': record.student_name,
-                        'subjects': [],
-                        'billing_amount': 0,
-                        'score_input_dates': []
-                    }
-                
-                student_billing[record.student_id]['subjects'].append({
-                    'subject': record.subject,
-                    'score_input_date': record.score_input_date.isoformat() if record.score_input_date else None,
-                    'amount': record.get_billing_amount()
-                })
-                
-                if record.score_input_date:
-                    student_billing[record.student_id]['score_input_dates'].append(
-                        record.score_input_date.isoformat()
+            ).first()
+
+            try:
+                if force_refresh or not report:
+                    generate_school_billing_report(
+                        school=school,
+                        year=year,
+                        period=period,
+                        force=True,
                     )
-            
-            # 教室ごとの料金計算
-            classroom_total = 0
-            classroom_students = list(student_billing.values())
-            
-            for student_data in classroom_students:
-                # 生徒単位の料金（1名あたり料金）
-                student_amount = classroom.get_price_per_student()
-                student_data['billing_amount'] = student_amount
-                classroom_total += student_amount
-            
-            billing_data.append({
-                'classroom_id': classroom.classroom_id,
-                'classroom_name': classroom.name,
-                'school_name': classroom.school.name,
-                'membership_type': classroom.school.membership_type,
-                'price_per_student': classroom.get_price_per_student(),
-                'students': classroom_students,
-                'student_count': len(classroom_students),
-                'total_amount': classroom_total,
+                    report = SchoolBillingReport.objects.filter(
+                        school=school,
+                        year=year,
+                        period=period,
+                    ).first()
+            except Exception as exc:
+                errors.append({
+                    'school_id': school.school_id,
+                    'school_name': school.name,
+                    'error': str(exc),
+                })
+                continue
+
+            if not report:
+                continue
+
+            total_classrooms += report.total_classrooms
+            total_students += report.billed_students
+            total_amount += report.total_amount
+
+            if latest_generated_at is None or report.generated_at > latest_generated_at:
+                latest_generated_at = report.generated_at
+            if latest_updated_at is None or report.updated_at > latest_updated_at:
+                latest_updated_at = report.updated_at
+
+            classroom_details = []
+            for classroom_name, detail in (report.classroom_details or {}).items():
+                detail_copy = dict(detail)
+                detail_copy['classroom_name'] = classroom_name
+                classroom_details.append(detail_copy)
+            classroom_details.sort(key=lambda item: item.get('classroom_name', ''))
+
+            students = []
+            for student in (report.student_details or {}).values():
+                student_copy = dict(student)
+                student_copy['billing_amount'] = report.price_per_student
+                students.append(student_copy)
+            students.sort(key=lambda item: (item.get('classroom_name', ''), item.get('student_name', '')))
+
+            detailed_entries.append({
+                'school_id': school.school_id,
+                'school_name': school.name,
+                'membership_type': school.get_membership_type_display(),
+                'price_per_student': report.price_per_student,
+                'total_classrooms': report.total_classrooms,
+                'total_students': report.total_students,
+                'billed_students': report.billed_students,
+                'total_amount': report.total_amount,
+                'classroom_details': classroom_details,
+                'students': students,
+                'generated_at': report.generated_at.isoformat(),
+                'updated_at': report.updated_at.isoformat(),
             })
-            
-            total_amount += classroom_total
-            total_students += len(classroom_students)
-        
-        return Response({
+
+        response_payload = {
             'year': year,
             'period': period,
+            'period_display': self._get_period_display(period),
             'summary': {
+                'total_schools': len(detailed_entries),
+                'total_classrooms': total_classrooms,
                 'total_students': total_students,
                 'total_amount': total_amount,
-                'classroom_count': len(billing_data),
             },
-            'classrooms': billing_data,
-            'generated_at': timezone.now().isoformat(),
-        })
+            'schools': detailed_entries,
+        }
+
+        if latest_generated_at:
+            response_payload['generated_at'] = latest_generated_at.isoformat()
+        if latest_updated_at:
+            response_payload['updated_at'] = latest_updated_at.isoformat()
+        if errors:
+            response_payload['errors'] = errors
+
+        return Response(response_payload)
     
     @action(detail=False, methods=['post'])
     def generate_billing_report(self, request):
-        """請求レポート生成・保存"""
-        user = request.user
+        """塾別課金レポートを生成・保存"""
         year = request.data.get('year')
         period = request.data.get('period')
-        
+        school_ids_param = request.data.get('school_ids')
+        force_param = request.data.get('force')
+
         if not year or not period:
             return Response(
-                {'error': '年度と期間を指定してください'}, 
+                {'error': '年度と期間を指定してください'},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        
+
         try:
             year = int(year)
         except ValueError:
             return Response(
-                {'error': '年度は数字で指定してください'}, 
+                {'error': '年度は数字で指定してください'},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        
-        # ユーザーの権限に応じて教室を取得
+
+        force_refresh = False
+        if isinstance(force_param, str):
+            force_refresh = force_param.lower() in {'1', 'true', 'yes'}
+        elif isinstance(force_param, bool):
+            force_refresh = force_param
+
         classrooms = self.get_queryset()
-        
-        created_reports = []
-        
-        for classroom in classrooms:
-            # 既存のレポートがある場合は更新、なければ作成
-            report, created = BillingReport.objects.get_or_create(
-                classroom=classroom,
-                year=year,
-                period=period,
-                defaults={
-                    'price_per_student': classroom.get_price_per_student(),
-                }
+        accessible_school_ids = list(classrooms.values_list('school_id', flat=True).distinct())
+
+        if not accessible_school_ids:
+            return Response(
+                {'error': '課金レポートを生成できる塾がありません'},
+                status=status.HTTP_400_BAD_REQUEST
             )
-            
-            # 出席かつ点数入力済みの生徒を集計
-            billing_records = AttendanceRecord.objects.filter(
-                classroom=classroom,
-                year=year,
-                period=period,
-                has_score_input=True
+
+        schools_qs = School.objects.filter(id__in=accessible_school_ids)
+
+        selected_school_codes = None
+        if school_ids_param:
+            if isinstance(school_ids_param, (list, tuple)):
+                selected_school_codes = [str(code) for code in school_ids_param]
+            elif isinstance(school_ids_param, str):
+                selected_school_codes = [code.strip() for code in school_ids_param.split(',') if code.strip()]
+            else:
+                return Response(
+                    {'error': 'school_ids はカンマ区切り文字列またはリストで指定してください'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+        if selected_school_codes:
+            schools_qs = schools_qs.filter(school_id__in=selected_school_codes)
+
+        schools = list(schools_qs.order_by('school_id'))
+
+        if selected_school_codes and not schools:
+            return Response(
+                {'error': '指定された塾IDの課金レポートを生成できません'},
+                status=status.HTTP_404_NOT_FOUND
             )
-            
-            # 生徒数とデータを集計
-            unique_students = billing_records.values('student_id', 'student_name').distinct()
-            billed_student_count = unique_students.count()
-            
-            # 全受講生徒数（参考用）
-            total_students = StudentEnrollment.objects.filter(
-                student__classroom=classroom,
-                year=year,
-                period=period,
-                is_active=True
-            ).count()
-            
-            # 生徒詳細データを作成
-            student_details = {}
-            for student_data in unique_students:
-                student_id = student_data['student_id']
-                student_records = billing_records.filter(student_id=student_id)
-                
-                student_details[student_id] = {
-                    'student_name': student_data['student_name'],
-                    'subjects': list(student_records.values_list('subject', flat=True)),
-                    'score_input_dates': [
-                        record.score_input_date.isoformat() if record.score_input_date else None
-                        for record in student_records
-                    ],
-                    'billing_amount': classroom.get_price_per_student(),
-                }
-            
-            # レポートを更新
-            report.total_students = total_students
-            report.billed_students = billed_student_count
-            report.price_per_student = classroom.get_price_per_student()
-            report.total_amount = billed_student_count * classroom.get_price_per_student()
-            report.student_details = student_details
-            report.save()
-            
-            created_reports.append({
-                'classroom_id': classroom.classroom_id,
-                'classroom_name': classroom.name,
-                'total_students': total_students,
-                'billed_students': billed_student_count,
-                'total_amount': report.total_amount,
-                'created': created,
-            })
-        
-        return Response({
-            'message': '請求レポートを生成しました',
+
+        results = []
+        errors = []
+
+        for school in schools:
+            try:
+                result = generate_school_billing_report(
+                    school=school,
+                    year=year,
+                    period=period,
+                    force=force_refresh,
+                )
+                report = SchoolBillingReport.objects.filter(
+                    school=school,
+                    year=year,
+                    period=period,
+                ).first()
+
+                results.append({
+                    'school_id': school.school_id,
+                    'school_name': school.name,
+                    'created': result.get('created', False),
+                    'updated': result.get('updated', False),
+                    'reason': result.get('reason'),
+                    'billed_students': result.get('billed_students', report.billed_students if report else 0),
+                    'total_amount': result.get('total_amount', report.total_amount if report else 0),
+                    'price_per_student': report.price_per_student if report else school.get_price_per_student(),
+                    'total_classrooms': report.total_classrooms if report else 0,
+                    'generated_at': report.generated_at.isoformat() if report else None,
+                    'updated_at': report.updated_at.isoformat() if report else None,
+                })
+            except Exception as exc:
+                errors.append({
+                    'school_id': school.school_id,
+                    'school_name': school.name,
+                    'error': str(exc),
+                })
+
+        response_payload = {
+            'message': '塾別課金レポートを生成しました',
             'year': year,
             'period': period,
-            'reports': created_reports,
-        })
+            'period_display': self._get_period_display(period),
+            'results': results,
+            'processed_schools': len(results),
+        }
+
+        if errors:
+            response_payload['errors'] = errors
+
+        return Response(response_payload)
     
     @action(detail=False, methods=['get'])
     def billing_reports(self, request):
-        """保存済み請求レポート一覧取得"""
-        user = request.user
+        """保存済み塾別課金レポート一覧を取得"""
         year = request.query_params.get('year')
         period = request.query_params.get('period')
-        
-        # ユーザーの権限に応じて教室を取得
+        school_identifier = request.query_params.get('school_id')
+
         classrooms = self.get_queryset()
-        
-        # レポートをフィルタリング
-        reports_query = BillingReport.objects.filter(
-            classroom__in=classrooms
-        ).select_related('classroom', 'classroom__school')
-        
+        accessible_school_ids = list(classrooms.values_list('school_id', flat=True).distinct())
+
+        if not accessible_school_ids:
+            return Response({'reports': [], 'count': 0})
+
+        reports_query = SchoolBillingReport.objects.filter(
+            school__id__in=accessible_school_ids
+        ).select_related('school')
+
         if year:
             try:
                 reports_query = reports_query.filter(year=int(year))
             except ValueError:
-                pass
-        
+                return Response(
+                    {'error': '年度は数字で指定してください'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
         if period:
             reports_query = reports_query.filter(period=period)
-        
+
+        if school_identifier:
+            reports_query = reports_query.filter(school__school_id=school_identifier)
+
         reports_data = []
         for report in reports_query.order_by('-generated_at'):
             reports_data.append({
-                'id': report.id,
-                'classroom_id': report.classroom.classroom_id,
-                'classroom_name': report.classroom.name,
-                'school_name': report.classroom.school.name,
+                'school_id': report.school.school_id,
+                'school_name': report.school.name,
                 'year': report.year,
-                'period': report.get_period_display(),
+                'period': report.period,
+                'period_display': self._get_period_display(report.period),
+                'membership_type': report.school.get_membership_type_display(),
                 'total_students': report.total_students,
                 'billed_students': report.billed_students,
+                'total_classrooms': report.total_classrooms,
                 'price_per_student': report.price_per_student,
                 'total_amount': report.total_amount,
                 'generated_at': report.generated_at.isoformat(),
                 'updated_at': report.updated_at.isoformat(),
             })
-        
+
         return Response({
             'reports': reports_data,
             'count': len(reports_data),
