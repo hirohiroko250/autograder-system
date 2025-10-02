@@ -20,13 +20,13 @@ export default function LoginPage() {
   const [isClassroomPage, setIsClassroomPage] = useState(isClassroomBuild);
   const router = useRouter();
   const { login } = useAuth();
-  const classroomLoginUrl = `${(process.env.NEXT_PUBLIC_CLASSROOM_URL ?? 'http://162.43.55.80:3001').replace(/\/$/, '')}/login`;
+  const classroomLoginUrl = `${(process.env.NEXT_PUBLIC_CLASSROOM_URL ?? 'https://classroom.kouzyoutest.com').replace(/\/$/, '')}/login`;
 
   useEffect(() => {
-    // クライアントサイドでポート番号で教室ページかどうかを判定
+    // クライアントサイドでホスト名で教室ページかどうかを判定
     if (typeof window !== 'undefined') {
-      const port = window.location.port;
-      const isClientClassroom = port === '3001';
+      const hostname = window.location.hostname;
+      const isClientClassroom = hostname.includes('classroom');
       if (isClientClassroom !== isClassroomPage) {
         setIsClassroomPage(isClientClassroom);
       }
@@ -58,10 +58,13 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/10 via-background to-accent/10 p-4">
       <Card className="w-full max-w-md animate-fade-in">
         <CardHeader className="text-center">
-          <div className="mx-auto mb-4 w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center">
-            <GraduationCap className="w-8 h-8 text-primary" />
+          <div className="mx-auto mb-4">
+            <img
+              src="/logo.png"
+              alt="全国学力向上テスト"
+              className="h-16 w-auto mx-auto"
+            />
           </div>
-          <CardTitle className="text-2xl font-bold">全国学力向上テスト</CardTitle>
           <CardDescription className="text-muted-foreground">
             {isClassroomPage
               ? '教室管理者としてログインしてください'
@@ -114,37 +117,22 @@ export default function LoginPage() {
             </Button>
           </form>
 
-          <div className="mt-6 pt-4 border-t">
-            <div className="text-center text-sm text-muted-foreground">
-              {isClassroomPage ? (
-                <>
-                  <p className="font-semibold mb-2">教室管理者専用ページ</p>
-                  <p className="text-xs">このページは教室管理者専用です</p>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="mt-2 text-xs"
-                    onClick={() => window.open('http://162.43.55.80:3000/login', '_blank')}
-                  >
-                    塾管理者ページでログイン
-                  </Button>
-                </>
-              ) : (
-                <>
-                  <p className="font-semibold mb-2">教室ページ</p>
-                  <p className="text-xs">教室管理者専用のログインページ</p>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="mt-2 text-xs"
-                    onClick={() => window.open(classroomLoginUrl, '_blank')}
-                  >
-                    教室ページでログイン
-                  </Button>
-                </>
-              )}
+          {isClassroomPage && (
+            <div className="mt-6 pt-4 border-t">
+              <div className="text-center text-sm text-muted-foreground">
+                <p className="font-semibold mb-2">教室管理者専用ページ</p>
+                <p className="text-xs">このページは教室管理者専用です</p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="mt-2 text-xs"
+                  onClick={() => window.open('https://kouzyoutest.com/login', '_blank')}
+                >
+                  塾管理者ページでログイン
+                </Button>
+              </div>
             </div>
-          </div>
+          )}
         </CardContent>
       </Card>
     </div>

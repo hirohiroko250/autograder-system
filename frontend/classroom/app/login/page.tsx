@@ -74,12 +74,13 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
-          <div className="flex justify-center mb-4">
-            <div className="bg-blue-100 dark:bg-blue-900 p-3 rounded-full">
-              <GraduationCap className="h-8 w-8 text-blue-600 dark:text-blue-400" />
-            </div>
+          <div className="mx-auto mb-4">
+            <img
+              src="/logo.png"
+              alt="全国学力向上テスト"
+              className="h-16 w-auto mx-auto"
+            />
           </div>
-          <CardTitle className="text-2xl font-bold">アン小学生テスト</CardTitle>
           <CardDescription>
             教室管理者ログイン
           </CardDescription>
@@ -123,6 +124,20 @@ export default function LoginPage() {
           <div className="mt-4 text-center text-sm text-gray-600 dark:text-gray-400">
             <p>教室管理者としてログインしてください</p>
             <p>ログインID（塾ID6桁 + 教室ID6桁）とパスワードは塾管理者から取得してください</p>
+          </div>
+          <div className="mt-6 pt-4 border-t">
+            <div className="text-center text-sm text-muted-foreground">
+              <p className="font-semibold mb-2">塾管理者ページ</p>
+              <p className="text-xs">塾管理者専用のログインページ</p>
+              <Button
+                variant="outline"
+                size="sm"
+                className="mt-2 text-xs"
+                onClick={() => window.open('https://kouzyoutest.com/login', '_blank')}
+              >
+                塾管理者ページでログイン
+              </Button>
+            </div>
           </div>
         </CardContent>
       </Card>
