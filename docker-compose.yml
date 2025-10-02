@@ -25,10 +25,12 @@ services:
       - .env
     environment:
       DJANGO_SETTINGS_MODULE: autograder.settings_production
+      LOG_DIR: /app/logs
     volumes:
       - ./backend:/app
       - static_volume:/app/staticfiles
       - media_volume:/app/mediafiles
+      - ./logs:/app/logs
     depends_on:
       - db
     networks:
@@ -36,7 +38,7 @@ services:
     command: >
       sh -c "python manage.py migrate &&
              python manage.py collectstatic --noinput &&
-             gunicorn autograder.wsgi:application --config gunicorn.conf.py"
+             python manage.py runserver 0.0.0.0:8000"
 
   # Next.js フロントエンド（zyukupage）
   frontend-zyuku:
@@ -47,8 +49,9 @@ services:
     env_file:
       - .env
     environment:
-      NEXT_PUBLIC_API_BASE_URL: /api
+      NEXT_PUBLIC_API_BASE_URL: https://kouzyoutest.com/api
       INTERNAL_API_BASE_URL: http://backend:8000/api
+      NEXT_PUBLIC_CLASSROOM_URL: https://classroom.kouzyoutest.com
       NODE_ENV: production
     depends_on:
       - backend
@@ -64,8 +67,9 @@ services:
     env_file:
       - .env
     environment:
-      NEXT_PUBLIC_API_BASE_URL: /api
+      NEXT_PUBLIC_API_BASE_URL: https://kouzyoutest.com/api
       INTERNAL_API_BASE_URL: http://backend:8000/api
+      NEXT_PUBLIC_ZYUKU_URL: https://kouzyoutest.com
       NODE_ENV: production
     depends_on:
       - backend
@@ -78,16 +82,15 @@ services:
     restart: always
     ports:
       - "80:80"
+      - "443:443"
     volumes:
       - ./deploy/nginx.conf:/etc/nginx/nginx.conf:ro
       - static_volume:/var/www/static
       - media_volume:/var/www/media
-      - ./certbot/www:/var/www/certbot:ro
-      - ./certbot/letsencrypt:/etc/letsencrypt:ro
+      - ./ssl:/etc/nginx/ssl:ro
     depends_on:
       - backend
       - frontend-zyuku
-      - frontend-classroom
     networks:
       - app-network
 
