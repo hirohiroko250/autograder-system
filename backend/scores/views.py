@@ -835,29 +835,68 @@ class TestResultViewSet(viewsets.ModelViewSet):
             if record['attendance']:
                 student_data[student_id]['combined_total'] += record['subject_total']
         
+        # 【最適化】全生徒の大問別得点を一括取得
+        all_question_scores = Score.objects.filter(
+            test_filter,
+            attendance=True
+        ).select_related('student', 'question_group').values(
+            'student__student_id',
+            'test__subject',
+            'question_group__group_number',
+            'score',
+            'question_group__max_score'
+        ).order_by('student__student_id', 'test__subject', 'question_group__group_number')
+
+        # 生徒別・科目別の大問得点を整理
+        student_question_scores = {}
+        for qs in all_question_scores:
+            student_id = qs['student__student_id']
+            subject = qs['test__subject']
+
+            if student_id not in student_question_scores:
+                student_question_scores[student_id] = {}
+            if subject not in student_question_scores[student_id]:
+                student_question_scores[student_id][subject] = []
+
+            student_question_scores[student_id][subject].append({
+                'question_number': qs['question_group__group_number'],
+                'score': qs['score'],
+                'max_score': qs['question_group__max_score']
+            })
+
+        # 【最適化】大問別平均を一括計算（学年・科目・大問ごと）
+        all_question_averages = Score.objects.filter(
+            test__schedule__year=year,
+            test__schedule__period=period,
+            attendance=True
+        ).values(
+            'student__grade',
+            'test__subject',
+            'question_group__group_number'
+        ).annotate(
+            avg_score=Avg('score')
+        )
+
+        # 辞書形式で整理: grade -> subject -> question_number -> avg_score
+        question_avg_cache = {}
+        for q_avg in all_question_averages:
+            grade = q_avg['student__grade']
+            subject = q_avg['test__subject']
+            q_num = q_avg['question_group__group_number']
+
+            if grade not in question_avg_cache:
+                question_avg_cache[grade] = {}
+            if subject not in question_avg_cache[grade]:
+                question_avg_cache[grade][subject] = {}
+
+            question_avg_cache[grade][subject][q_num] = q_avg['avg_score']
+
         # 各生徒の詳細情報を追加
         results = []
-        
+
         for student_id, data in student_data.items():
-            # 大問別得点を取得
-            detailed_scores = {}
-            
-            for subject in data['subjects'].keys():
-                question_scores = Score.objects.filter(
-                    student__student_id=student_id,
-                    test__schedule__year=year,
-                    test__schedule__period=period,
-                    test__subject=subject,
-                    attendance=True
-                ).order_by('question_group__group_number')
-                
-                detailed_scores[subject] = []
-                for score in question_scores:
-                    detailed_scores[subject].append({
-                        'question_number': score.question_group.group_number,
-                        'score': score.score,
-                        'max_score': score.question_group.max_score
-                    })
+            # 大問別得点を取得（既に一括取得済み）
+            detailed_scores = student_question_scores.get(student_id, {})
             
             # 学年ごとの順位と平均を計算
             grade = data['grade']
@@ -909,21 +948,9 @@ class TestResultViewSet(viewsets.ModelViewSet):
                     'grade_average': subject_grade_avg,
                     'school_average': subject_school_avg
                 }
-                
-                # 大問別平均も計算
-                question_averages = Score.objects.filter(
-                    test__schedule__year=year,
-                    test__schedule__period=period,
-                    test__subject=subject,
-                    student__grade=grade,
-                    attendance=True
-                ).values('question_group__group_number').annotate(
-                    avg_score=Avg('score')
-                ).order_by('question_group__group_number')
-                
-                subject_averages[subject]['question_averages'] = {}
-                for q_avg in question_averages:
-                    subject_averages[subject]['question_averages'][q_avg['question_group__group_number']] = q_avg['avg_score']
+
+                # 【最適化】大問別平均をキャッシュから取得
+                subject_averages[subject]['question_averages'] = question_avg_cache.get(grade, {}).get(subject, {})
             
             results.append({
                 'student_id': student_id,
