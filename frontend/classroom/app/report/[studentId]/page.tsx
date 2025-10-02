@@ -15,6 +15,7 @@ export default function ReportPage() {
     queryKey: ['student-report', studentId],
     queryFn: async () => {
       // ダミーデータ（実際はAPIから取得）
+      await new Promise(resolve => setTimeout(resolve, 100)); // 小さな遅延
       return {
         issueDate: '2025年00月00日',
         year: 2025,
