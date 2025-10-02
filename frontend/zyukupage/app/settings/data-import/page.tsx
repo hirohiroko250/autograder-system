@@ -72,10 +72,19 @@ export default function DataImportPage() {
   const { data: importHistory = [], isLoading, refetch } = useQuery({
     queryKey: ['import-history'],
     queryFn: async () => {
-      const response = await fetch('http://localhost:8000/api/past-data-imports/');
-      if (!response.ok) throw new Error('Failed to fetch import history');
-      const data = await response.json();
-      return data.results || [];
+      try {
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL || 'https://kouzyoutest.com/api'}/past-data-imports/`, {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+          },
+        });
+        if (!response.ok) throw new Error('Failed to fetch import history');
+        const data = await response.json();
+        return data.results || [];
+      } catch (error) {
+        console.error('Failed to fetch import history:', error);
+        return [];
+      }
     },
   });
 
@@ -91,8 +100,11 @@ export default function DataImportPage() {
         formData.append('notes', data.notes);
       }
 
-      const response = await fetch('http://localhost:8000/api/past-data-imports/', {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL || 'https://kouzyoutest.com/api'}/past-data-imports/`, {
         method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+        },
         body: formData,
       });
 

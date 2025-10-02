@@ -1,11 +1,24 @@
-from django.db.models import Sum, Count, Q
+from __future__ import annotations
+
+from django.db.models import Sum, Count, Q, Avg, Max, Min
+from django.core.exceptions import ValidationError
+from django.db import transaction
+from django.conf import settings
+from django.utils import timezone
+from decimal import Decimal
+import io
+import os
+import zipfile
+import statistics
+import tempfile
+from datetime import datetime
+
+import pandas as pd
+
 from .models import Score, TestResult, CommentTemplate
 from schools.models import School
 from students.models import Student
 from tests.models import TestDefinition, QuestionGroup
-import pandas as pd
-from django.core.exceptions import ValidationError
-from django.db import transaction
 
 def calculate_test_results(student, test, force_temporary=False):
     """学生のテスト結果を計算"""
@@ -484,6 +497,28 @@ def calculate_bulk_rankings(students_data, test):
             rankings_data[student.id]['grade_total'] = len(grade_sorted)
 
     return rankings_data
+
+
+def set_cell_background(cell, rgb_color):
+    """python-docxのセル背景色を設定"""
+    try:
+        from docx.oxml import OxmlElement
+        from docx.oxml.ns import qn
+    except ImportError:
+        return
+
+    tc_pr = cell._tc.get_or_add_tcPr()
+    shading = OxmlElement('w:shd')
+    shading.set(qn('w:val'), 'clear')
+    shading.set(qn('w:color'), 'auto')
+    try:
+        fill = str(rgb_color.rgb)
+    except AttributeError:
+        fill = 'FFFFFF'
+    shading.set(qn('w:fill'), fill)
+    tc_pr.append(shading)
+
+
 def create_beautiful_word_report(report_data):
     """
     美しいデザインのWordレポートを生成
@@ -1469,3 +1504,763 @@ def get_test_summary(year, period, subject, grade_level=None):
         return {'success': False, 'error': '集計結果が見つかりません'}
     except Exception as e:
         return {'success': False, 'error': str(e)}
+
+
+# =============================================================
+# 個別成績表PDF生成ユーティリティ
+# =============================================================
+
+PERIOD_LABELS = {
+    'spring': '春期',
+    'summer': '夏期',
+    'winter': '冬期',
+}
+
+PERIOD_ITERATIONS = {
+    'spring': '第1回',
+    'summer': '第2回',
+    'winter': '第3回',
+}
+
+PERIOD_SHORT_LABELS = {
+    'spring': '春',
+    'summer': '夏',
+    'winter': '冬',
+}
+
+PERIOD_ORDER = {'spring': 1, 'summer': 2, 'winter': 3}
+
+SUBJECT_DISPLAY = {
+    'math': '算数',
+    'mathematics': '数学',
+    'japanese': '国語',
+    'english': '英語',
+}
+
+SUBJECT_ORDER = {
+    'math': 1,
+    'mathematics': 1,
+    'japanese': 2,
+    'english': 3,
+}
+
+REPORTS_SUBDIR = 'reports'
+PDF_FONTS_REGISTERED = False
+
+
+def _ensure_reports_dir() -> str:
+    """帳票保存先ディレクトリを作成してパスを返す"""
+    reports_dir = os.path.join(settings.MEDIA_ROOT, REPORTS_SUBDIR)
+    os.makedirs(reports_dir, exist_ok=True)
+    return reports_dir
+
+
+def _build_download_url(abs_path: str) -> str:
+    """媒体ファイルの絶対パスからダウンロードURLを生成"""
+    rel_path = os.path.relpath(abs_path, settings.MEDIA_ROOT)
+    if rel_path.startswith('..'):
+        return abs_path  # MEDIA_ROOT外に保存されている場合は絶対パスを返す
+    rel_path = rel_path.replace(os.sep, '/')
+    base = settings.MEDIA_URL
+    if not base.endswith('/'):
+        base = f"{base}/"
+    return f"{base}{rel_path}"
+
+
+def _period_display(period: str) -> str:
+    return PERIOD_LABELS.get(period, period)
+
+
+def _iteration_display(period: str) -> str:
+    return PERIOD_ITERATIONS.get(period, '')
+
+
+def _short_period_label(period: str) -> str:
+    return PERIOD_SHORT_LABELS.get(period, period)
+
+
+def _subject_display(subject: str) -> str:
+    if subject in SUBJECT_DISPLAY:
+        return SUBJECT_DISPLAY[subject]
+    subject_dict = dict(TestDefinition.SUBJECTS)
+    return subject_dict.get(subject, subject)
+
+
+def _calculate_deviation(score: float, population_scores: list[float]) -> float | None:
+    if not population_scores:
+        return None
+    if len(population_scores) == 1:
+        return 50.0
+    mean_value = statistics.mean(population_scores)
+    std_dev = statistics.pstdev(population_scores)
+    if std_dev == 0:
+        return 50.0
+    deviation = 50 + 10 * ((score - mean_value) / std_dev)
+    return round(deviation, 1)
+
+
+def _register_pdf_fonts() -> None:
+    """ReportLabで日本語フォントを利用できるよう登録"""
+    global PDF_FONTS_REGISTERED
+    if PDF_FONTS_REGISTERED:
+        return
+    try:
+        from reportlab.pdfbase import pdfmetrics
+        from reportlab.pdfbase.cidfonts import UnicodeCIDFont
+    except ImportError:
+        return
+    pdfmetrics.registerFont(UnicodeCIDFont('HeiseiKakuGo-W5'))
+    pdfmetrics.registerFont(UnicodeCIDFont('HeiseiMincho-W3'))
+    PDF_FONTS_REGISTERED = True
+
+
+def _calculate_combined_average(grade: str, year: int, period: str) -> float:
+    grade_totals = TestResult.objects.filter(
+        test__schedule__year=year,
+        test__schedule__period=period,
+        student__grade=grade
+    ).values('student').annotate(total=Sum('total_score'))
+    if not grade_totals:
+        return 0.0
+    total_sum = sum(item['total'] for item in grade_totals)
+    return float(total_sum / len(grade_totals))
+
+
+def _calculate_combined_metrics(student: Student, year: int, period: str, total_score: float) -> dict:
+    base_qs = TestResult.objects.filter(
+        test__schedule__year=year,
+        test__schedule__period=period
+    )
+
+    grade_qs = list(
+        base_qs.filter(student__grade=student.grade)
+        .values('student', 'student__classroom__school_id')
+        .annotate(total=Sum('total_score'))
+    )
+
+    grade_scores = [item['total'] for item in grade_qs]
+    grade_rank = (sum(1 for item in grade_qs if item['total'] > total_score) + 1) if grade_qs else None
+    grade_total = len(grade_qs)
+    grade_average = (sum(grade_scores) / grade_total) if grade_total else 0
+    grade_deviation = _calculate_deviation(total_score, grade_scores)
+
+    school_rank = None
+    school_total = 0
+    school_average = 0
+    school_scores = []
+    school_id = student.classroom.school_id if student.classroom and student.classroom.school else None
+    if school_id:
+        school_entries = [item for item in grade_qs if item['student__classroom__school_id'] == school_id]
+        school_scores = [item['total'] for item in school_entries]
+        school_total = len(school_entries)
+        if school_total:
+            school_rank = sum(1 for item in school_entries if item['total'] > total_score) + 1
+            school_average = sum(school_scores) / school_total
+
+    national_qs = list(
+        base_qs.values('student').annotate(total=Sum('total_score'))
+    )
+    national_scores = [item['total'] for item in national_qs]
+    national_rank = (sum(1 for item in national_qs if item['total'] > total_score) + 1) if national_qs else None
+    national_total = len(national_qs)
+    national_average = (sum(national_scores) / national_total) if national_total else 0
+    national_deviation = _calculate_deviation(total_score, national_scores)
+
+    return {
+        'grade_rank': grade_rank,
+        'grade_total': grade_total,
+        'grade_average': round(grade_average, 1) if grade_total else 0,
+        'grade_deviation': grade_deviation,
+        'school_rank': school_rank,
+        'school_total': school_total,
+        'school_average': round(school_average, 1) if school_total else 0,
+        'school_deviation': _calculate_deviation(total_score, school_scores) if school_scores else None,
+        'national_rank': national_rank,
+        'national_total': national_total,
+        'national_average': round(national_average, 1) if national_total else 0,
+        'national_deviation': national_deviation,
+    }
+
+
+def _collect_trend_data(student: Student, grade_level: str) -> dict:
+    if not grade_level:
+        return {'overall': [], 'subjects': {}}
+
+    results_qs = TestResult.objects.filter(
+        student=student,
+        test__grade_level=grade_level
+    ).select_related('test__schedule').order_by('test__schedule__year', 'test__schedule__period')
+
+    timeline: dict[tuple[int, str], dict] = {}
+    for result in results_qs:
+        schedule = result.test.schedule
+        key = (schedule.year, schedule.period)
+        entry = timeline.setdefault(key, {
+            'label': f"{str(schedule.year)[2:]}{_short_period_label(schedule.period)}",
+            'subjects': {},
+        })
+        entry['subjects'][result.test.subject] = result.total_score
+
+    sorted_keys = sorted(timeline.keys(), key=lambda x: (x[0], PERIOD_ORDER.get(x[1], 9)))
+
+    overall_trend = []
+    subject_trend: dict[str, list] = {}
+
+    for year_value, period_value in sorted_keys:
+        entry = timeline[(year_value, period_value)]
+        subject_scores = [score for score in entry['subjects'].values() if score is not None]
+        total_score = sum(subject_scores)
+        overall_average = _calculate_combined_average(student.grade, year_value, period_value)
+        overall_trend.append({
+            'label': entry['label'],
+            'score': total_score,
+            'average': overall_average,
+        })
+
+        for subject_code, score in entry['subjects'].items():
+            subject_avg = TestResult.objects.filter(
+                test__schedule__year=year_value,
+                test__schedule__period=period_value,
+                test__subject=subject_code,
+                student__grade=student.grade
+            ).aggregate(avg=Avg('total_score'))['avg'] or 0
+            subject_trend.setdefault(subject_code, [])
+            subject_trend[subject_code].append({
+                'label': entry['label'],
+                'score': score,
+                'average': float(subject_avg),
+            })
+
+    return {'overall': overall_trend, 'subjects': subject_trend}
+
+
+def _collect_individual_report_data(student_id: str, year: int, period: str) -> tuple[dict | None, str | None]:
+    student = Student.objects.select_related('classroom__school').filter(student_id=student_id).first()
+    if not student:
+        return None, '対象の生徒が見つかりません'
+
+    grade_level = get_grade_level_from_student_grade(student.grade)
+
+    tests_qs = TestDefinition.objects.filter(
+        schedule__year=year,
+        schedule__period=period
+    )
+    if grade_level:
+        tests_qs = tests_qs.filter(grade_level=grade_level)
+
+    tests = list(tests_qs.select_related('schedule').prefetch_related('question_groups'))
+    if not tests:
+        return None, '指定条件のテストが見つかりません'
+
+    results_map = {
+        result.test_id: result
+        for result in TestResult.objects.filter(student=student, test__in=tests)
+        .select_related('test', 'test__schedule')
+    }
+    if not results_map:
+        return None, '指定条件の成績が登録されていません'
+
+    schedule = tests[0].schedule
+    test_date = schedule.actual_date or schedule.planned_date
+
+    student_info = {
+        'id': student.student_id,
+        'name': student.name,
+        'grade': student.grade,
+        'school_name': student.classroom.school.name if student.classroom and student.classroom.school else '',
+        'classroom_name': student.classroom.name if student.classroom else '',
+        'membership_type': student.classroom.get_membership_type_display() if student.classroom else '',
+    }
+
+    test_info = {
+        'year': int(year),
+        'period': period,
+        'period_display': _period_display(period),
+        'iteration': _iteration_display(period),
+        'date': test_date.strftime('%Y.%m.%d') if test_date else '',
+        'grade_level': grade_level,
+    }
+
+    subject_entries = []
+    subjects_data = {}
+
+    for test in tests:
+        result = results_map.get(test.id)
+        subject_code = test.subject
+        subject_name = _subject_display(subject_code)
+
+        if not result:
+            continue
+
+        student_scores_qs = Score.objects.filter(student=student, test=test).select_related('question_group')
+        student_scores = {score.question_group_id: score for score in student_scores_qs}
+        attended = any(score.attendance for score in student_scores_qs)
+
+        group_averages = {
+            item['question_group_id']: item['avg']
+            for item in Score.objects.filter(test=test)
+            .values('question_group_id')
+            .annotate(avg=Avg('score'))
+        }
+
+        subject_results_qs = TestResult.objects.filter(test=test)
+        national_average = subject_results_qs.aggregate(avg=Avg('total_score'))['avg'] or 0
+        national_total = subject_results_qs.count()
+
+        school_average = 0
+        school_high = None
+        school_low = None
+        if student.classroom and student.classroom.school:
+            school_results = subject_results_qs.filter(student__classroom__school=student.classroom.school)
+            if school_results.exists():
+                school_average = school_results.aggregate(avg=Avg('total_score'))['avg'] or 0
+                school_high = school_results.aggregate(max=Max('total_score'))['max']
+                school_low = school_results.aggregate(min=Min('total_score'))['min']
+
+        national_rank, national_total_rank = result.get_current_national_rank()
+        school_rank, school_total_rank = result.get_current_school_rank()
+
+        grade_rank = result.grade_rank
+        grade_total = result.grade_total
+
+        deviation = float(result.grade_deviation_score) if result.grade_deviation_score is not None else None
+        if deviation is None:
+            population_scores = list(
+                subject_results_qs.filter(student__grade=student.grade).values_list('total_score', flat=True)
+            )
+            deviation = _calculate_deviation(result.total_score, population_scores)
+
+        question_details = []
+        for group in test.question_groups.order_by('group_number'):
+            score_obj = student_scores.get(group.id)
+            score_value = score_obj.score if score_obj else None
+            max_score = group.max_score
+            national_avg = group_averages.get(group.id, 0)
+            question_details.append({
+                'number': group.group_number,
+                'title': group.title,
+                'score': score_value,
+                'max_score': max_score,
+                'national_average': national_avg,
+                'correct_rate': round((score_value / max_score) * 100, 1) if score_value is not None and max_score else None,
+                'national_correct_rate': round((national_avg / max_score) * 100, 1) if max_score else None,
+            })
+
+        subjects_data[subject_code] = {
+            'code': subject_code,
+            'name': subject_name,
+            'total_score': result.total_score,
+            'max_score': test.max_score,
+            'deviation': deviation,
+            'attendance': attended,
+            'rankings': {
+                'national': {'rank': national_rank, 'total': national_total_rank},
+                'school': {'rank': school_rank, 'total': school_total_rank},
+                'grade': {'rank': grade_rank, 'total': grade_total},
+            },
+            'statistics': {
+                'national_average': round(float(national_average), 1) if national_average is not None else 0,
+                'school_average': round(float(school_average), 1) if school_average else 0,
+                'school_highest': school_high,
+                'school_lowest': school_low,
+            },
+            'question_details': question_details,
+            'comment': result.comment or '',
+        }
+        subject_entries.append(subject_code)
+
+    if not subject_entries:
+        return None, '成績データが見つかりません'
+
+    subject_entries.sort(key=lambda code: SUBJECT_ORDER.get(code, 99))
+
+    total_score = sum(subjects_data[code]['total_score'] for code in subject_entries)
+    total_max = sum(subjects_data[code]['max_score'] for code in subject_entries)
+    combined_metrics = _calculate_combined_metrics(student, year, period, total_score)
+
+    report_data = {
+        'student_info': student_info,
+        'test_info': test_info,
+        'subjects': subjects_data,
+        'subject_order': subject_entries,
+        'combined': {
+            'total_score': total_score,
+            'max_score': total_max,
+            'rankings': {
+                'grade': {
+                    'rank': combined_metrics['grade_rank'],
+                    'total': combined_metrics['grade_total']
+                },
+                'school': {
+                    'rank': combined_metrics['school_rank'],
+                    'total': combined_metrics['school_total']
+                },
+                'national': {
+                    'rank': combined_metrics['national_rank'],
+                    'total': combined_metrics['national_total']
+                },
+            },
+            'averages': {
+                'grade': combined_metrics['grade_average'],
+                'school': combined_metrics['school_average'],
+                'national': combined_metrics['national_average'],
+            },
+            'deviations': {
+                'grade': combined_metrics['grade_deviation'],
+                'school': combined_metrics['school_deviation'],
+                'national': combined_metrics['national_deviation'],
+            }
+        },
+        'trend': _collect_trend_data(student, grade_level),
+    }
+
+    return report_data, None
+
+
+def _format_rank(rank_info: dict) -> str:
+    if not rank_info or not rank_info.get('rank'):
+        return '-'
+    rank = rank_info['rank']
+    total = rank_info.get('total')
+    if total:
+        return f"{int(rank)}位/{int(total)}人"
+    return f"{int(rank)}位"
+
+
+def _format_score(value) -> str:
+    if value is None:
+        return '-'
+    if isinstance(value, (int, float, Decimal)):
+        if float(value).is_integer():
+            return f"{int(value)}"
+        return f"{float(value):.1f}"
+    return str(value)
+
+
+def _generate_trend_chart(points: list[dict], title: str) -> str | None:
+    if len(points) < 2:
+        return None
+    try:
+        import matplotlib
+        matplotlib.use('Agg')
+        import matplotlib.pyplot as plt
+        matplotlib.rcParams['font.family'] = [
+            'Noto Sans CJK JP', 'Yu Gothic', 'Hiragino Sans', 'Meiryo',
+            'IPAexGothic', 'TakaoGothic', 'MS Gothic', 'DejaVu Sans'
+        ]
+        labels = [p['label'] for p in points]
+        scores = [p['score'] for p in points]
+        averages = [p.get('average', 0) for p in points]
+        fig, ax = plt.subplots(figsize=(3.3, 2.0), dpi=160)
+        ax.plot(labels, scores, marker='o', linewidth=2, label='あなた')
+        if any(averages):
+            ax.plot(labels, averages, marker='o', linestyle='--', linewidth=1.6, label='平均')
+        ax.set_title(title)
+        ax.grid(True, alpha=0.3)
+        ax.set_ylim(bottom=0)
+        ax.legend(fontsize=8, loc='lower right')
+        fig.tight_layout()
+        temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.png')
+        fig.savefig(temp_file.name, transparent=True)
+        plt.close(fig)
+        return temp_file.name
+    except Exception:
+        return None
+
+
+def create_individual_report_pdf(report_data: dict) -> tuple[str | None, str | None]:
+    try:
+        from reportlab.pdfgen import canvas
+        from reportlab.lib.pagesizes import landscape, A4
+        from reportlab.lib import colors
+        from reportlab.lib.units import mm
+        from reportlab.platypus import Table, TableStyle, Paragraph
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    except ImportError as exc:
+        return None, f'PDF生成に必要なライブラリが不足しています: {exc}'
+
+    _register_pdf_fonts()
+
+    reports_dir = _ensure_reports_dir()
+    logo_path = os.path.join(settings.BASE_DIR, 'static', 'reports', 'logo.png')
+
+    file_name = "individual_report_{sid}_{year}_{period}_{stamp}.pdf".format(
+        sid=report_data['student_info']['id'],
+        year=report_data['test_info']['year'],
+        period=report_data['test_info']['period'],
+        stamp=datetime.now().strftime('%Y%m%d_%H%M%S'),
+    )
+    file_path = os.path.join(reports_dir, file_name)
+
+    canvas_obj = canvas.Canvas(file_path, pagesize=landscape(A4))
+    width, height = landscape(A4)
+
+    # ヘッダー背景
+    header_height = 40 * mm
+    canvas_obj.setFillColor(colors.HexColor('#0b1f2c'))
+    canvas_obj.rect(0, height - header_height, width, header_height, stroke=0, fill=1)
+
+    canvas_obj.setFillColor(colors.white)
+    canvas_obj.setFont('HeiseiKakuGo-W5', 22)
+    canvas_obj.drawString(20 * mm, height - 18 * mm, '全国学力向上テスト 個人成績表')
+
+    if os.path.exists(logo_path):
+        try:
+            logo_width = 42 * mm
+            logo_height = 28 * mm
+            canvas_obj.drawImage(
+                logo_path,
+                width - logo_width - 15 * mm,
+                height - logo_height - 10 * mm,
+                width=logo_width,
+                height=logo_height,
+                mask='auto'
+            )
+        except Exception:
+            pass
+
+    test_info = report_data['test_info']
+    header_text = f"{test_info['year']}年度 {test_info['iteration']} {test_info['period_display']}"
+    canvas_obj.setFont('HeiseiKakuGo-W5', 13)
+    canvas_obj.drawString(20 * mm, height - 28 * mm, header_text.strip())
+
+    canvas_obj.setFont('HeiseiKakuGo-W5', 10)
+    canvas_obj.drawRightString(width - 15 * mm, height - 12 * mm, f"発行日: {datetime.now():%Y.%m.%d}")
+
+    student_info = report_data['student_info']
+    info_lines = [
+        f"生徒名: {student_info['name']}",
+        f"生徒ID: {student_info['id']}",
+        f"学年: {student_info['grade']}   塾: {student_info['school_name']}   教室: {student_info['classroom_name']}",
+    ]
+    base_y = height - header_height - 8 * mm
+    canvas_obj.setFillColor(colors.black)
+    canvas_obj.setFont('HeiseiKakuGo-W5', 11)
+    for idx, line in enumerate(info_lines):
+        canvas_obj.drawString(20 * mm, base_y - idx * 6 * mm, line)
+
+    # サマリーテーブル
+    subjects_order = report_data['subject_order']
+    column_headers = ['教科'] + [report_data['subjects'][code]['name'] for code in subjects_order] + ['合計']
+
+    combined = report_data['combined']
+    combined_rankings = combined['rankings']
+    combined_averages = combined['averages']
+
+    summary_rows = [column_headers]
+
+    def _subject_row(key: str, formatter):
+        row = [key]
+        for code in subjects_order:
+            row.append(formatter(report_data['subjects'][code]))
+        row.append(formatter(combined))
+        return row
+
+    summary_rows.append(_subject_row('得点', lambda data: _format_score(data.get('total_score'))))
+    summary_rows.append(_subject_row('偏差値', lambda data: _format_score(data.get('deviation'))))
+    summary_rows.append(_subject_row('全国順位', lambda data: _format_rank(data.get('rankings', {}).get('national'))))
+    summary_rows.append(_subject_row('塾内順位', lambda data: _format_rank(data.get('rankings', {}).get('school'))))
+    summary_rows.append(_subject_row('平均点(全国)', lambda data: _format_score(data.get('statistics', {}).get('national_average') if 'statistics' in data else combined_averages.get('national'))))
+    summary_rows.append(_subject_row('平均点(塾)', lambda data: _format_score(data.get('statistics', {}).get('school_average') if 'statistics' in data else combined_averages.get('school'))))
+    summary_rows.append(_subject_row('最高点(塾)', lambda data: _format_score(data.get('statistics', {}).get('school_highest') if 'statistics' in data else None)))
+    summary_rows.append(_subject_row('最低点(塾)', lambda data: _format_score(data.get('statistics', {}).get('school_lowest') if 'statistics' in data else None)))
+
+    summary_table = Table(summary_rows, colWidths=[32 * mm] + [28 * mm] * (len(column_headers) - 1))
+    summary_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#0b1f2c')),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+        ('FONTNAME', (0, 0), (-1, 0), 'HeiseiKakuGo-W5'),
+        ('FONTSIZE', (0, 0), (-1, -1), 10),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('BACKGROUND', (0, 1), (-1, -1), colors.HexColor('#f6f7f9')),
+        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.HexColor('#f6f7f9'), colors.HexColor('#ffffff')]),
+        ('GRID', (0, 0), (-1, -1), 0.25, colors.grey),
+    ]))
+
+    table_width, table_height = summary_table.wrap(0, 0)
+    summary_x = 20 * mm
+    summary_y = base_y - 45 * mm
+    summary_table.drawOn(canvas_obj, summary_x, summary_y - table_height)
+
+    # 科目別詳細
+    detail_x = summary_x + table_width + 12 * mm
+    detail_top = base_y - 10 * mm
+
+    styles = getSampleStyleSheet()
+    remark_style = ParagraphStyle(
+        'Comment',
+        parent=styles['Normal'],
+        fontName='HeiseiKakuGo-W5',
+        fontSize=9,
+        leading=11,
+    )
+
+    current_top = detail_top
+    for code in subjects_order:
+        subject = report_data['subjects'][code]
+        title_text = f"{subject['name']} 出題項目別の成果"
+        canvas_obj.setFont('HeiseiKakuGo-W5', 12)
+        canvas_obj.setFillColor(colors.HexColor('#0b1f2c'))
+        canvas_obj.drawString(detail_x, current_top, title_text)
+
+        question_rows = [['大問', '出題領域名', '得点/配点', '全国平均', '正答率']]
+        for item in subject['question_details']:
+            score_text = '-' if item['score'] is None else f"{item['score']}/{item['max_score']}"
+            avg_text = f"{item['national_average']:.1f}" if item['national_average'] is not None else '-'
+            rate_text = '-' if item['correct_rate'] is None else f"{item['correct_rate']:.0f}%"
+            question_rows.append([
+                f"{item['number']}",
+                item['title'],
+                score_text,
+                avg_text,
+                rate_text,
+            ])
+
+        question_table = Table(question_rows, colWidths=[18 * mm, 50 * mm, 28 * mm, 24 * mm, 24 * mm])
+        question_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#e1f0f8')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.HexColor('#0b1f2c')),
+            ('FONTNAME', (0, 0), (-1, -1), 'HeiseiKakuGo-W5'),
+            ('FONTSIZE', (0, 0), (-1, -1), 9),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('ALIGN', (1, 1), (1, -1), 'LEFT'),
+            ('GRID', (0, 0), (-1, -1), 0.25, colors.HexColor('#bcd4e6')),
+        ]))
+
+        qt_width, qt_height = question_table.wrap(0, 0)
+        current_top -= 8 * mm
+        question_table.drawOn(canvas_obj, detail_x, current_top - qt_height)
+        current_top = current_top - qt_height - 8 * mm
+
+        if subject['comment']:
+            Paragraph(f"{subject['comment']}", remark_style).wrapOn(canvas_obj, qt_width, 20 * mm)
+            Paragraph(f"{subject['comment']}", remark_style).drawOn(canvas_obj, detail_x, current_top - 18 * mm)
+            current_top -= 22 * mm
+
+    # 成長の推移チャート
+    charts_top = summary_y - table_height - 20 * mm
+    trend = report_data['trend']
+    chart_x = 20 * mm
+
+    overall_chart = _generate_trend_chart(trend.get('overall', []), '全教科の推移')
+    if overall_chart:
+        canvas_obj.drawImage(overall_chart, chart_x, charts_top - 55 * mm, width=65 * mm, height=40 * mm, mask='auto')
+        try:
+            os.remove(overall_chart)
+        except OSError:
+            pass
+
+    chart_x += 70 * mm
+    for code in subjects_order:
+        chart_path = _generate_trend_chart(trend['subjects'].get(code, []), f"{report_data['subjects'][code]['name']}の推移")
+        if not chart_path:
+            continue
+        canvas_obj.drawImage(chart_path, chart_x, charts_top - 55 * mm, width=65 * mm, height=40 * mm, mask='auto')
+        chart_x += 70 * mm
+        try:
+            os.remove(chart_path)
+        except OSError:
+            pass
+
+    canvas_obj.showPage()
+    canvas_obj.save()
+
+    try:
+        os.chmod(file_path, 0o644)
+    except OSError:
+        pass
+
+    return file_path, None
+
+
+def generate_individual_report_template(student_id: str, year: int, period: str, format_type: str = 'pdf') -> dict:
+    report_data, error = _collect_individual_report_data(student_id, year, period)
+    if error:
+        return {'success': False, 'error': error}
+
+    if format_type == 'pdf':
+        file_path, err = create_individual_report_pdf(report_data)
+        if err:
+            return {'success': False, 'error': err}
+        download_url = _build_download_url(file_path)
+        return {
+            'success': True,
+            'download_url': download_url,
+            'format': 'pdf',
+        }
+    elif format_type == 'word':
+        try:
+            file_path = create_beautiful_word_report(report_data)
+            download_url = _build_download_url(file_path)
+            return {
+                'success': True,
+                'download_url': download_url,
+                'format': 'word',
+            }
+        except Exception as exc:
+            return {'success': False, 'error': str(exc)}
+    else:
+        return {'success': False, 'error': f'未対応の出力形式です: {format_type}'}
+
+
+def generate_bulk_reports_template(student_ids: list[str], year: int, period: str, format_type: str = 'pdf') -> dict:
+    if not student_ids:
+        return {'success': False, 'error': '生徒IDが指定されていません'}
+
+    generated_files = []
+    errors = []
+
+    for student_id in student_ids:
+        report_data, data_error = _collect_individual_report_data(student_id, year, period)
+        if data_error:
+            errors.append(f"{student_id}: {data_error}")
+            continue
+
+        try:
+            if format_type == 'pdf':
+                file_path, err = create_individual_report_pdf(report_data)
+                if err:
+                    errors.append(f"{student_id}: {err}")
+                    continue
+            elif format_type == 'word':
+                file_path = create_beautiful_word_report(report_data)
+            else:
+                errors.append(f"{student_id}: 未対応の出力形式です ({format_type})")
+                continue
+
+            generated_files.append(file_path)
+        except Exception as exc:  # noqa: BLE001
+            errors.append(f"{student_id}: {exc}")
+
+    if not generated_files:
+        return {'success': False, 'error': errors[0] if errors else '帳票生成に失敗しました'}
+
+    reports_dir = _ensure_reports_dir()
+    zip_name = "individual_reports_{year}_{period}_{stamp}.zip".format(
+        year=year,
+        period=period,
+        stamp=datetime.now().strftime('%Y%m%d_%H%M%S')
+    )
+    zip_path = os.path.join(reports_dir, zip_name)
+
+    with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+        for file_path in generated_files:
+            arcname = os.path.basename(file_path)
+            zip_file.write(file_path, arcname)
+
+    try:
+        os.chmod(zip_path, 0o644)
+    except OSError:
+        pass
+
+    download_url = _build_download_url(zip_path)
+    response = {
+        'success': True,
+        'download_url': download_url,
+        'format': format_type,
+    }
+
+    if errors:
+        response['warnings'] = errors
+
+    return response

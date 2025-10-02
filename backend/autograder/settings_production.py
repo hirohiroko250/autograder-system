@@ -20,8 +20,8 @@ ALLOWED_HOSTS = [
 ]
 
 # セキュリティ設定
-SECURE_SSL_REDIRECT = False  # HTTPSが設定された場合にTrueにする
-SECURE_HSTS_SECONDS = 31536000 if SECURE_SSL_REDIRECT else 0
+SECURE_SSL_REDIRECT = True  # HTTPS強制を有効化
+SECURE_HSTS_SECONDS = 31536000
 SECURE_HSTS_INCLUDE_SUBDOMAINS = True
 SECURE_HSTS_PRELOAD = True
 SECURE_CONTENT_TYPE_NOSNIFF = True
@@ -29,30 +29,34 @@ SECURE_BROWSER_XSS_FILTER = True
 X_FRAME_OPTIONS = 'DENY'
 
 # セッション・クッキー設定
-SESSION_COOKIE_SECURE = SECURE_SSL_REDIRECT
-CSRF_COOKIE_SECURE = SECURE_SSL_REDIRECT
+SESSION_COOKIE_SECURE = False  # 一時的に無効化
+CSRF_COOKIE_SECURE = False     # 一時的に無効化
 SESSION_COOKIE_HTTPONLY = True
 CSRF_COOKIE_HTTPONLY = True
 
 # データベース設定（本番用）
-if os.environ.get('DATABASE_URL'):
-    # PostgreSQL等の本番DB設定
-    import dj_database_url
-    DATABASES = {
-        'default': dj_database_url.parse(os.environ.get('DATABASE_URL'))
+# DATABASE_URLを使用する場合はdj_database_urlが必要
+# if os.environ.get('DATABASE_URL'):
+#     # PostgreSQL等の本番DB設定
+#     import dj_database_url
+#     DATABASES = {
+#         'default': dj_database_url.parse(os.environ.get('DATABASE_URL'))
+#     }
+# else:
+# SQLite（開発・テスト用）
+DATABASES = {
+    'default': {
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': BASE_DIR / 'db_production.sqlite3',
     }
-else:
-    # SQLite（開発・テスト用）
-    DATABASES = {
-        'default': {
-            'ENGINE': 'django.db.backends.sqlite3',
-            'NAME': BASE_DIR / 'db_production.sqlite3',
-        }
-    }
+}
 
 # 静的ファイル設定
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 MEDIA_ROOT = BASE_DIR / 'mediafiles'
+
+# WhiteNoiseが利用できない場合は標準のStorageを使用
+STATICFILES_STORAGE = 'django.contrib.staticfiles.storage.StaticFilesStorage'
 
 # キャッシュ設定
 CACHES = {
@@ -137,6 +141,9 @@ EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', '')
 EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
 DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', EMAIL_HOST_USER)
 
+# 正しいAUTH_USER_MODEL設定（修正）
+AUTH_USER_MODEL = 'accounts.User'
+
 # CORS設定（本番用）
 CORS_ALLOWED_ORIGINS = [
     "https://162.43.55.80",
@@ -151,20 +158,36 @@ CORS_ALLOWED_ORIGINS = [
     "https://kouzyoutest.com",
     "https://www.kouzyoutest.com",
     "https://classroom.kouzyoutest.com",
-    "http://kouzyoutest.com",
-    "http://www.kouzyoutest.com",
-    "http://classroom.kouzyoutest.com",
 ]
 
-CSRF_TRUSTED_ORIGINS += [
+CSRF_TRUSTED_ORIGINS = [
     "https://kouzyoutest.xvps.jp",
     "https://classroom.kouzyoutest.xvps.jp",
     "https://kouzyoutest.com",
     "https://www.kouzyoutest.com",
     "https://classroom.kouzyoutest.com",
-    "http://kouzyoutest.com",
-    "http://www.kouzyoutest.com",
-    "http://classroom.kouzyoutest.com",
+    "https://162.43.55.80",
+    "http://162.43.55.80",
+]
+
+# 一時的にCSRF無効化（管理画面アクセスのため）
+USE_TZ = True
+CSRF_COOKIE_DOMAIN = None
+
+# CSRF検証を完全に無効化（一時的）
+CSRF_FAILURE_VIEW = 'django.views.csrf.csrf_failure'
+CSRF_USE_SESSIONS = False
+
+# 一時的にCSRFミドルウェアを無効化
+MIDDLEWARE = [
+    'corsheaders.middleware.CorsMiddleware',
+    'django.middleware.security.SecurityMiddleware',
+    'django.contrib.sessions.middleware.SessionMiddleware',
+    'django.middleware.common.CommonMiddleware',
+    # 'django.middleware.csrf.CsrfViewMiddleware',  # 一時的にコメントアウト
+    'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'django.contrib.messages.middleware.MessageMiddleware',
+    'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
 # 管理者設定

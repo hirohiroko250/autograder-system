@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import Image from 'next/image';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -81,9 +82,12 @@ export function Sidebar() {
       <div className="p-3 md:p-4 border-b">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <GraduationCap className="w-8 h-8 text-primary" />
             {(!collapsed || isMobile) && (
-              <h1 className="text-lg md:text-xl font-bold">{isMobile ? '学力テスト' : '全国学力向上テスト'}</h1>
+              <img
+                src="/logo.png"
+                alt="全国学力向上テスト"
+                className="h-10 w-auto"
+              />
             )}
           </div>
           <Button

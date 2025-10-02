@@ -67,7 +67,7 @@ export default function LoginPage() {
           </div>
           <CardDescription className="text-muted-foreground">
             {isClassroomPage
-              ? '教室管理者としてログインしてください'
+              ? '塾管理者としてログインしてください'
               : '塾管理者・教室管理者としてログインしてください'}
           </CardDescription>
         </CardHeader>

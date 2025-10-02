@@ -49,7 +49,7 @@ export function ResultsClient({ year }: ResultsClientProps) {
   const [selectedStudents, setSelectedStudents] = useState<string[]>([]);
   const [isReportDialogOpen, setIsReportDialogOpen] = useState(false);
   const [reportType, setReportType] = useState<string>('individual');
-  const [reportFormat, setReportFormat] = useState<string>('word');
+  const [reportFormat, setReportFormat] = useState<string>('pdf');
   const [sortOrder, setSortOrder] = useState<string>('rank');
   const [selectedStudent, setSelectedStudent] = useState<any>(null);
   const [filterStatus, setFilterStatus] = useState<string>('all');
@@ -222,16 +222,20 @@ export function ResultsClient({ year }: ResultsClientProps) {
         studentId: studentId,
         year: parseInt(year),
         period: 'summer',
-        format: 'word'
+        format: reportFormat
       });
 
       if (response.success) {
         // ファイルダウンロード処理
         const link = document.createElement('a');
-        link.href = response.download_url;
-        link.download = `${student.student_name}_成績表_${year}年度夏期.docx`;
+        const downloadUrl = response.download_url.startsWith('http')
+          ? response.download_url
+          : `${process.env.NEXT_PUBLIC_API_BASE_URL?.replace('/api', '') || 'https://kouzyoutest.com'}${response.download_url}`;
+        link.href = downloadUrl;
+        const extension = response.format === 'pdf' || reportFormat === 'pdf' ? 'pdf' : 'docx';
+        link.download = `${student.student_name}_成績表_${year}年度夏期.${extension}`;
         link.click();
-        
+
         toast.success(`${student.student_name}の成績表をダウンロードしました`);
       } else {
         toast.error(`帳票生成に失敗しました: ${response.error}`);
@@ -261,10 +265,13 @@ export function ResultsClient({ year }: ResultsClientProps) {
       if (response.success) {
         // ZIPファイルダウンロード処理
         const link = document.createElement('a');
-        link.href = response.download_url;
+        const downloadUrl = response.download_url.startsWith('http')
+          ? response.download_url
+          : `${process.env.NEXT_PUBLIC_API_BASE_URL?.replace('/api', '') || 'https://kouzyoutest.com'}${response.download_url}`;
+        link.href = downloadUrl;
         link.download = `成績表一括_${year}年度夏期_${selectedStudents.length}名.zip`;
         link.click();
-        
+
         toast.success(`${selectedStudents.length}名の成績表を一括ダウンロードしました`);
       } else {
         toast.error(`一括帳票生成に失敗しました: ${response.error}`);
@@ -290,9 +297,8 @@ export function ResultsClient({ year }: ResultsClientProps) {
 
     const formatText = {
       pdf: 'PDF',
-      excel: 'Excel',
-      csv: 'CSV'
-    }[reportFormat];
+      word: 'Word',
+    }[reportFormat] || 'PDF';
 
     // 帳票生成のシミュレーション
     toast.success(`${reportTypeText}を${formatText}形式で生成しました`);
@@ -357,13 +363,13 @@ export function ResultsClient({ year }: ResultsClientProps) {
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="word">Word（推奨）</SelectItem>
-                      <SelectItem value="excel">Excel</SelectItem>
-                    </SelectContent>
+                  <SelectContent>
+                    <SelectItem value="pdf">PDF（推奨）</SelectItem>
+                    <SelectItem value="word">Word</SelectItem>
+                  </SelectContent>
                   </Select>
                   <p className="text-xs text-gray-500">
-                    Wordファイルは差し込み済みで出力されます
+                    PDFはブラウザでの閲覧と印刷に適したレイアウトです
                   </p>
                 </div>
 

@@ -16,7 +16,7 @@ import {
 } from './types';
 
 const PUBLIC_API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || '/api';
-const INTERNAL_API_BASE_URL = process.env.INTERNAL_API_BASE_URL || process.env.NEXT_PUBLIC_API_BASE_URL || 'http://backend:8000/api';
+const INTERNAL_API_BASE_URL = process.env.INTERNAL_API_BASE_URL || process.env.NEXT_PUBLIC_API_BASE_URL || 'https://kouzyoutest.com/api';
 
 const resolveBaseURL = () => (typeof window === 'undefined' ? INTERNAL_API_BASE_URL : PUBLIC_API_BASE_URL);
 
@@ -89,7 +89,7 @@ apiClient.interceptors.response.use(
 
       if (refreshToken) {
         try {
-          const response = await axios.post(`${API_BASE_URL}/auth/refresh/`, {
+          const response = await axios.post(`${resolveBaseURL()}/auth/refresh/`, {
             refresh: refreshToken,
           });
           

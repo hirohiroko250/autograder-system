@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import Image from 'next/image';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -76,12 +77,15 @@ export function Sidebar() {
     )}>
       <div className="p-4 border-b">
         <div className="flex items-center justify-between">
-          {!collapsed && (
-            <div className="flex items-center gap-2">
-              <GraduationCap className="w-8 h-8 text-primary" />
-              <h1 className="text-xl font-bold">全国学力向上テスト</h1>
-            </div>
-          )}
+          <div className="flex items-center gap-2">
+            {!collapsed && (
+              <img
+                src="/logo.png"
+                alt="全国学力向上テスト"
+                className="h-10 w-auto"
+              />
+            )}
+          </div>
           <Button
             variant="ghost"
             size="icon"

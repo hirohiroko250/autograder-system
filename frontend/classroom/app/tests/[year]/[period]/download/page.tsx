@@ -203,7 +203,7 @@ function StudentManagementContent({ year, period }: { year: string; period: stri
         studentId: studentId,
         year: parseInt(year),
         period: period,
-        format: 'word'
+        format: 'pdf'
       });
 
       if (response.success) {
@@ -211,9 +211,10 @@ function StudentManagementContent({ year, period }: { year: string; period: stri
         const link = document.createElement('a');
         const downloadUrl = response.download_url.startsWith('http') 
           ? response.download_url 
-          : `http://localhost:8000${response.download_url}`;
+          : `${process.env.NEXT_PUBLIC_API_BASE_URL?.replace('/api', '') || 'http://162.43.55.80:8000'}${response.download_url}`;
         link.href = downloadUrl;
-        link.download = `${student.student_name}_成績表_${year}年度${getPeriodLabel(period)}.docx`;
+        const fileExt = response.format === 'pdf' ? 'pdf' : 'docx';
+        link.download = `${student.student_name}_成績表_${year}年度${getPeriodLabel(period)}.${fileExt}`;
         link.target = '_blank';  // 新しいタブで開く
         document.body.appendChild(link);
         link.click();
@@ -242,7 +243,7 @@ function StudentManagementContent({ year, period }: { year: string; period: stri
         studentIds: selectedStudents,
         year: parseInt(year),
         period: period,
-        format: 'word'
+        format: 'pdf'
       });
 
       if (response.success) {
@@ -250,7 +251,7 @@ function StudentManagementContent({ year, period }: { year: string; period: stri
         const link = document.createElement('a');
         const downloadUrl = response.download_url.startsWith('http') 
           ? response.download_url 
-          : `http://localhost:8000${response.download_url}`;
+          : `${process.env.NEXT_PUBLIC_API_BASE_URL?.replace('/api', '') || 'http://162.43.55.80:8000'}${response.download_url}`;
         link.href = downloadUrl;
         link.download = `成績表一括_${year}年度${getPeriodLabel(period)}_${selectedStudents.length}名.zip`;
         link.target = '_blank';

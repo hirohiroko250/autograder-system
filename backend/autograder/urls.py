@@ -24,7 +24,13 @@ import pandas as pd
 
 def redirect_to_frontend(request):
     """管理画面の「サイトを表示」ボタンで塾ページにリダイレクト"""
-    return redirect('http://172.20.10.2:3000')
+    # Hostヘッダーに基づいて適切なフロントエンドURLにリダイレクト
+    host = request.get_host()
+    protocol = 'https' if request.is_secure() else 'http'
+    if 'classroom' in host:
+        return redirect(f'{protocol}://{host}/')
+    else:
+        return redirect(f'{protocol}://{host}/')
 
 def download_school_template(request):
     """塾登録テンプレートを直接ダウンロード"""
@@ -75,7 +81,6 @@ def bulk_add_school_billing(request):
     """課金レポート一括追加ページ"""
     from django.shortcuts import render, redirect
     from django.contrib import messages
-    from django.contrib.admin.views.decorators import staff_member_required
     from classrooms.utils import generate_school_billing_report
     from schools.models import School
     from datetime import datetime
@@ -169,7 +174,7 @@ billing_redirect_patterns = [
     path('admin/classrooms/billingreport/<int:id>/delete/', redirect_billing_to_school_billing, name='billing_redirect_delete'),
 ]
 
-urlpatterns = billing_redirect_patterns + [
+urlpatterns = [
     path('admin/scores/csv-import-launcher/', csv_import_launcher, name='csv_import_launcher'),
     path('admin/scores/import-csv/', import_csv_scores, name='admin_import_csv_scores'),
     path('admin/bulk-add-school-billing/', bulk_add_school_billing, name='bulk_add_school_billing'),
@@ -181,7 +186,7 @@ urlpatterns = billing_redirect_patterns + [
     path('download-school-template/', download_school_template, name='download_school_template'),
     path('admin/schools/import/', include('schools.urls')),
     path('', redirect_to_frontend),  # ルートページで塾ページにリダイレクト
-]
+] + billing_redirect_patterns
 
 # メディアファイルの配信設定（開発環境用）
 if settings.DEBUG:
