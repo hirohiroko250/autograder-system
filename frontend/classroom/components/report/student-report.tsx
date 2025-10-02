@@ -1,5 +1,4 @@
 import React from 'react';
-import Image from 'next/image';
 
 export interface SubjectItem {
   number: number;
@@ -100,18 +99,17 @@ export const StudentReport: React.FC<{ data: ReportData }> = ({ data }) => {
   return (
     <div id="student-report" className="w-[210mm] h-[297mm] bg-white text-black p-8 print:p-8" style={{ fontFamily: 'sans-serif' }}>
       {/* ヘッダー */}
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-4">
-          <div className="w-32 h-16 border border-gray-300 flex items-center justify-center">
-            <Image src="/logo.png" alt="Logo" width={120} height={60} className="object-contain" />
+      <div className="mb-4">
+        <div className="flex items-start justify-between">
+          <div className="w-48">
+            <img src="/logo.png" alt="全国学力向上テスト" className="w-full h-auto" />
           </div>
-          <div>
-            <h1 className="text-2xl font-bold">全国学力向上テスト 個人成績表</h1>
+          <div className="text-right">
+            <p className="text-sm mb-1">発行日：{data.issueDate}</p>
           </div>
         </div>
-        <div className="text-right">
-          <p className="text-sm">発行日：{data.issueDate}</p>
-          <p className="text-lg font-bold">{data.year} 年度 第 {data.periodNumber} 回 学年 {data.grade}</p>
+        <div className="flex items-center justify-center mt-2">
+          <h1 className="text-xl font-bold">全国学力向上テスト 個人成績表 {data.year}年度 第{data.periodNumber}回 学年{data.grade}</h1>
         </div>
       </div>
 
