@@ -195,9 +195,9 @@ function TestResultsContent({ year, period }: { year: string; period: string }) 
       if (response.success) {
         // ファイルダウンロード処理
         const link = document.createElement('a');
-        const downloadUrl = response.download_url.startsWith('http') 
-          ? response.download_url 
-          : `http://localhost:8000${response.download_url}`;
+        const downloadUrl = response.download_url.startsWith('http')
+          ? response.download_url
+          : `${process.env.NEXT_PUBLIC_API_BASE_URL?.replace('/api', '')}${response.download_url}`;
         link.href = downloadUrl;
         const fileExt = response.format === 'pdf' ? 'pdf' : 'docx';
         link.download = `${student.student_name}_成績表_${year}年度${getPeriodLabel(period)}.${fileExt}`;
@@ -235,9 +235,9 @@ function TestResultsContent({ year, period }: { year: string; period: string }) 
       if (response.success) {
         // ZIPファイルダウンロード処理
         const link = document.createElement('a');
-        const downloadUrl = response.download_url.startsWith('http') 
-          ? response.download_url 
-          : `http://localhost:8000${response.download_url}`;
+        const downloadUrl = response.download_url.startsWith('http')
+          ? response.download_url
+          : `${process.env.NEXT_PUBLIC_API_BASE_URL?.replace('/api', '')}${response.download_url}`;
         link.href = downloadUrl;
         link.download = `成績表一括_${year}年度${getPeriodLabel(period)}_${selectedStudents.length}名.zip`;
         link.target = '_blank';

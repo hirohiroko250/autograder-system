@@ -206,7 +206,7 @@ function TestDownloadContent() {
                 </SelectTrigger>
                 <SelectContent>
                   {Array.from({ length: 6 }).map((_, index) => {
-                    const targetYear = (new Date().getFullYear() - index).toString();
+                    const targetYear = (2025 + index).toString();
                     return (
                       <SelectItem key={targetYear} value={targetYear}>
                         {targetYear}年度

@@ -44,7 +44,7 @@ function TestDownloadContent() {
     queryFn: async () => {
       try {
         // 実際のAPIエンドポイントに修正
-        const response = await fetch(`http://localhost:8000/api/tests/${selectedYear}/${selectedPeriod}/files/`);
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/tests/${selectedYear}/${selectedPeriod}/files/`);
         if (!response.ok) {
           throw new Error('Failed to fetch test files');
         }
@@ -114,7 +114,7 @@ function TestDownloadContent() {
       }
       
       // 一時的にfetchを使用してテスト
-      const response = await fetch(`http://localhost:8000/api/tests/${selectedYear}/${selectedPeriod}/files/${file.id}/download/`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/tests/${selectedYear}/${selectedPeriod}/files/${file.id}/download/`, {
         method: 'GET',
       });
       
@@ -146,8 +146,8 @@ function TestDownloadContent() {
   const handleBulkDownload = async () => {
     try {
       console.log('Bulk downloading files');
-      
-      const response = await fetch(`http://localhost:8000/api/tests/${selectedYear}/${selectedPeriod}/files/bulk-download/`, {
+
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/tests/${selectedYear}/${selectedPeriod}/files/bulk-download/`, {
         method: 'GET',
       });
       

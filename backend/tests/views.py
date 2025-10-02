@@ -4,7 +4,7 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny, BasePermission
 from rest_framework.views import APIView
 from django_filters.rest_framework import DjangoFilterBackend
-from django.http import HttpResponse
+from django.http import HttpResponse, Http404
 from django.shortcuts import get_object_or_404
 from .models import TestSchedule, TestDefinition, QuestionGroup, Question, AnswerKey
 
@@ -274,8 +274,13 @@ class TestFileListView(APIView):
         try:
             # 指定された年度・期間のテストを取得
             schedule = get_object_or_404(TestSchedule, year=year, period=period)
+        except Http404:
+            # テストスケジュールが存在しない場合は空のリストを返す
+            return Response([])
+
+        try:
             tests = TestDefinition.objects.filter(schedule=schedule, is_active=True)
-            
+
             files = []
             for test in tests:
                 # 問題ファイル
@@ -294,7 +299,7 @@ class TestFileListView(APIView):
                     'downloadCount': 0 if problem_status != 'available' else 0,
                     'lastUpdated': test.updated_at.isoformat() if test.updated_at else None,
                 })
-                
+
                 # 解答ファイル
                 answer_status = self._get_file_status(test.answer_pdf)
                 files.append({
@@ -311,9 +316,12 @@ class TestFileListView(APIView):
                     'downloadCount': 0 if answer_status != 'available' else 0,
                     'lastUpdated': test.updated_at.isoformat() if test.updated_at else None,
                 })
-            
+
             return Response(files)
         except Exception as e:
+            import traceback
+            print(f"ERROR in TestFileListView: {str(e)}")
+            print(traceback.format_exc())
             return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
     
     def _get_file_status(self, file_field):

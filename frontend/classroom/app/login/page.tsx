@@ -20,7 +20,7 @@ export default function LoginPage() {
 
   useEffect(() => {
     // Set API URL on client side to avoid hydration mismatch
-    setApiUrl(process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000/api');
+    setApiUrl(process.env.NEXT_PUBLIC_API_BASE_URL || '');
   }, []);
 
   const handleLogin = async (e: React.FormEvent) => {

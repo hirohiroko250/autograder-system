@@ -81,23 +81,33 @@ export function Sidebar() {
     )}>
       <div className="p-3 md:p-4 border-b">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            {(!collapsed || isMobile) && (
+          {collapsed && !isMobile ? (
+            <div className="flex items-center justify-center w-full">
               <img
                 src="/logo.png"
                 alt="全国学力向上テスト"
-                className="h-10 w-auto"
+                className="h-10 w-10 object-cover object-left"
               />
-            )}
-          </div>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setCollapsed(!collapsed)}
-            className="hover:bg-primary/10 hidden md:flex"
-          >
-            {collapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
-          </Button>
+            </div>
+          ) : (
+            <>
+              <div className="flex items-center gap-2">
+                <img
+                  src="/logo.png"
+                  alt="全国学力向上テスト"
+                  className="h-10 w-auto"
+                />
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setCollapsed(!collapsed)}
+                className="hover:bg-primary/10 hidden md:flex"
+              >
+                {collapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
+              </Button>
+            </>
+          )}
         </div>
       </div>
       

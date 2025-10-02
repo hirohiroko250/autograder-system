@@ -95,7 +95,7 @@ export default function CommentTemplatesPage() {
   const { data: templates = [], isLoading } = useQuery({
     queryKey: ['comment-templates'],
     queryFn: async () => {
-      const response = await fetch('http://localhost:8000/api/comment-templates-v2/');
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/comment-templates-v2/`);
       if (!response.ok) throw new Error('Failed to fetch templates');
       const data = await response.json();
       return data.results || [];
@@ -105,7 +105,7 @@ export default function CommentTemplatesPage() {
   // テンプレート作成
   const createMutation = useMutation({
     mutationFn: async (data: TemplateFormData) => {
-      const response = await fetch('http://localhost:8000/api/comment-templates-v2/', {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/comment-templates-v2/`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
@@ -127,7 +127,7 @@ export default function CommentTemplatesPage() {
   // テンプレート更新
   const updateMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: TemplateFormData }) => {
-      const response = await fetch(`http://localhost:8000/api/comment-templates-v2/${id}/`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/comment-templates-v2/${id}/`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
@@ -150,7 +150,7 @@ export default function CommentTemplatesPage() {
   // テンプレート削除
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      const response = await fetch(`http://localhost:8000/api/comment-templates-v2/${id}/`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/comment-templates-v2/${id}/`, {
         method: 'DELETE',
       });
       if (!response.ok) throw new Error('Failed to delete template');

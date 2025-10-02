@@ -11,7 +11,7 @@ export default function TestSchedulePage() {
   const { data: schedules } = useQuery({
     queryKey: ['test-schedule-info'],
     queryFn: async () => {
-      const response = await fetch('http://localhost:8000/api/test-schedules-info/', {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/test-schedules-info/`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
         },

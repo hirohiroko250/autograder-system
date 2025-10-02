@@ -44,7 +44,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             if ((userData.role === 'classroom_admin' || userData.role === 'school_admin') && userData.school_id && !userData.permissions) {
               console.log('AuthContext: User without permissions, fetching from API');
               try {
-                const schoolUrl = `${process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000/api'}/schools/?school_id=${userData.school_id}`;
+                const schoolUrl = `${process.env.NEXT_PUBLIC_API_BASE_URL}/schools/?school_id=${userData.school_id}`;
                 console.log('AuthContext: Fetching school permissions from:', schoolUrl);
                 
                 const schoolResponse = await fetch(schoolUrl, {
@@ -153,7 +153,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       if ((response.user.role === 'classroom_admin' || response.user.role === 'school_admin') && response.user.school_id) {
         console.log('AuthContext: Fetching school permissions for school_id:', response.user.school_id);
         try {
-          const schoolUrl = `${process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000/api'}/schools/?school_id=${response.user.school_id}`;
+          const schoolUrl = `${process.env.NEXT_PUBLIC_API_BASE_URL}/schools/?school_id=${response.user.school_id}`;
           console.log('AuthContext: School API URL:', schoolUrl);
           
           const schoolResponse = await fetch(schoolUrl, {

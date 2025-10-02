@@ -106,8 +106,8 @@ export function TestDownloadClient({ year, period }: TestDownloadClientProps) {
     try {
       // 実際のファイルダウンロードAPI
       console.log('Downloading file:', file.id);
-      
-      const response = await fetch(`http://localhost:8000/api/tests/${selectedYear}/${selectedPeriod}/files/${file.id}/download/`, {
+
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/tests/${selectedYear}/${selectedPeriod}/files/${file.id}/download/`, {
         method: 'GET',
       });
       
@@ -140,8 +140,8 @@ export function TestDownloadClient({ year, period }: TestDownloadClientProps) {
     try {
       // 一括ダウンロードAPI
       console.log('Bulk downloading files');
-      
-      const response = await fetch(`http://localhost:8000/api/tests/${selectedYear}/${selectedPeriod}/files/bulk-download/`, {
+
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/tests/${selectedYear}/${selectedPeriod}/files/bulk-download/`, {
         method: 'GET',
       });
       

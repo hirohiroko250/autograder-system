@@ -70,7 +70,7 @@ export default function DataImportPage() {
   const { data: importHistory = [], isLoading, refetch } = useQuery({
     queryKey: ['import-history'],
     queryFn: async () => {
-      const response = await fetch('http://localhost:8000/api/past-data-imports/');
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/past-data-imports/`);
       if (!response.ok) throw new Error('Failed to fetch import history');
       const data = await response.json();
       return data.results || [];
@@ -89,7 +89,7 @@ export default function DataImportPage() {
         formData.append('notes', data.notes);
       }
 
-      const response = await fetch('http://localhost:8000/api/past-data-imports/', {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/past-data-imports/`, {
         method: 'POST',
         body: formData,
       });

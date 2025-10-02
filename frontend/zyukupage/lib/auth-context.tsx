@@ -44,7 +44,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             if (userData.role === 'classroom_admin' && userData.classroom_id && !userData.permissions) {
               console.log('zyukupage AuthContext: Classroom admin without permissions, fetching from API');
               try {
-                const classroomUrl = `${process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000/api'}/classrooms/${userData.classroom_id}/`;
+                const classroomUrl = `${process.env.NEXT_PUBLIC_API_BASE_URL}/classrooms/${userData.classroom_id}/`;
                 console.log('zyukupage AuthContext: Fetching classroom permissions from:', classroomUrl);
                 
                 const classroomResponse = await fetch(classroomUrl, {
@@ -115,7 +115,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       // 教室管理者の場合、教室の権限設定を取得
       if (response.user.role === 'classroom_admin' && response.user.classroom_id) {
         try {
-          const classroomResponse = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000/api'}/classrooms/${response.user.classroom_id}/`, {
+          const classroomResponse = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/classrooms/${response.user.classroom_id}/`, {
             headers: {
               'Authorization': `Bearer ${response.access}`,
             },
