@@ -1546,6 +1546,7 @@ SUBJECT_ORDER = {
 
 REPORTS_SUBDIR = 'reports'
 PDF_FONTS_REGISTERED = False
+DEFAULT_JAPANESE_FONT = 'HeiseiKakuGo-W5'  # デフォルトフォント（登録時に更新される）
 
 
 def _ensure_reports_dir() -> str:
@@ -1609,8 +1610,26 @@ def _register_pdf_fonts() -> None:
         from reportlab.pdfbase.cidfonts import UnicodeCIDFont
     except ImportError:
         return
-    pdfmetrics.registerFont(UnicodeCIDFont('HeiseiKakuGo-W5'))
-    pdfmetrics.registerFont(UnicodeCIDFont('HeiseiMincho-W3'))
+
+    # フォントを登録（エラーハンドリング付き、複数の候補を試す）
+    global DEFAULT_JAPANESE_FONT
+    font_candidates = [
+        'HeiseiKakuGo-W5',
+        'HeiseiMincho-W3',
+        'MS-Gothic',
+        'MS-Mincho'
+    ]
+
+    registered_any = False
+    for font_name in font_candidates:
+        try:
+            pdfmetrics.registerFont(UnicodeCIDFont(font_name))
+            if not registered_any:
+                DEFAULT_JAPANESE_FONT = font_name  # 最初に登録できたフォントをデフォルトに
+                registered_any = True
+        except (KeyError, Exception):
+            continue  # フォントが利用できない場合は次を試す
+
     PDF_FONTS_REGISTERED = True
 
 
@@ -2001,7 +2020,7 @@ def create_individual_report_pdf(report_data: dict) -> tuple[str | None, str | N
     canvas_obj.rect(0, height - header_height, width, header_height, stroke=0, fill=1)
 
     canvas_obj.setFillColor(colors.white)
-    canvas_obj.setFont('HeiseiKakuGo-W5', 22)
+    canvas_obj.setFont(DEFAULT_JAPANESE_FONT, 22)
     canvas_obj.drawString(20 * mm, height - 18 * mm, '全国学力向上テスト 個人成績表')
 
     if os.path.exists(logo_path):
@@ -2021,10 +2040,10 @@ def create_individual_report_pdf(report_data: dict) -> tuple[str | None, str | N
 
     test_info = report_data['test_info']
     header_text = f"{test_info['year']}年度 {test_info['iteration']} {test_info['period_display']}"
-    canvas_obj.setFont('HeiseiKakuGo-W5', 13)
+    canvas_obj.setFont(DEFAULT_JAPANESE_FONT, 13)
     canvas_obj.drawString(20 * mm, height - 28 * mm, header_text.strip())
 
-    canvas_obj.setFont('HeiseiKakuGo-W5', 10)
+    canvas_obj.setFont(DEFAULT_JAPANESE_FONT, 10)
     canvas_obj.drawRightString(width - 15 * mm, height - 12 * mm, f"発行日: {datetime.now():%Y.%m.%d}")
 
     student_info = report_data['student_info']
@@ -2035,7 +2054,7 @@ def create_individual_report_pdf(report_data: dict) -> tuple[str | None, str | N
     ]
     base_y = height - header_height - 8 * mm
     canvas_obj.setFillColor(colors.black)
-    canvas_obj.setFont('HeiseiKakuGo-W5', 11)
+    canvas_obj.setFont(DEFAULT_JAPANESE_FONT, 11)
     for idx, line in enumerate(info_lines):
         canvas_obj.drawString(20 * mm, base_y - idx * 6 * mm, line)
 
@@ -2069,7 +2088,7 @@ def create_individual_report_pdf(report_data: dict) -> tuple[str | None, str | N
     summary_table.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#0b1f2c')),
         ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-        ('FONTNAME', (0, 0), (-1, 0), 'HeiseiKakuGo-W5'),
+        ('FONTNAME', (0, 0), (-1, 0), DEFAULT_JAPANESE_FONT),
         ('FONTSIZE', (0, 0), (-1, -1), 10),
         ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
         ('BACKGROUND', (0, 1), (-1, -1), colors.HexColor('#f6f7f9')),
@@ -2090,7 +2109,7 @@ def create_individual_report_pdf(report_data: dict) -> tuple[str | None, str | N
     remark_style = ParagraphStyle(
         'Comment',
         parent=styles['Normal'],
-        fontName='HeiseiKakuGo-W5',
+        fontName=DEFAULT_JAPANESE_FONT,
         fontSize=9,
         leading=11,
     )
@@ -2099,7 +2118,7 @@ def create_individual_report_pdf(report_data: dict) -> tuple[str | None, str | N
     for code in subjects_order:
         subject = report_data['subjects'][code]
         title_text = f"{subject['name']} 出題項目別の成果"
-        canvas_obj.setFont('HeiseiKakuGo-W5', 12)
+        canvas_obj.setFont(DEFAULT_JAPANESE_FONT, 12)
         canvas_obj.setFillColor(colors.HexColor('#0b1f2c'))
         canvas_obj.drawString(detail_x, current_top, title_text)
 
@@ -2120,7 +2139,7 @@ def create_individual_report_pdf(report_data: dict) -> tuple[str | None, str | N
         question_table.setStyle(TableStyle([
             ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#e1f0f8')),
             ('TEXTCOLOR', (0, 0), (-1, 0), colors.HexColor('#0b1f2c')),
-            ('FONTNAME', (0, 0), (-1, -1), 'HeiseiKakuGo-W5'),
+            ('FONTNAME', (0, 0), (-1, -1), DEFAULT_JAPANESE_FONT),
             ('FONTSIZE', (0, 0), (-1, -1), 9),
             ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
             ('ALIGN', (1, 1), (1, -1), 'LEFT'),
