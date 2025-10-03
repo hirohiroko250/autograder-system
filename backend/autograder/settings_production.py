@@ -5,6 +5,12 @@ from .settings import *
 import os
 from pathlib import Path
 
+# DRF 認証設定を上書き（セッション認証を追加）
+REST_FRAMEWORK['DEFAULT_AUTHENTICATION_CLASSES'] = [
+    'rest_framework_simplejwt.authentication.JWTAuthentication',
+    'rest_framework.authentication.SessionAuthentication',
+]
+
 # 本番環境フラグ
 DEBUG = False
 ALLOWED_HOSTS = [
