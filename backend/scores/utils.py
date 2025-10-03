@@ -1613,11 +1613,31 @@ def _register_pdf_fonts() -> None:
 
     # フォントを登録（エラーハンドリング付き、複数の候補を試す）
     global DEFAULT_JAPANESE_FONT
+
+    # まずTTFフォントを試す（文字化けしにくい）
+    try:
+        from reportlab.pdfbase.ttfonts import TTFont
+        # DejaVu Sans（多くのLinuxシステムで利用可能）
+        ttf_paths = [
+            '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf',
+            '/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf',
+        ]
+        for ttf_path in ttf_paths:
+            if os.path.exists(ttf_path):
+                try:
+                    pdfmetrics.registerFont(TTFont('JapaneseFont', ttf_path))
+                    DEFAULT_JAPANESE_FONT = 'JapaneseFont'
+                    PDF_FONTS_REGISTERED = True
+                    return
+                except:
+                    continue
+    except:
+        pass
+
+    # TTFが失敗したらCIDフォントを試す
     font_candidates = [
         'HeiseiKakuGo-W5',
         'HeiseiMincho-W3',
-        'MS-Gothic',
-        'MS-Mincho'
     ]
 
     registered_any = False
@@ -1625,10 +1645,10 @@ def _register_pdf_fonts() -> None:
         try:
             pdfmetrics.registerFont(UnicodeCIDFont(font_name))
             if not registered_any:
-                DEFAULT_JAPANESE_FONT = font_name  # 最初に登録できたフォントをデフォルトに
+                DEFAULT_JAPANESE_FONT = font_name
                 registered_any = True
         except (KeyError, Exception):
-            continue  # フォントが利用できない場合は次を試す
+            continue
 
     PDF_FONTS_REGISTERED = True
 
