@@ -1769,7 +1769,7 @@ def _collect_individual_report_data(student_id: str, year: int, period: str) -> 
         'grade': student.grade,
         'school_name': student.classroom.school.name if student.classroom and student.classroom.school else '',
         'classroom_name': student.classroom.name if student.classroom else '',
-        'membership_type': student.classroom.get_membership_type_display() if student.classroom else '',
+        'membership_type': student.classroom.school.get_membership_type_display() if student.classroom and student.classroom.school else '',
     }
 
     test_info = {
