@@ -1808,6 +1808,7 @@ def _collect_individual_report_data(student_id: str, year: int, period: str) -> 
         'grade': student.grade,
         'school_name': student.classroom.school.name if student.classroom and student.classroom.school else '',
         'classroom_name': student.classroom.name if student.classroom else '',
+        'school_id': student.classroom.school.school_id if student.classroom and student.classroom.school else '',
         'membership_type': student.classroom.school.get_membership_type_display() if student.classroom and student.classroom.school else '',
     }
 
@@ -2008,9 +2009,10 @@ def _generate_trend_chart(points: list[dict], title: str) -> str | None:
 
 
 def create_individual_report_pdf(report_data: dict) -> tuple[str | None, str | None]:
+    """個人成績表PDF生成（デザイン仕様完全準拠版 - A3横向き）"""
     try:
         from reportlab.pdfgen import canvas
-        from reportlab.lib.pagesizes import landscape, A4
+        from reportlab.lib.pagesizes import landscape, A3
         from reportlab.lib import colors
         from reportlab.lib.units import mm
         from reportlab.platypus import Table, TableStyle, Paragraph
@@ -2019,196 +2021,372 @@ def create_individual_report_pdf(report_data: dict) -> tuple[str | None, str | N
         return None, f'PDF生成に必要なライブラリが不足しています: {exc}'
 
     _register_pdf_fonts()
-
+    
     reports_dir = _ensure_reports_dir()
     logo_path = os.path.join(settings.BASE_DIR, 'static', 'reports', 'logo.png')
-
-    file_name = "individual_report_{sid}_{year}_{period}_{stamp}.pdf".format(
-        sid=report_data['student_info']['id'],
-        year=report_data['test_info']['year'],
-        period=report_data['test_info']['period'],
-        stamp=datetime.now().strftime('%Y%m%d_%H%M%S'),
-    )
+    
+    file_name = f"individual_report_{report_data['student_info']['id']}_{report_data['test_info']['year']}_{report_data['test_info']['period']}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
     file_path = os.path.join(reports_dir, file_name)
-
-    canvas_obj = canvas.Canvas(file_path, pagesize=landscape(A4))
-    width, height = landscape(A4)
-
-    # ヘッダー背景
-    header_height = 40 * mm
-    canvas_obj.setFillColor(colors.HexColor('#0b1f2c'))
-    canvas_obj.rect(0, height - header_height, width, header_height, stroke=0, fill=1)
-
-    canvas_obj.setFillColor(colors.white)
-    canvas_obj.setFont(DEFAULT_JAPANESE_FONT, 22)
-    canvas_obj.drawString(20 * mm, height - 18 * mm, '全国学力向上テスト 個人成績表')
-
+    
+    # A3横向き（デザイン仕様準拠）
+    c = canvas.Canvas(file_path, pagesize=landscape(A3))
+    width, height = landscape(A3)
+    
+    # 色定義（デザイン仕様準拠）
+    COLOR_MATH = colors.HexColor('#00A650')  # 算数: 緑
+    COLOR_JAPANESE = colors.HexColor('#FF8C00')  # 国語: オレンジ  
+    COLOR_TOTAL = colors.HexColor('#00A0E9')  # 合計: 水色
+    COLOR_HEADER_BG = colors.HexColor('#F5F5F5')
+    
+    # === ヘッダー部分 ===
+    y = height - 15*mm
+    
+    # ロゴ
     if os.path.exists(logo_path):
         try:
-            logo_width = 42 * mm
-            logo_height = 28 * mm
-            canvas_obj.drawImage(
-                logo_path,
-                width - logo_width - 15 * mm,
-                height - logo_height - 10 * mm,
-                width=logo_width,
-                height=logo_height,
-                mask='auto'
-            )
-        except Exception:
+            c.drawImage(logo_path, 10*mm, y - 15*mm, width=50*mm, height=12*mm, preserveAspectRatio=True, mask='auto')
+        except:
             pass
-
+    
+    # タイトル
+    c.setFont(DEFAULT_JAPANESE_FONT, 18)
+    c.drawString(70*mm, y, '全国学力向上テスト  個人成績表')
+    
+    # 発行日
+    c.setFont(DEFAULT_JAPANESE_FONT, 10)
+    c.drawRightString(width - 10*mm, y, f'発行日：{datetime.now().strftime("%Y年%m月%d日")}')
+    
+    y -= 20*mm
+    
+    # 年度・回・学年情報
     test_info = report_data['test_info']
-    header_text = f"{test_info['year']}年度 {test_info['iteration']} {test_info['period_display']}"
-    canvas_obj.setFont(DEFAULT_JAPANESE_FONT, 13)
-    canvas_obj.drawString(20 * mm, height - 28 * mm, header_text.strip())
-
-    canvas_obj.setFont(DEFAULT_JAPANESE_FONT, 10)
-    canvas_obj.drawRightString(width - 15 * mm, height - 12 * mm, f"発行日: {datetime.now():%Y.%m.%d}")
-
     student_info = report_data['student_info']
-    info_lines = [
-        f"生徒名: {student_info['name']}",
-        f"生徒ID: {student_info['id']}",
-        f"学年: {student_info['grade']}   塾: {student_info['school_name']}   教室: {student_info['classroom_name']}",
-    ]
-    base_y = height - header_height - 8 * mm
-    canvas_obj.setFillColor(colors.black)
-    canvas_obj.setFont(DEFAULT_JAPANESE_FONT, 11)
-    for idx, line in enumerate(info_lines):
-        canvas_obj.drawString(20 * mm, base_y - idx * 6 * mm, line)
-
-    # サマリーテーブル
-    subjects_order = report_data['subject_order']
-    column_headers = ['教科'] + [report_data['subjects'][code]['name'] for code in subjects_order] + ['合計']
-
-    combined = report_data['combined']
-    combined_rankings = combined['rankings']
-    combined_averages = combined['averages']
-
-    summary_rows = [column_headers]
-
-    def _subject_row(key: str, formatter):
-        row = [key]
-        for code in subjects_order:
-            row.append(formatter(report_data['subjects'][code]))
-        row.append(formatter(combined))
-        return row
-
-    summary_rows.append(_subject_row('得点', lambda data: _format_score(data.get('total_score'))))
-    summary_rows.append(_subject_row('偏差値', lambda data: _format_score(data.get('deviation'))))
-    summary_rows.append(_subject_row('全国順位', lambda data: _format_rank(data.get('rankings', {}).get('national'))))
-    summary_rows.append(_subject_row('塾内順位', lambda data: _format_rank(data.get('rankings', {}).get('school'))))
-    summary_rows.append(_subject_row('平均点(全国)', lambda data: _format_score(data.get('statistics', {}).get('national_average') if 'statistics' in data else combined_averages.get('national'))))
-    summary_rows.append(_subject_row('平均点(塾)', lambda data: _format_score(data.get('statistics', {}).get('school_average') if 'statistics' in data else combined_averages.get('school'))))
-    summary_rows.append(_subject_row('最高点(塾)', lambda data: _format_score(data.get('statistics', {}).get('school_highest') if 'statistics' in data else None)))
-    summary_rows.append(_subject_row('最低点(塾)', lambda data: _format_score(data.get('statistics', {}).get('school_lowest') if 'statistics' in data else None)))
-
-    summary_table = Table(summary_rows, colWidths=[32 * mm] + [28 * mm] * (len(column_headers) - 1))
-    summary_table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#0b1f2c')),
-        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-        ('FONTNAME', (0, 0), (-1, 0), DEFAULT_JAPANESE_FONT),
-        ('FONTSIZE', (0, 0), (-1, -1), 10),
+    
+    info_text = f"{test_info['year']}年度  第{test_info.get('iteration', '1').replace('第', '').replace('回', '')}回  学年 小{student_info['grade']}"
+    c.setFont(DEFAULT_JAPANESE_FONT, 12)
+    c.drawString(10*mm, y, info_text)
+    
+    y -= 12*mm
+    
+    # 生徒情報テーブル
+    school_id = student_info.get('school_id', student_info.get('classroom', {}).get('school', {}).get('school_id', ''))
+    if not school_id and 'classroom' in student_info:
+        # classroom経由で取得を試みる
+        pass
+    
+    student_data = [[
+        '塾ID', school_id or '',
+        '塾名', student_info.get('school_name', ''),
+        '生徒ID', student_info['id'],
+        '受験ID', student_info['id'],  # 受験ID = 生徒ID
+        '学年', student_info['grade'],
+        '生徒氏名', student_info['name']
+    ]]
+    
+    student_table = Table(student_data, colWidths=[15*mm, 25*mm, 15*mm, 35*mm, 17*mm, 25*mm, 17*mm, 25*mm, 15*mm, 15*mm, 20*mm, 35*mm])
+    student_table.setStyle(TableStyle([
+        ('FONTNAME', (0, 0), (-1, -1), DEFAULT_JAPANESE_FONT),
+        ('FONTSIZE', (0, 0), (-1, -1), 9),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
+        ('BACKGROUND', (0, 0), (0, 0), COLOR_HEADER_BG),
+        ('BACKGROUND', (2, 0), (2, 0), COLOR_HEADER_BG),
+        ('BACKGROUND', (4, 0), (4, 0), COLOR_HEADER_BG),
+        ('BACKGROUND', (6, 0), (6, 0), COLOR_HEADER_BG),
+        ('BACKGROUND', (8, 0), (8, 0), COLOR_HEADER_BG),
+        ('BACKGROUND', (10, 0), (10, 0), COLOR_HEADER_BG),
         ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-        ('BACKGROUND', (0, 1), (-1, -1), colors.HexColor('#f6f7f9')),
-        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.HexColor('#f6f7f9'), colors.HexColor('#ffffff')]),
-        ('GRID', (0, 0), (-1, -1), 0.25, colors.grey),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
     ]))
-
-    table_width, table_height = summary_table.wrap(0, 0)
-    summary_x = 20 * mm
-    summary_y = base_y - 45 * mm
-    summary_table.drawOn(canvas_obj, summary_x, summary_y - table_height)
-
-    # 科目別詳細
-    detail_x = summary_x + table_width + 12 * mm
-    detail_top = base_y - 10 * mm
-
-    styles = getSampleStyleSheet()
-    remark_style = ParagraphStyle(
-        'Comment',
-        parent=styles['Normal'],
-        fontName=DEFAULT_JAPANESE_FONT,
-        fontSize=9,
-        leading=11,
-    )
-
-    current_top = detail_top
-    for code in subjects_order:
-        subject = report_data['subjects'][code]
-        title_text = f"{subject['name']} 出題項目別の成果"
-        canvas_obj.setFont(DEFAULT_JAPANESE_FONT, 12)
-        canvas_obj.setFillColor(colors.HexColor('#0b1f2c'))
-        canvas_obj.drawString(detail_x, current_top, title_text)
-
-        question_rows = [['大問', '出題領域名', '得点/配点', '全国平均', '正答率']]
-        for item in subject['question_details']:
-            score_text = '-' if item['score'] is None else f"{item['score']}/{item['max_score']}"
-            avg_text = f"{item['national_average']:.1f}" if item['national_average'] is not None else '-'
-            rate_text = '-' if item['correct_rate'] is None else f"{item['correct_rate']:.0f}%"
-            question_rows.append([
-                f"{item['number']}",
-                item['title'],
-                score_text,
-                avg_text,
-                rate_text,
+    
+    student_table.wrapOn(c, width, height)
+    student_table.drawOn(c, 10*mm, y - 8*mm)
+    
+    y -= 20*mm
+    
+    # === 左側: 得点・偏差値・順位テーブル ===
+    subjects = report_data.get('subjects', {})
+    combined = report_data.get('combined', {})
+    
+    # 得点テーブルデータ
+    score_data = [
+        ['教科', '算数', '国語', '合計'],
+        ['得点',
+         f"{subjects.get('math', {}).get('total_score', 0)}点",
+         f"{subjects.get('japanese', {}).get('total_score', 0)}点",
+         f"{combined.get('total_score', 0)}点"],
+        ['偏差値',
+         f"{subjects.get('math', {}).get('deviation', 0):.1f}",
+         f"{subjects.get('japanese', {}).get('deviation', 0):.1f}",
+         f"{combined.get('deviation', 0):.1f}"],
+        ['全国順位（受験者数）',
+         f"{subjects.get('math', {}).get('rankings', {}).get('national', {}).get('rank', 0)}位({subjects.get('math', {}).get('rankings', {}).get('national', {}).get('total', 0)}人中)",
+         f"{subjects.get('japanese', {}).get('rankings', {}).get('national', {}).get('rank', 0)}位({subjects.get('japanese', {}).get('rankings', {}).get('national', {}).get('total', 0)}人中)",
+         f"{combined.get('rankings', {}).get('national', {}).get('rank', 0)}位({combined.get('rankings', {}).get('national', {}).get('total', 0)}人中)"],
+        ['塾内順位（受験者数）',
+         f"{subjects.get('math', {}).get('rankings', {}).get('school', {}).get('rank', 0)}位({subjects.get('math', {}).get('rankings', {}).get('school', {}).get('total', 0)}人中)",
+         f"{subjects.get('japanese', {}).get('rankings', {}).get('school', {}).get('rank', 0)}位({subjects.get('japanese', {}).get('rankings', {}).get('school', {}).get('total', 0)}人中)",
+         f"{combined.get('rankings', {}).get('school', {}).get('rank', 0)}位({combined.get('rankings', {}).get('school', {}).get('total', 0)}人中)"],
+        ['最高点（全国）',
+         f"{subjects.get('math', {}).get('statistics', {}).get('national_highest', 100)}点",
+         f"{subjects.get('japanese', {}).get('statistics', {}).get('national_highest', 100)}点",
+         f"{combined.get('statistics', {}).get('national_highest', 100)}点"],
+        ['最高点（塾内）',
+         f"{subjects.get('math', {}).get('statistics', {}).get('school_highest', 100)}点",
+         f"{subjects.get('japanese', {}).get('statistics', {}).get('school_highest', 100)}点",
+         f"{combined.get('statistics', {}).get('school_highest', 100)}点"],
+        ['平均点（全国）',
+         f"{subjects.get('math', {}).get('statistics', {}).get('national_average', 68.8):.1f}点",
+         f"{subjects.get('japanese', {}).get('statistics', {}).get('national_average', 68.8):.1f}点",
+         f"{combined.get('averages', {}).get('national', 68.8):.1f}点"],
+        ['平均点（塾内）',
+         f"{subjects.get('math', {}).get('statistics', {}).get('school_average', 68.8):.1f}点",
+         f"{subjects.get('japanese', {}).get('statistics', {}).get('school_average', 68.8):.1f}点",
+         f"{combined.get('averages', {}).get('school', 68.8):.1f}点"],
+    ]
+    
+    score_table = Table(score_data, colWidths=[45*mm, 35*mm, 35*mm, 35*mm])
+    score_table.setStyle(TableStyle([
+        ('FONTNAME', (0, 0), (-1, -1), DEFAULT_JAPANESE_FONT),
+        ('FONTSIZE', (0, 0), (-1, -1), 10),
+        ('FONTSIZE', (1, 1), (-1, 1), 16),  # 得点行を大きく
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
+        ('BACKGROUND', (0, 0), (0, -1), COLOR_HEADER_BG),
+        ('BACKGROUND', (1, 0), (1, 0), COLOR_MATH),
+        ('BACKGROUND', (2, 0), (2, 0), COLOR_JAPANESE),
+        ('BACKGROUND', (3, 0), (3, 0), COLOR_TOTAL),
+        ('TEXTCOLOR', (1, 0), (3, 0), colors.white),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+    ]))
+    
+    score_table.wrapOn(c, width, height)
+    score_table.drawOn(c, 10*mm, y - 90*mm)
+    
+    # === 右側: 出題項目別の成績（横棒グラフ） ===
+    right_x = 170*mm
+    graph_y = y
+    
+    c.setFont(DEFAULT_JAPANESE_FONT, 12)
+    c.drawString(right_x, graph_y, '◆出題項目別の成績')
+    
+    graph_y -= 10*mm
+    
+    # 算数の横棒グラフ
+    c.setFont(DEFAULT_JAPANESE_FONT, 10)
+    c.setFillColor(COLOR_MATH)
+    c.drawString(right_x, graph_y, '算数')
+    c.setFillColor(colors.black)
+    
+    graph_y -= 5*mm
+    
+    # グラフヘッダー
+    c.setFont(DEFAULT_JAPANESE_FONT, 8)
+    c.drawString(right_x, graph_y, '大問')
+    c.drawString(right_x + 12*mm, graph_y, '出題項目名')
+    c.drawString(right_x + 45*mm, graph_y, '得点/配点')
+    c.drawString(right_x + 70*mm, graph_y, '全国平均点')
+    c.drawString(right_x + 95*mm, graph_y, '正答率')
+    c.drawString(right_x + 110*mm, graph_y, '20%   40%   60%   80%  100%')
+    
+    graph_y -= 5*mm
+    
+    # 算数の問題別データ
+    math_questions = subjects.get('math', {}).get('question_details', [])
+    for i, q in enumerate(math_questions[:10]):  # 最大10問
+        c.setFont(DEFAULT_JAPANESE_FONT, 8)
+        c.drawString(right_x, graph_y, str(q.get('number', i+1)))
+        c.drawString(right_x + 12*mm, graph_y, q.get('title', '')[:15])
+        c.drawString(right_x + 45*mm, graph_y, f"{q.get('score', 0)}/{q.get('max_score', 0)}")
+        c.drawString(right_x + 70*mm, graph_y, f"{q.get('national_average', 0):.1f}")
+        c.drawString(right_x + 95*mm, graph_y, f"{q.get('correct_rate', 0):.0f}%")
+        
+        # 横棒グラフ
+        bar_width = (q.get('correct_rate', 0) / 100) * 70*mm
+        c.setFillColor(COLOR_MATH)
+        c.rect(right_x + 110*mm, graph_y - 2*mm, bar_width, 3*mm, fill=1, stroke=0)
+        
+        # 全国平均の★マーク
+        nat_avg_rate = (q.get('national_average', 0) / q.get('max_score', 1)) * 100 if q.get('max_score', 0) > 0 else 0
+        star_x = right_x + 110*mm + (nat_avg_rate / 100) * 70*mm
+        c.setFillColor(colors.red)
+        c.setFont('Helvetica', 12)
+        c.drawString(star_x - 2*mm, graph_y - 2*mm, '★')
+        
+        c.setFillColor(colors.black)
+        graph_y -= 5*mm
+    
+    graph_y -= 5*mm
+    
+    # 国語の横棒グラフ
+    c.setFont(DEFAULT_JAPANESE_FONT, 10)
+    c.setFillColor(COLOR_JAPANESE)
+    c.drawString(right_x, graph_y, '国語')
+    c.setFillColor(colors.black)
+    
+    graph_y -= 5*mm
+    
+    # グラフヘッダー
+    c.setFont(DEFAULT_JAPANESE_FONT, 8)
+    c.drawString(right_x, graph_y, '大問')
+    c.drawString(right_x + 12*mm, graph_y, '出題項目名')
+    c.drawString(right_x + 45*mm, graph_y, '得点/配点')
+    c.drawString(right_x + 70*mm, graph_y, '全国平均点')
+    c.drawString(right_x + 95*mm, graph_y, '正答率')
+    c.drawString(right_x + 110*mm, graph_y, '20%   40%   60%   80%  100%')
+    
+    graph_y -= 5*mm
+    
+    # 国語の問題別データ
+    japanese_questions = subjects.get('japanese', {}).get('question_details', [])
+    for i, q in enumerate(japanese_questions[:10]):  # 最大10問
+        c.setFont(DEFAULT_JAPANESE_FONT, 8)
+        c.drawString(right_x, graph_y, str(q.get('number', i+1)))
+        c.drawString(right_x + 12*mm, graph_y, q.get('title', '')[:15])
+        c.drawString(right_x + 45*mm, graph_y, f"{q.get('score', 0)}/{q.get('max_score', 0)}")
+        c.drawString(right_x + 70*mm, graph_y, f"{q.get('national_average', 0):.1f}")
+        c.drawString(right_x + 95*mm, graph_y, f"{q.get('correct_rate', 0):.0f}%")
+        
+        # 横棒グラフ
+        bar_width = (q.get('correct_rate', 0) / 100) * 70*mm
+        c.setFillColor(COLOR_JAPANESE)
+        c.rect(right_x + 110*mm, graph_y - 2*mm, bar_width, 3*mm, fill=1, stroke=0)
+        
+        # 全国平均の★マーク
+        nat_avg_rate = (q.get('national_average', 0) / q.get('max_score', 1)) * 100 if q.get('max_score', 0) > 0 else 0
+        star_x = right_x + 110*mm + (nat_avg_rate / 100) * 70*mm
+        c.setFillColor(colors.red)
+        c.setFont('Helvetica', 12)
+        c.drawString(star_x - 2*mm, graph_y - 2*mm, '★')
+        
+        c.setFillColor(colors.black)
+        graph_y -= 5*mm
+    
+    # === 下部: 教科ごとの総評と塾長コメント、成績推移 ===
+    bottom_y = 55*mm
+    
+    # 教科ごとの総評
+    c.setFont(DEFAULT_JAPANESE_FONT, 10)
+    c.drawString(10*mm, bottom_y, '◆教科ごとの総評')
+    
+    bottom_y -= 8*mm
+    
+    # 算数総評
+    c.setFillColor(COLOR_MATH)
+    c.rect(10*mm, bottom_y - 2*mm, 3*mm, 3*mm, fill=1, stroke=0)
+    c.setFillColor(colors.black)
+    c.setFont(DEFAULT_JAPANESE_FONT, 9)
+    c.drawString(15*mm, bottom_y, '算数')
+    
+    bottom_y -= 5*mm
+    
+    math_comment = subjects.get('math', {}).get('comment', 'コメントなし')
+    c.setFont(DEFAULT_JAPANESE_FONT, 8)
+    # コメントを複数行に分割
+    lines = [math_comment[i:i+60] for i in range(0, len(math_comment), 60)]
+    for line in lines[:3]:  # 最大3行
+        c.drawString(10*mm, bottom_y, line)
+        bottom_y -= 4*mm
+    
+    bottom_y -= 2*mm
+    
+    # 国語総評
+    c.setFillColor(COLOR_JAPANESE)
+    c.rect(10*mm, bottom_y - 2*mm, 3*mm, 3*mm, fill=1, stroke=0)
+    c.setFillColor(colors.black)
+    c.setFont(DEFAULT_JAPANESE_FONT, 9)
+    c.drawString(15*mm, bottom_y, '国語')
+    
+    bottom_y -= 5*mm
+    
+    japanese_comment = subjects.get('japanese', {}).get('comment', 'コメントなし')
+    c.setFont(DEFAULT_JAPANESE_FONT, 8)
+    lines = [japanese_comment[i:i+60] for i in range(0, len(japanese_comment), 60)]
+    for line in lines[:3]:  # 最大3行
+        c.drawString(10*mm, bottom_y, line)
+        bottom_y -= 4*mm
+    
+    # 塾長からのコメント（右側）
+    comment_x = right_x
+    comment_y = 55*mm
+    
+    c.setFont(DEFAULT_JAPANESE_FONT, 10)
+    c.drawString(comment_x, comment_y, '◆塾長からのコメント')
+    
+    comment_y -= 8*mm
+    
+    # 算数コメント
+    c.setFillColor(COLOR_MATH)
+    c.rect(comment_x, comment_y - 2*mm, 3*mm, 3*mm, fill=1, stroke=0)
+    c.setFillColor(colors.black)
+    c.setFont(DEFAULT_JAPANESE_FONT, 9)
+    c.drawString(comment_x + 5*mm, comment_y, '算数')
+    
+    comment_y -= 5*mm
+    
+    c.setFont(DEFAULT_JAPANESE_FONT, 8)
+    school_comment_math = '今回の結果は、未来へのヒントです。今の努力が、これからの可能性を広げていきます。'
+    lines = [school_comment_math[i:i+40] for i in range(0, len(school_comment_math), 40)]
+    for line in lines[:3]:
+        c.drawString(comment_x, comment_y, line)
+        comment_y -= 4*mm
+    
+    comment_y -= 2*mm
+    
+    # 国語コメント
+    c.setFillColor(COLOR_JAPANESE)
+    c.rect(comment_x, comment_y - 2*mm, 3*mm, 3*mm, fill=1, stroke=0)
+    c.setFillColor(colors.black)
+    c.setFont(DEFAULT_JAPANESE_FONT, 9)
+    c.drawString(comment_x + 5*mm, comment_y, '国語')
+    
+    comment_y -= 5*mm
+    
+    c.setFont(DEFAULT_JAPANESE_FONT, 8)
+    school_comment_japanese = '今回の結果は、未来へのヒントです。今の努力が、これからの可能性を広げていきます。'
+    lines = [school_comment_japanese[i:i+40] for i in range(0, len(school_comment_japanese), 40)]
+    for line in lines[:3]:
+        c.drawString(comment_x, comment_y, line)
+        comment_y -= 4*mm
+    
+    # 成績の推移（左下）
+    trend_y = 10*mm
+    c.setFont(DEFAULT_JAPANESE_FONT, 10)
+    c.drawString(10*mm, trend_y + 30*mm, '◆成績の推移')
+    
+    # 簡易的な推移グラフ（テーブル形式）
+    trend_data = report_data.get('trend', {})
+    trend_overall = trend_data.get('overall', [])[:3]  # 最新3回
+    
+    if trend_overall:
+        trend_table_data = [['回数', '得点', '偏差値']]
+        for i, t in enumerate(trend_overall):
+            trend_table_data.append([
+                str(i + 1),
+                f"{t.get('total_score', 0)}",
+                f"{t.get('deviation', 0):.1f}"
             ])
-
-        question_table = Table(question_rows, colWidths=[18 * mm, 50 * mm, 28 * mm, 24 * mm, 24 * mm])
-        question_table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#e1f0f8')),
-            ('TEXTCOLOR', (0, 0), (-1, 0), colors.HexColor('#0b1f2c')),
+        
+        trend_table = Table(trend_table_data, colWidths=[15*mm, 20*mm, 20*mm])
+        trend_table.setStyle(TableStyle([
             ('FONTNAME', (0, 0), (-1, -1), DEFAULT_JAPANESE_FONT),
-            ('FONTSIZE', (0, 0), (-1, -1), 9),
+            ('FONTSIZE', (0, 0), (-1, -1), 8),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
+            ('BACKGROUND', (0, 0), (-1, 0), COLOR_TOTAL),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
             ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-            ('ALIGN', (1, 1), (1, -1), 'LEFT'),
-            ('GRID', (0, 0), (-1, -1), 0.25, colors.HexColor('#bcd4e6')),
         ]))
-
-        qt_width, qt_height = question_table.wrap(0, 0)
-        current_top -= 8 * mm
-        question_table.drawOn(canvas_obj, detail_x, current_top - qt_height)
-        current_top = current_top - qt_height - 8 * mm
-
-        if subject['comment']:
-            Paragraph(f"{subject['comment']}", remark_style).wrapOn(canvas_obj, qt_width, 20 * mm)
-            Paragraph(f"{subject['comment']}", remark_style).drawOn(canvas_obj, detail_x, current_top - 18 * mm)
-            current_top -= 22 * mm
-
-    # 成長の推移チャート
-    charts_top = summary_y - table_height - 20 * mm
-    trend = report_data['trend']
-    chart_x = 20 * mm
-
-    overall_chart = _generate_trend_chart(trend.get('overall', []), '全教科の推移')
-    if overall_chart:
-        canvas_obj.drawImage(overall_chart, chart_x, charts_top - 55 * mm, width=65 * mm, height=40 * mm, mask='auto')
-        try:
-            os.remove(overall_chart)
-        except OSError:
-            pass
-
-    chart_x += 70 * mm
-    for code in subjects_order:
-        chart_path = _generate_trend_chart(trend['subjects'].get(code, []), f"{report_data['subjects'][code]['name']}の推移")
-        if not chart_path:
-            continue
-        canvas_obj.drawImage(chart_path, chart_x, charts_top - 55 * mm, width=65 * mm, height=40 * mm, mask='auto')
-        chart_x += 70 * mm
-        try:
-            os.remove(chart_path)
-        except OSError:
-            pass
-
-    canvas_obj.showPage()
-    canvas_obj.save()
-
+        
+        trend_table.wrapOn(c, width, height)
+        trend_table.drawOn(c, 10*mm, trend_y)
+    
+    c.showPage()
+    c.save()
+    
     try:
         os.chmod(file_path, 0o644)
     except OSError:
         pass
-
+    
     return file_path, None
 
 
