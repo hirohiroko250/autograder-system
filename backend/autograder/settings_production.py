@@ -179,13 +179,12 @@ CSRF_COOKIE_DOMAIN = None
 CSRF_FAILURE_VIEW = 'django.views.csrf.csrf_failure'
 CSRF_USE_SESSIONS = False
 
-# 一時的にCSRFミドルウェアを無効化
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
-    # 'django.middleware.csrf.CsrfViewMiddleware',  # 一時的にコメントアウト
+    'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
