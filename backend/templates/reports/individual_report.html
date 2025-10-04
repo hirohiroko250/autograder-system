@@ -12,8 +12,9 @@
     <div class="report-page">
         <!-- ヘッダー -->
         <header class="header">
-            <div class="logo">
-                <img src="{{ logo_url }}" alt="全国学力向上テスト">
+            <div class="header-left">
+                <img src="/static/reports/logo.png" alt="全国学力向上テスト" class="logo">
+                <h1 class="main-title">個人成績表</h1>
             </div>
             <div class="header-info">
                 <div class="test-info">
@@ -27,7 +28,6 @@
                     <span class="label">年度</span>
                     <span class="value">{{ test_year }}</span>
                 </div>
-                <h1 class="main-title">個人成績表</h1>
                 <p class="issue-date">発行日:{{ issue_date }}</p>
             </div>
         </header>
@@ -132,60 +132,131 @@
                 <!-- 成績の推移 -->
                 <div class="trend-section">
                     <h2 class="section-title"><span class="diamond">◆</span>成績の推移</h2>
-                    
-                    <div class="trend-grid">
-                        <div class="trend-card total-card">
-                            <div class="trend-header total-bg">合計</div>
-                            <table class="trend-table">
-                                <thead>
-                                    <tr>
-                                        <th>回</th>
-                                        <th>得点</th>
-                                        <th>偏差値</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for trend in trends %}<tr><td>{{ trend.iteration }}</td><td>{{ trend.score }}</td><td>{{ trend.deviation }}</td></tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
-                        </div>
 
-                        <div class="trend-card japanese-card">
-                            <div class="trend-header japanese-bg">国語</div>
-                            <table class="trend-table">
-                                <thead>
-                                    <tr>
-                                        <th>回</th>
-                                        <th>得点</th>
-                                        <th>偏差値</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for trend in trends %}<tr><td>{{ trend.iteration }}</td><td>-</td><td>-</td></tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
-                        </div>
-
-                        <div class="trend-card math-card">
-                            <div class="trend-header math-bg">算数</div>
-                            <table class="trend-table">
-                                <thead>
-                                    <tr>
-                                        <th>回</th>
-                                        <th>得点</th>
-                                        <th>偏差値</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for trend in trends %}<tr><td>{{ trend.iteration }}</td><td>-</td><td>-</td></tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
-                        </div>
+                    <div class="trend-charts">
+                        <canvas id="trendChart" width="400" height="200"></canvas>
                     </div>
                 </div>
+
+                <script>
+                // 成績推移グラフを描画
+                (function() {
+                    const canvas = document.getElementById('trendChart');
+                    if (!canvas) return;
+
+                    const ctx = canvas.getContext('2d');
+                    const width = canvas.width;
+                    const height = canvas.height;
+
+                    // ダミーデータ（実際はテンプレート変数から取得）
+                    const trends = {{ trends|safe }};
+
+                    if (!trends || trends.length === 0) return;
+
+                    const padding = 40;
+                    const chartWidth = width - padding * 2;
+                    const chartHeight = height - padding * 2;
+
+                    // データの最大値を取得
+                    const maxScore = Math.max(...trends.map(t => t.score), 100);
+                    const minScore = 0;
+
+                    // グリッド描画
+                    ctx.strokeStyle = '#ecf0f1';
+                    ctx.lineWidth = 1;
+                    for (let i = 0; i <= 4; i++) {
+                        const y = padding + (chartHeight / 4) * i;
+                        ctx.beginPath();
+                        ctx.moveTo(padding, y);
+                        ctx.lineTo(width - padding, y);
+                        ctx.stroke();
+
+                        // Y軸ラベル
+                        ctx.fillStyle = '#7f8c8d';
+                        ctx.font = '10px sans-serif';
+                        ctx.textAlign = 'right';
+                        const score = Math.round(maxScore - (maxScore / 4) * i);
+                        ctx.fillText(score, padding - 5, y + 4);
+                    }
+
+                    // データプロット
+                    const points = trends.map((trend, index) => {
+                        const x = padding + (chartWidth / (trends.length - 1)) * index;
+                        const y = padding + chartHeight - ((trend.score - minScore) / (maxScore - minScore)) * chartHeight;
+                        return { x, y, score: trend.score, iteration: trend.iteration };
+                    });
+
+                    // 生徒のスコアライン（青）
+                    ctx.strokeStyle = '#3498db';
+                    ctx.lineWidth = 3;
+                    ctx.beginPath();
+                    points.forEach((point, index) => {
+                        if (index === 0) {
+                            ctx.moveTo(point.x, point.y);
+                        } else {
+                            ctx.lineTo(point.x, point.y);
+                        }
+                    });
+                    ctx.stroke();
+
+                    // 生徒のスコアポイント
+                    points.forEach(point => {
+                        ctx.fillStyle = '#3498db';
+                        ctx.beginPath();
+                        ctx.arc(point.x, point.y, 5, 0, Math.PI * 2);
+                        ctx.fill();
+
+                        // スコア表示
+                        ctx.fillStyle = '#2c3e50';
+                        ctx.font = 'bold 11px sans-serif';
+                        ctx.textAlign = 'center';
+                        ctx.fillText(point.score, point.x, point.y - 10);
+                    });
+
+                    // 全国平均ライン（オレンジ、点線）
+                    const avgScore = 65; // 実際は {{ total_national_avg }} から取得
+                    const avgY = padding + chartHeight - ((avgScore - minScore) / (maxScore - minScore)) * chartHeight;
+
+                    ctx.strokeStyle = '#e67e22';
+                    ctx.lineWidth = 2;
+                    ctx.setLineDash([5, 5]);
+                    ctx.beginPath();
+                    ctx.moveTo(padding, avgY);
+                    ctx.lineTo(width - padding, avgY);
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+
+                    // 全国平均ポイント
+                    points.forEach(point => {
+                        ctx.fillStyle = '#e67e22';
+                        ctx.beginPath();
+                        ctx.arc(point.x, avgY, 4, 0, Math.PI * 2);
+                        ctx.fill();
+                    });
+
+                    // X軸ラベル（回数）
+                    ctx.fillStyle = '#7f8c8d';
+                    ctx.font = '10px sans-serif';
+                    ctx.textAlign = 'center';
+                    points.forEach(point => {
+                        ctx.fillText(`第${point.iteration}回`, point.x, height - padding + 20);
+                    });
+
+                    // 凡例
+                    const legendY = 15;
+                    ctx.fillStyle = '#3498db';
+                    ctx.fillRect(width - 150, legendY, 20, 3);
+                    ctx.fillStyle = '#2c3e50';
+                    ctx.font = '11px sans-serif';
+                    ctx.textAlign = 'left';
+                    ctx.fillText('あなた', width - 125, legendY + 5);
+
+                    ctx.fillStyle = '#e67e22';
+                    ctx.fillRect(width - 150, legendY + 15, 20, 3);
+                    ctx.fillStyle = '#2c3e50';
+                    ctx.fillText('全国平均', width - 125, legendY + 20);
+                })();
+                </script>
             </div>
 
             <!-- 右側カラム -->

@@ -51,8 +51,22 @@ body {
     border-bottom: 3px solid #3498db;
 }
 
-.logo img {
-    height: 35px;
+.header-left {
+    display: flex;
+    align-items: center;
+    gap: 15mm;
+}
+
+.logo {
+    height: 50px;
+    width: auto;
+}
+
+.main-title {
+    font-size: 28pt;
+    font-weight: 700;
+    color: #2c3e50;
+    margin: 0;
 }
 
 .header-info {
@@ -83,16 +97,23 @@ body {
     margin: 0 3px;
 }
 
-.main-title {
-    font-size: 24pt;
-    font-weight: 700;
-    color: #2c3e50;
-    margin-bottom: 1mm;
-}
-
 .issue-date {
     font-size: 8pt;
     color: #95a5a6;
+}
+
+/* 成績推移グラフ */
+.trend-charts {
+    background: white;
+    padding: 15px;
+    border-radius: 4px;
+    border: 1px solid #ecf0f1;
+}
+
+.trend-charts canvas {
+    width: 100% !important;
+    height: auto !important;
+    max-width: 100%;
 }
 
 /* 生徒情報 - Grid to Table */
