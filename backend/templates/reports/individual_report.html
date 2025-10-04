@@ -12,51 +12,65 @@
     <div class="report-page">
         <!-- ヘッダー -->
         <header class="header">
-            <div class="header-left">
-                <img src="/static/reports/logo.png" alt="全国学力向上テスト" class="logo">
-                <h1 class="main-title">個人成績表</h1>
+            <div class="logo">
+                <img src="/static/reports/logo.png" alt="全国学力向上テスト">
             </div>
-            <div class="header-info">
+            <div class="header-right">
+                <p class="issue-date">発行日：{{ issue_date }}</p>
                 <div class="test-info">
-                    <span class="label">学年</span>
-                    <span class="value">{{ student_grade }}</span>
-                    <span class="separator">|</span>
-                    <span class="label">第</span>
-                    <span class="value">{{ test_iteration }}</span>
-                    <span class="label">回</span>
-                    <span class="separator">|</span>
-                    <span class="label">年度</span>
-                    <span class="value">{{ test_year }}</span>
+                    <span class="info-label">学年</span>
+                    <span class="info-value">{{ student_grade }}</span>
+                    <span class="info-label">第</span>
+                    <span class="info-value">{{ test_iteration }}</span>
+                    <span class="info-label">回</span>
+                    <span class="info-label">年度</span>
+                    <span class="info-value">{{ test_year }}</span>
                 </div>
-                <p class="issue-date">発行日:{{ issue_date }}</p>
+                <h1 class="main-title">個人成績表</h1>
             </div>
         </header>
 
-        <!-- 生徒情報 -->
-        <div class="student-info">
-            <div class="info-item">
-                <span class="label">生徒氏名</span>
-                <span class="value">{{ student_name }}</span>
+        <!-- 窓あき封筒用エリアと生徒情報 -->
+        <div class="top-area">
+            <!-- 窓あき封筒用 -->
+            <div class="window-area">
+                <div class="window-frame">
+                    <div class="window-content">
+                        <p class="address-line">〒000-0000</p>
+                        <p class="address-line">{{ school_name }}</p>
+                        <p class="student-name">{{ student_name }}　様</p>
+                    </div>
+                </div>
             </div>
-            <div class="info-item">
-                <span class="label">学年</span>
-                <span class="value">{{ student_grade }}</span>
-            </div>
-            <div class="info-item">
-                <span class="label">生徒ID</span>
-                <span class="value">{{ student_id }}</span>
-            </div>
-            <div class="info-item">
-                <span class="label">塾名</span>
-                <span class="value">{{ school_name }}</span>
-            </div>
-            <div class="info-item">
-                <span class="label">塾ID</span>
-                <span class="value">{{ school_id }}</span>
-            </div>
-            <div class="info-item">
-                <span class="label">テスト年度</span>
-                <span class="value">{{ test_year }}</span>
+
+            <!-- 生徒情報 -->
+            <div class="student-info">
+                <div class="info-row">
+                    <div class="info-item">
+                        <span class="label">生徒氏名</span>
+                        <span class="value">{{ student_name }}</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="label">学年</span>
+                        <span class="value">{{ student_grade }}</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="label">生徒ID</span>
+                        <span class="value">{{ student_id }}</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="label">塾名</span>
+                        <span class="value">{{ school_name }}</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="label">塾ID</span>
+                        <span class="value">{{ school_id }}</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="label">テスト年度</span>
+                        <span class="value">{{ test_year }}</span>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -64,205 +78,91 @@
         <div class="main-layout">
             <!-- 左側カラム -->
             <div class="left-column">
-                <!-- 窓あき封筒用（角形2号対応） -->
-                <div class="window-area">
-                    <div class="window-frame">
-                        <div class="window-content">
-                            <p class="address-line">〒000-0000</p>
-                            <p class="address-line">{{ school_name }}</p>
-                            <p class="student-name">{{ student_name }}　様</p>
-                        </div>
-                    </div>
-                </div>
-
                 <!-- 得点・偏差値・順位 -->
-                <div class="score-section">
+                <section class="score-section">
                     <h2 class="section-title"><span class="diamond">◆</span>得点・偏差値・順位</h2>
-                    
+
                     <table class="score-table">
                         <thead>
                             <tr>
-                                <th class="label-th">項目</th>
-                                <th class="total-th">合計</th>
-                                <th class="japanese-th">国語</th>
-                                <th class="math-th">算数</th>
+                                <th class="label-col">教科</th>
+                                <th class="total-col">合計</th>
+                                <th class="japanese-col">国語</th>
+                                <th class="math-col">算数</th>
                             </tr>
                         </thead>
                         <tbody>
                             <tr>
-                                <td class="label-td">得点</td>
-                                <td class="total-data">{{ total_score }}<span class="unit">点</span></td>
-                                <td class="japanese-data">{{ japanese_score }}<span class="unit">点</span></td>
-                                <td class="math-data">{{ math_score }}<span class="unit">点</span></td>
+                                <td class="label-cell">得点</td>
+                                <td class="total-cell">{{ total_score }}<span class="unit">点</span></td>
+                                <td class="japanese-cell">{{ japanese_score }}<span class="unit">点</span></td>
+                                <td class="math-cell">{{ math_score }}<span class="unit">点</span></td>
                             </tr>
                             <tr>
-                                <td class="label-td">偏差値</td>
-                                <td class="total-data">{{ total_deviation }}</td>
-                                <td class="japanese-data">{{ japanese_deviation }}</td>
-                                <td class="math-data">{{ math_deviation }}</td>
+                                <td class="label-cell">偏差値</td>
+                                <td class="total-cell">{{ total_deviation }}</td>
+                                <td class="japanese-cell">{{ japanese_deviation }}</td>
+                                <td class="math-cell">{{ math_deviation }}</td>
                             </tr>
                             <tr>
-                                <td class="label-td">全国順位<br><span class="sub">(受験者数)</span></td>
-                                <td class="total-data">{{ total_national_rank }}<span class="unit">位</span><br><span class="sub-text">({{ total_national_total }}人中)</span></td>
-                                <td class="japanese-data">{{ japanese_national_rank }}<span class="unit">位</span><br><span class="sub-text">({{ japanese_national_total }}人中)</span></td>
-                                <td class="math-data">{{ math_national_rank }}<span class="unit">位</span><br><span class="sub-text">({{ math_national_total }}人中)</span></td>
+                                <td class="label-cell">全国順位<br><span class="sub-label">(受験者数)</span></td>
+                                <td class="total-cell">{{ total_national_rank }}<span class="unit">位</span><br><span class="sub-value">({{ total_national_total }}人中)</span></td>
+                                <td class="japanese-cell">{{ japanese_national_rank }}<span class="unit">位</span><br><span class="sub-value">({{ japanese_national_total }}人中)</span></td>
+                                <td class="math-cell">{{ math_national_rank }}<span class="unit">位</span><br><span class="sub-value">({{ math_national_total }}人中)</span></td>
                             </tr>
                             <tr>
-                                <td class="label-td">塾内順位<br><span class="sub">(受験者数)</span></td>
-                                <td class="total-data">{{ total_school_rank }}<span class="unit">位</span><br><span class="sub-text">({{ total_school_total }}人中)</span></td>
-                                <td class="japanese-data">{{ japanese_school_rank }}<span class="unit">位</span><br><span class="sub-text">({{ japanese_school_total }}人中)</span></td>
-                                <td class="math-data">{{ math_school_rank }}<span class="unit">位</span><br><span class="sub-text">({{ math_school_total }}人中)</span></td>
+                                <td class="label-cell">塾内順位<br><span class="sub-label">(受験者数)</span></td>
+                                <td class="total-cell">{{ total_school_rank }}<span class="unit">位</span><br><span class="sub-value">({{ total_school_total }}人中)</span></td>
+                                <td class="japanese-cell">{{ japanese_school_rank }}<span class="unit">位</span><br><span class="sub-value">({{ japanese_school_total }}人中)</span></td>
+                                <td class="math-cell">{{ math_school_rank }}<span class="unit">位</span><br><span class="sub-value">({{ math_school_total }}人中)</span></td>
                             </tr>
                             <tr>
-                                <td class="label-td">平均点(全国)</td>
+                                <td class="label-cell">平均点(全国)</td>
                                 <td>{{ total_national_avg }}<span class="unit">点</span></td>
                                 <td>{{ japanese_national_avg }}<span class="unit">点</span></td>
                                 <td>{{ math_national_avg }}<span class="unit">点</span></td>
                             </tr>
                             <tr>
-                                <td class="label-td">最高点(全国)</td>
+                                <td class="label-cell">最高点(全国)</td>
                                 <td>{{ total_national_highest }}<span class="unit">点</span></td>
                                 <td>{{ japanese_national_highest }}<span class="unit">点</span></td>
                                 <td>{{ math_national_highest }}<span class="unit">点</span></td>
                             </tr>
                         </tbody>
                     </table>
-                </div>
+                </section>
 
                 <!-- 成績の推移 -->
-                <div class="trend-section">
+                <section class="trend-section">
                     <h2 class="section-title"><span class="diamond">◆</span>成績の推移</h2>
 
-                    <div class="trend-charts">
-                        <canvas id="trendChart" width="400" height="200"></canvas>
+                    <div class="trend-graphs">
+                        <div class="trend-graph">
+                            <div class="graph-header total-bg">合計</div>
+                            <div class="graph-content">
+                                <canvas id="totalChart" class="line-chart" width="300" height="150"></canvas>
+                            </div>
+                        </div>
+                        <div class="trend-graph">
+                            <div class="graph-header japanese-bg">国語</div>
+                            <div class="graph-content">
+                                <canvas id="japaneseChart" class="line-chart" width="300" height="150"></canvas>
+                            </div>
+                        </div>
+                        <div class="trend-graph">
+                            <div class="graph-header math-bg">算数</div>
+                            <div class="graph-content">
+                                <canvas id="mathChart" class="line-chart" width="300" height="150"></canvas>
+                            </div>
+                        </div>
                     </div>
-                </div>
-
-                <script>
-                // 成績推移グラフを描画
-                (function() {
-                    const canvas = document.getElementById('trendChart');
-                    if (!canvas) return;
-
-                    const ctx = canvas.getContext('2d');
-                    const width = canvas.width;
-                    const height = canvas.height;
-
-                    // ダミーデータ（実際はテンプレート変数から取得）
-                    const trends = {{ trends|safe }};
-
-                    if (!trends || trends.length === 0) return;
-
-                    const padding = 40;
-                    const chartWidth = width - padding * 2;
-                    const chartHeight = height - padding * 2;
-
-                    // データの最大値を取得
-                    const maxScore = Math.max(...trends.map(t => t.score), 100);
-                    const minScore = 0;
-
-                    // グリッド描画
-                    ctx.strokeStyle = '#ecf0f1';
-                    ctx.lineWidth = 1;
-                    for (let i = 0; i <= 4; i++) {
-                        const y = padding + (chartHeight / 4) * i;
-                        ctx.beginPath();
-                        ctx.moveTo(padding, y);
-                        ctx.lineTo(width - padding, y);
-                        ctx.stroke();
-
-                        // Y軸ラベル
-                        ctx.fillStyle = '#7f8c8d';
-                        ctx.font = '10px sans-serif';
-                        ctx.textAlign = 'right';
-                        const score = Math.round(maxScore - (maxScore / 4) * i);
-                        ctx.fillText(score, padding - 5, y + 4);
-                    }
-
-                    // データプロット
-                    const points = trends.map((trend, index) => {
-                        const x = padding + (chartWidth / (trends.length - 1)) * index;
-                        const y = padding + chartHeight - ((trend.score - minScore) / (maxScore - minScore)) * chartHeight;
-                        return { x, y, score: trend.score, iteration: trend.iteration };
-                    });
-
-                    // 生徒のスコアライン（青）
-                    ctx.strokeStyle = '#3498db';
-                    ctx.lineWidth = 3;
-                    ctx.beginPath();
-                    points.forEach((point, index) => {
-                        if (index === 0) {
-                            ctx.moveTo(point.x, point.y);
-                        } else {
-                            ctx.lineTo(point.x, point.y);
-                        }
-                    });
-                    ctx.stroke();
-
-                    // 生徒のスコアポイント
-                    points.forEach(point => {
-                        ctx.fillStyle = '#3498db';
-                        ctx.beginPath();
-                        ctx.arc(point.x, point.y, 5, 0, Math.PI * 2);
-                        ctx.fill();
-
-                        // スコア表示
-                        ctx.fillStyle = '#2c3e50';
-                        ctx.font = 'bold 11px sans-serif';
-                        ctx.textAlign = 'center';
-                        ctx.fillText(point.score, point.x, point.y - 10);
-                    });
-
-                    // 全国平均ライン（オレンジ、点線）
-                    const avgScore = 65; // 実際は {{ total_national_avg }} から取得
-                    const avgY = padding + chartHeight - ((avgScore - minScore) / (maxScore - minScore)) * chartHeight;
-
-                    ctx.strokeStyle = '#e67e22';
-                    ctx.lineWidth = 2;
-                    ctx.setLineDash([5, 5]);
-                    ctx.beginPath();
-                    ctx.moveTo(padding, avgY);
-                    ctx.lineTo(width - padding, avgY);
-                    ctx.stroke();
-                    ctx.setLineDash([]);
-
-                    // 全国平均ポイント
-                    points.forEach(point => {
-                        ctx.fillStyle = '#e67e22';
-                        ctx.beginPath();
-                        ctx.arc(point.x, avgY, 4, 0, Math.PI * 2);
-                        ctx.fill();
-                    });
-
-                    // X軸ラベル（回数）
-                    ctx.fillStyle = '#7f8c8d';
-                    ctx.font = '10px sans-serif';
-                    ctx.textAlign = 'center';
-                    points.forEach(point => {
-                        ctx.fillText(`第${point.iteration}回`, point.x, height - padding + 20);
-                    });
-
-                    // 凡例
-                    const legendY = 15;
-                    ctx.fillStyle = '#3498db';
-                    ctx.fillRect(width - 150, legendY, 20, 3);
-                    ctx.fillStyle = '#2c3e50';
-                    ctx.font = '11px sans-serif';
-                    ctx.textAlign = 'left';
-                    ctx.fillText('あなた', width - 125, legendY + 5);
-
-                    ctx.fillStyle = '#e67e22';
-                    ctx.fillRect(width - 150, legendY + 15, 20, 3);
-                    ctx.fillStyle = '#2c3e50';
-                    ctx.fillText('全国平均', width - 125, legendY + 20);
-                })();
-                </script>
+                </section>
             </div>
 
             <!-- 右側カラム -->
             <div class="right-column">
                 <!-- 出題項目別の成績 -->
-                <div class="items-section">
+                <section class="items-section">
                     <h2 class="section-title"><span class="diamond">◆</span>出題項目別の成績</h2>
 
                     <!-- 算数 -->
@@ -273,11 +173,11 @@
                         <table class="items-table">
                             <thead>
                                 <tr>
-                                    <th>大問</th>
-                                    <th>項目名</th>
-                                    <th>得点/配点</th>
-                                    <th>平均点</th>
-                                    <th>正答率</th>
+                                    <th class="q-col">大問</th>
+                                    <th class="item-col">項目名</th>
+                                    <th class="score-col">得点/配点</th>
+                                    <th class="avg-col">平均点</th>
+                                    <th class="rate-col">正答率</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -287,15 +187,20 @@
                                     <td>{{ question.title }}</td>
                                     <td>{{ question.score }}/{{ question.max_score }}<span class="unit">点</span></td>
                                     <td>{{ question.national_avg }}<span class="unit">点</span></td>
-                                    <td>
-                                        <div class="rate-bar">
-                                            <div class="rate-fill math-fill" style="width: {{ question.correct_rate }}%;">{{ question.correct_rate }}%</div>
+                                    <td class="rate-cell">
+                                        <div class="rate-container">
+                                            <div class="rate-bar math-bar" style="width: {{ question.correct_rate }}%;"></div>
+                                            <div class="avg-star" style="left: {{ question.national_avg_rate }}%;">★</div>
+                                            <div class="rate-text">{{ question.correct_rate }}%</div>
                                         </div>
                                     </td>
                                 </tr>
                                 {% endfor %}
                             </tbody>
                         </table>
+                        <div class="chart-note">
+                            <span class="note-star">★</span> = 全国平均正答率
+                        </div>
                     </div>
 
                     <!-- 国語 -->
@@ -306,11 +211,11 @@
                         <table class="items-table">
                             <thead>
                                 <tr>
-                                    <th>大問</th>
-                                    <th>項目名</th>
-                                    <th>得点/配点</th>
-                                    <th>平均点</th>
-                                    <th>正答率</th>
+                                    <th class="q-col">大問</th>
+                                    <th class="item-col">項目名</th>
+                                    <th class="score-col">得点/配点</th>
+                                    <th class="avg-col">平均点</th>
+                                    <th class="rate-col">正答率</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -320,36 +225,138 @@
                                     <td>{{ question.title }}</td>
                                     <td>{{ question.score }}/{{ question.max_score }}<span class="unit">点</span></td>
                                     <td>{{ question.national_avg }}<span class="unit">点</span></td>
-                                    <td>
-                                        <div class="rate-bar">
-                                            <div class="rate-fill japanese-fill" style="width: {{ question.correct_rate }}%;">{{ question.correct_rate }}%</div>
+                                    <td class="rate-cell">
+                                        <div class="rate-container">
+                                            <div class="rate-bar japanese-bar" style="width: {{ question.correct_rate }}%;"></div>
+                                            <div class="avg-star" style="left: {{ question.national_avg_rate }}%;">★</div>
+                                            <div class="rate-text">{{ question.correct_rate }}%</div>
                                         </div>
                                     </td>
                                 </tr>
                                 {% endfor %}
                             </tbody>
                         </table>
+                        <div class="chart-note">
+                            <span class="note-star">★</span> = 全国平均正答率
+                        </div>
                     </div>
-                </div>
+                </section>
 
                 <!-- 塾長からのコメント -->
-                <div class="comment-section">
+                <section class="comment-section">
                     <h2 class="section-title"><span class="diamond">◆</span>塾長からのコメント</h2>
-                    
-                    <div class="comment-cards">
-                        <div class="comment-card math-comment">
+
+                    <div class="comment-grid">
+                        <div class="comment-box">
                             <div class="comment-header math-bg">算数</div>
                             <p class="comment-text">{{ principal_math_comment }}</p>
                         </div>
-
-                        <div class="comment-card japanese-comment">
+                        <div class="comment-box">
                             <div class="comment-header japanese-bg">国語</div>
                             <p class="comment-text">{{ principal_japanese_comment }}</p>
                         </div>
                     </div>
-                </div>
+                </section>
             </div>
         </div>
     </div>
+
+    <script>
+    // 成績推移グラフ描画
+    (function() {
+        const trends = {{ trends|safe }};
+        if (!trends || trends.length === 0) return;
+
+        function drawChart(canvasId, scores, avgScore, color, avgColor) {
+            const canvas = document.getElementById(canvasId);
+            if (!canvas) return;
+
+            const ctx = canvas.getContext('2d');
+            const width = canvas.width;
+            const height = canvas.height;
+            const padding = 30;
+            const chartWidth = width - padding * 2;
+            const chartHeight = height - padding * 2;
+
+            // 最大値・最小値
+            const maxScore = Math.max(...scores, avgScore, 100);
+            const minScore = 0;
+
+            // グリッド
+            ctx.strokeStyle = '#f0f0f0';
+            ctx.lineWidth = 1;
+            for (let i = 0; i <= 4; i++) {
+                const y = padding + (chartHeight / 4) * i;
+                ctx.beginPath();
+                ctx.moveTo(padding, y);
+                ctx.lineTo(width - padding, y);
+                ctx.stroke();
+            }
+
+            // データポイント
+            const points = scores.map((score, index) => {
+                const x = padding + (chartWidth / (scores.length - 1)) * index;
+                const y = padding + chartHeight - ((score - minScore) / (maxScore - minScore)) * chartHeight;
+                return { x, y, score };
+            });
+
+            // 生徒スコアライン
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            points.forEach((point, index) => {
+                if (index === 0) ctx.moveTo(point.x, point.y);
+                else ctx.lineTo(point.x, point.y);
+            });
+            ctx.stroke();
+
+            // 生徒スコアポイント
+            points.forEach(point => {
+                ctx.fillStyle = color;
+                ctx.beginPath();
+                ctx.arc(point.x, point.y, 4, 0, Math.PI * 2);
+                ctx.fill();
+            });
+
+            // 全国平均ライン
+            const avgY = padding + chartHeight - ((avgScore - minScore) / (maxScore - minScore)) * chartHeight;
+            ctx.strokeStyle = avgColor;
+            ctx.lineWidth = 1.5;
+            ctx.setLineDash([4, 4]);
+            ctx.beginPath();
+            ctx.moveTo(padding, avgY);
+            ctx.lineTo(width - padding, avgY);
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            // 全国平均ポイント
+            points.forEach(point => {
+                ctx.fillStyle = avgColor;
+                ctx.beginPath();
+                ctx.arc(point.x, avgY, 3, 0, Math.PI * 2);
+                ctx.fill();
+            });
+
+            // X軸ラベル
+            ctx.fillStyle = '#666';
+            ctx.font = '8px sans-serif';
+            ctx.textAlign = 'center';
+            trends.forEach((trend, index) => {
+                const x = padding + (chartWidth / (scores.length - 1)) * index;
+                ctx.fillText(`第${trend.iteration}回`, x, height - 10);
+            });
+        }
+
+        // 合計グラフ
+        const totalScores = trends.map(t => t.score || 0);
+        drawChart('totalChart', totalScores, {{ total_national_avg }}, '#3498db', '#e67e22');
+
+        // 国語グラフ（データがあれば）
+        drawChart('japaneseChart', totalScores, {{ japanese_national_avg }}, '#e67e22', '#f39c12');
+
+        // 算数グラフ（データがあれば）
+        drawChart('mathChart', totalScores, {{ math_national_avg }}, '#27ae60', '#52c97f');
+    })();
+    </script>
 </body>
 </html>
