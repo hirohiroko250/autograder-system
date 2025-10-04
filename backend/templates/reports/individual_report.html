@@ -145,12 +145,7 @@
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {% for trend in trends %}
-                                    <tr>
-                                        <td>{{ trend.iteration }}</td>
-                                        <td>{{ trend.score }}</td>
-                                        <td>{{ trend.deviation }}</td>
-                                    </tr>
+                                    {% for trend in trends %}<tr><td>{{ trend.iteration }}</td><td>{{ trend.score }}</td><td>{{ trend.deviation }}</td></tr>
                                     {% endfor %}
                                 </tbody>
                             </table>
@@ -167,12 +162,7 @@
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {% for trend in trends %}
-                                    <tr>
-                                        <td>{{ trend.iteration }}</td>
-                                        <td>-</td>
-                                        <td>-</td>
-                                    </tr>
+                                    {% for trend in trends %}<tr><td>{{ trend.iteration }}</td><td>-</td><td>-</td></tr>
                                     {% endfor %}
                                 </tbody>
                             </table>
@@ -189,12 +179,7 @@
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {% for trend in trends %}
-                                    <tr>
-                                        <td>{{ trend.iteration }}</td>
-                                        <td>-</td>
-                                        <td>-</td>
-                                    </tr>
+                                    {% for trend in trends %}<tr><td>{{ trend.iteration }}</td><td>-</td><td>-</td></tr>
                                     {% endfor %}
                                 </tbody>
                             </table>
@@ -221,7 +206,7 @@
                                     <th>項目名</th>
                                     <th>得点/配点</th>
                                     <th>平均点</th>
-                                    <th>正答率（★は全国平均）</th>
+                                    <th>正答率</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -254,7 +239,7 @@
                                     <th>項目名</th>
                                     <th>得点/配点</th>
                                     <th>平均点</th>
-                                    <th>正答率（★は全国平均）</th>
+                                    <th>正答率</th>
                                 </tr>
                             </thead>
                             <tbody>
