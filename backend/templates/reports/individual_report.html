@@ -2,12 +2,11 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>個人成績表</title>
     <style>
         @page {
             size: A3 landscape;
-            margin: 10mm;
+            margin: 8mm;
         }
 
         * {
@@ -18,14 +17,17 @@
 
         body {
             font-family: 'Noto Sans CJK JP', 'Hiragino Sans', 'Yu Gothic', sans-serif;
-            font-size: 9pt;
-            line-height: 1.4;
+            font-size: 8pt;
+            line-height: 1.3;
             color: #333;
+            width: 404mm;
+            height: 277mm;
         }
 
         .container {
             width: 100%;
-            max-width: 400mm;
+            height: 100%;
+            padding: 5mm;
         }
 
         /* ヘッダー */
@@ -33,64 +35,61 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 8mm;
-            padding-bottom: 3mm;
+            margin-bottom: 3mm;
+            padding-bottom: 2mm;
             border-bottom: 2px solid #333;
         }
 
         .logo {
-            height: 12mm;
+            height: 10mm;
         }
 
         .title {
-            font-size: 18pt;
+            font-size: 16pt;
             font-weight: bold;
-            color: #333;
         }
 
         .issue-date {
-            font-size: 8pt;
+            font-size: 7pt;
             color: #666;
         }
 
         /* テスト情報 */
         .test-info {
-            font-size: 10pt;
-            margin-bottom: 5mm;
+            font-size: 9pt;
+            margin-bottom: 2mm;
             font-weight: bold;
         }
 
-        /* 生徒情報テーブル */
-        .student-info-table {
+        /* 生徒情報 */
+        .student-info {
             width: 100%;
             border-collapse: collapse;
-            margin-bottom: 8mm;
+            margin-bottom: 3mm;
         }
 
-        .student-info-table th {
+        .student-info th {
             background-color: #f0f0f0;
-            font-size: 7pt;
-            padding: 2mm 1mm;
+            font-size: 6pt;
+            padding: 1mm;
             border: 1px solid #000;
-            text-align: center;
             font-weight: bold;
         }
 
-        .student-info-table td {
-            font-size: 7pt;
-            padding: 2mm 1mm;
+        .student-info td {
+            font-size: 6pt;
+            padding: 1mm;
             border: 1px solid #000;
-            text-align: center;
         }
 
         /* メインコンテンツ */
         .main-content {
             display: flex;
-            gap: 8mm;
+            gap: 5mm;
         }
 
         .left-section {
-            flex: 0 0 128mm;
+            flex: 0 0 120mm;
         }
 
         .right-section {
@@ -101,26 +100,19 @@
         .score-table {
             width: 100%;
             border-collapse: collapse;
-            margin-bottom: 8mm;
+            margin-bottom: 3mm;
         }
 
-        .score-table th {
-            padding: 3mm 2mm;
+        .score-table th, .score-table td {
+            padding: 1.5mm 1mm;
             border: 1px solid #000;
             text-align: center;
-            font-size: 8pt;
-            font-weight: bold;
-        }
-
-        .score-table td {
-            padding: 3mm 2mm;
-            border: 1px solid #000;
-            text-align: center;
-            font-size: 8pt;
+            font-size: 6pt;
         }
 
         .score-table th.subject-header {
             color: white;
+            font-size: 7pt;
         }
 
         .score-table th.math {
@@ -138,72 +130,67 @@
         .score-table tr th:first-child {
             background-color: #f0f0f0;
             color: #333;
+            font-size: 6pt;
         }
 
         .score-table .score-row td {
-            font-size: 12pt;
+            font-size: 10pt;
             font-weight: bold;
         }
 
-        /* 横棒グラフセクション */
+        /* セクションタイトル */
         .section-title {
-            font-size: 9pt;
+            font-size: 7pt;
             font-weight: bold;
-            margin-bottom: 4mm;
-            padding-left: 3mm;
-            border-left: 3mm solid #333;
+            margin-bottom: 2mm;
+            padding-left: 2mm;
+            border-left: 2mm solid #333;
         }
 
+        /* 横棒グラフ */
         .subject-section {
-            margin-bottom: 6mm;
+            margin-bottom: 3mm;
         }
 
         .subject-name {
-            font-size: 8pt;
+            font-size: 7pt;
             font-weight: bold;
-            margin-bottom: 2mm;
-            padding: 1mm 2mm;
+            margin-bottom: 1mm;
+            padding: 0.5mm 1.5mm;
             display: inline-block;
+            color: white;
         }
 
         .subject-name.math {
             background-color: #00A650;
-            color: white;
         }
 
         .subject-name.japanese {
             background-color: #FF8C00;
-            color: white;
+        }
+
+        .graph-header, .graph-row {
+            display: grid;
+            grid-template-columns: 12mm 45mm 20mm 20mm 18mm 1fr;
+            font-size: 5pt;
+            padding: 1mm 0;
         }
 
         .graph-header {
-            display: grid;
-            grid-template-columns: 15mm 50mm 25mm 25mm 25mm 1fr;
-            font-size: 6pt;
             font-weight: bold;
-            padding: 1mm 0;
             border-bottom: 1px solid #ccc;
-            margin-bottom: 2mm;
-        }
-
-        .graph-row {
-            display: grid;
-            grid-template-columns: 15mm 50mm 25mm 25mm 25mm 1fr;
-            align-items: center;
-            font-size: 6pt;
-            padding: 1.5mm 0;
+            margin-bottom: 1mm;
         }
 
         .bar-chart {
             position: relative;
-            height: 5mm;
+            height: 4mm;
             background-color: #f5f5f5;
             border: 0.5px solid #ccc;
         }
 
         .bar {
             height: 100%;
-            position: relative;
         }
 
         .bar.math {
@@ -216,69 +203,78 @@
 
         .star-marker {
             position: absolute;
-            top: -2mm;
+            top: -1.5mm;
             transform: translateX(-50%);
             color: red;
-            font-size: 8pt;
+            font-size: 6pt;
         }
 
-        /* コメントセクション */
+        /* コメント・推移セクション */
+        .bottom-section {
+            display: flex;
+            gap: 5mm;
+            margin-top: 3mm;
+        }
+
         .comments-section {
-            margin-top: 8mm;
+            flex: 1;
+        }
+
+        .comments-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 3mm;
         }
 
         .comment-box {
-            margin-bottom: 5mm;
+            margin-bottom: 2mm;
         }
 
         .comment-label {
-            font-size: 7pt;
+            font-size: 6pt;
             font-weight: bold;
-            margin-bottom: 1mm;
-            padding: 1mm 2mm;
+            padding: 0.5mm 1.5mm;
             display: inline-block;
+            color: white;
+            margin-bottom: 1mm;
         }
 
         .comment-label.math {
             background-color: #00A650;
-            color: white;
         }
 
         .comment-label.japanese {
             background-color: #FF8C00;
-            color: white;
         }
 
         .comment-text {
-            font-size: 6pt;
-            line-height: 1.6;
-            padding: 2mm;
+            font-size: 5pt;
+            line-height: 1.4;
+            padding: 1.5mm;
             background-color: #fafafa;
             border: 1px solid #e0e0e0;
-            min-height: 12mm;
+            min-height: 10mm;
         }
 
-        /* 推移セクション */
         .trend-section {
-            margin-top: 6mm;
+            flex: 0 0 60mm;
         }
 
         .trend-table {
-            width: 50mm;
+            width: 100%;
             border-collapse: collapse;
         }
 
         .trend-table th {
             background-color: #00A0E9;
             color: white;
-            padding: 2mm;
+            padding: 1.5mm;
             border: 1px solid #000;
             font-size: 6pt;
-            text-align: center;
         }
 
         .trend-table td {
-            padding: 2mm;
+            padding: 1.5mm;
             border: 1px solid #000;
             font-size: 6pt;
             text-align: center;
@@ -299,8 +295,8 @@
             {{ test_year }}年度  第{{ test_iteration }}回  学年 小{{ student_grade }}
         </div>
 
-        <!-- 生徒情報テーブル -->
-        <table class="student-info-table">
+        <!-- 生徒情報 -->
+        <table class="student-info">
             <tr>
                 <th>塾ID</th>
                 <td>{{ school_id }}</td>
@@ -396,7 +392,7 @@
                         <div>得点/配点</div>
                         <div>全国平均点</div>
                         <div>正答率</div>
-                        <div style="padding-left: 10mm;">0%   20%   40%   60%   80%  100%</div>
+                        <div style="padding-left: 8mm;">0%   20%   40%   60%   80%  100%</div>
                     </div>
                     {% for question in math_questions %}
                     <div class="graph-row">
@@ -422,7 +418,7 @@
                         <div>得点/配点</div>
                         <div>全国平均点</div>
                         <div>正答率</div>
-                        <div style="padding-left: 10mm;">0%   20%   40%   60%   80%  100%</div>
+                        <div style="padding-left: 8mm;">0%   20%   40%   60%   80%  100%</div>
                     </div>
                     {% for question in japanese_questions %}
                     <div class="graph-row">
@@ -441,58 +437,56 @@
             </div>
         </div>
 
-        <!-- コメントセクション -->
-        <div class="comments-section">
-            <div style="display: flex; gap: 8mm;">
-                <!-- 教科ごとの総評 -->
-                <div style="flex: 1;">
-                    <div class="section-title">◆教科ごとの総評</div>
-                    <div class="comment-box">
-                        <div class="comment-label math">算数</div>
-                        <div class="comment-text">{{ math_comment }}</div>
+        <!-- コメントと推移 -->
+        <div class="bottom-section">
+            <div class="comments-section">
+                <div class="section-title">◆教科ごとの総評</div>
+                <div class="comments-grid">
+                    <div>
+                        <div class="comment-box">
+                            <div class="comment-label math">算数</div>
+                            <div class="comment-text">{{ math_comment }}</div>
+                        </div>
+                        <div class="comment-box">
+                            <div class="comment-label japanese">国語</div>
+                            <div class="comment-text">{{ japanese_comment }}</div>
+                        </div>
                     </div>
-                    <div class="comment-box">
-                        <div class="comment-label japanese">国語</div>
-                        <div class="comment-text">{{ japanese_comment }}</div>
-                    </div>
-                </div>
-
-                <!-- 塾長からのコメント -->
-                <div style="flex: 1;">
-                    <div class="section-title">◆塾長からのコメント</div>
-                    <div class="comment-box">
-                        <div class="comment-label math">算数</div>
-                        <div class="comment-text">{{ principal_math_comment }}</div>
-                    </div>
-                    <div class="comment-box">
-                        <div class="comment-label japanese">国語</div>
-                        <div class="comment-text">{{ principal_japanese_comment }}</div>
+                    <div>
+                        <div class="section-title">◆塾長からのコメント</div>
+                        <div class="comment-box">
+                            <div class="comment-label math">算数</div>
+                            <div class="comment-text">{{ principal_math_comment }}</div>
+                        </div>
+                        <div class="comment-box">
+                            <div class="comment-label japanese">国語</div>
+                            <div class="comment-text">{{ principal_japanese_comment }}</div>
+                        </div>
                     </div>
                 </div>
             </div>
-        </div>
 
-        <!-- 成績の推移 -->
-        <div class="trend-section">
-            <div class="section-title">◆成績の推移</div>
-            <table class="trend-table">
-                <thead>
-                    <tr>
-                        <th>回数</th>
-                        <th>得点</th>
-                        <th>偏差値</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for trend in trends %}
-                    <tr>
-                        <td>{{ trend.iteration }}</td>
-                        <td>{{ trend.score }}</td>
-                        <td>{{ trend.deviation }}</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+            <div class="trend-section">
+                <div class="section-title">◆成績の推移</div>
+                <table class="trend-table">
+                    <thead>
+                        <tr>
+                            <th>回数</th>
+                            <th>得点</th>
+                            <th>偏差値</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for trend in trends %}
+                        <tr>
+                            <td>{{ trend.iteration }}</td>
+                            <td>{{ trend.score }}</td>
+                            <td>{{ trend.deviation }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
         </div>
     </div>
 </body>
