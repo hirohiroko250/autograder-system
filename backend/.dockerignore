@@ -42,3 +42,10 @@ staticfiles/
 .git
 .gitignore
 README.md
+*.sqlite3
+db.sqlite3
+db_production.sqlite3
+autograder_env/
+venv/
+env/
+*.log

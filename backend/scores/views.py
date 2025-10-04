@@ -7,7 +7,7 @@ from rest_framework.filters import SearchFilter, OrderingFilter
 from django.shortcuts import render
 from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib import messages
-from django.http import HttpResponseRedirect
+from django.http import HttpResponseRedirect, HttpResponse
 from django.db import models
 from .models import (
     Score, TestResult, CommentTemplate, CommentTemplateV2, StudentComment, TestComment,
@@ -1037,32 +1037,32 @@ class IndividualProblemScoreViewSet(viewsets.ModelViewSet):
     def generate_individual_report(self, request):
         """個別成績表帳票生成エンドポイント"""
         from .utils import generate_individual_report_template
-        
+
         try:
             student_id = request.data.get('studentId')
             year = request.data.get('year')
             period = request.data.get('period')
-            format_type = request.data.get('format', 'word')
-            
+            format_type = request.data.get('format', 'pdf')
+
             print(f"個別帳票生成開始: studentId={student_id}, year={year}, period={period}, format={format_type}")
-            
+
             if not all([student_id, year, period]):
                 return Response({
                     'success': False,
                     'error': 'studentId, year, periodは必須パラメータです'
                 }, status=400)
-            
+
             result = generate_individual_report_template(
                 student_id=student_id,
                 year=year,
                 period=period,
                 format_type=format_type
             )
-            
+
             print(f"帳票生成結果: {result}")
-            
+
             return Response(result)
-            
+
         except Exception as e:
             print(f"個別帳票生成API例外: {str(e)}")
             import traceback
@@ -1071,44 +1071,294 @@ class IndividualProblemScoreViewSet(viewsets.ModelViewSet):
                 'success': False,
                 'error': str(e)
             }, status=500)
+
+    @action(detail=False, methods=['get'], permission_classes=[], url_path='preview-individual-report')
+    def preview_individual_report(self, request):
+        """個別成績表HTML印刷プレビュー"""
+        from .utils import get_individual_report_data
+        from django.template.loader import render_to_string
+        import os
+        from django.conf import settings
+
+        try:
+            student_id = request.query_params.get('studentId')
+            year = request.query_params.get('year')
+            period = request.query_params.get('period')
+
+            if not all([student_id, year, period]):
+                return HttpResponse(
+                    '<html><body><h1>エラー</h1><p>studentId, year, periodパラメータが必要です</p></body></html>',
+                    content_type='text/html'
+                )
+
+            # 成績データを取得
+            report_data = get_individual_report_data(student_id, year, period)
+            if not report_data:
+                return HttpResponse(
+                    '<html><body><h1>エラー</h1><p>該当する成績データが見つかりません</p></body></html>',
+                    content_type='text/html'
+                )
+
+            # CSS読み込み
+            css_path = os.path.join(settings.BASE_DIR, 'static', 'reports', 'report.css')
+            try:
+                with open(css_path, 'r', encoding='utf-8') as f:
+                    css_content = f.read()
+            except FileNotFoundError:
+                css_content = ''
+
+            # ロゴパス
+            logo_path = os.path.join(settings.BASE_DIR, 'static', 'reports', 'logo.svg')
+
+            # テンプレートデータ準備
+            from datetime import datetime
+            template_data = {
+                'css_content': css_content,
+                'logo_url': f'file://{logo_path}',
+                'issue_date': datetime.now().strftime('%Y年%m月%d日'),
+                **report_data
+            }
+
+            # HTML生成
+            html_content = render_to_string('reports/individual_report.html', template_data)
+
+            # 印刷用のJavaScriptを追加
+            print_script = '''
+<script>
+function printReport() {
+    window.print();
+}
+
+// Ctrl+P または Cmd+P でも印刷可能
+document.addEventListener('keydown', function(e) {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'p') {
+        e.preventDefault();
+        printReport();
+    }
+});
+</script>
+<style>
+@media screen {
+    .print-button {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        padding: 15px 30px;
+        background: #3498db;
+        color: white;
+        border: none;
+        border-radius: 5px;
+        font-size: 16px;
+        font-weight: bold;
+        cursor: pointer;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        z-index: 9999;
+    }
+    .print-button:hover {
+        background: #2980b9;
+    }
+}
+@media print {
+    .print-button {
+        display: none;
+    }
+}
+</style>
+<button class="print-button" onclick="printReport()">🖨️ 印刷 / PDF保存</button>
+'''
+            html_content = html_content.replace('</body>', f'{print_script}</body>')
+
+            return HttpResponse(html_content, content_type='text/html; charset=utf-8')
+
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            return HttpResponse(
+                f'<html><body><h1>エラー</h1><p>{str(e)}</p></body></html>',
+                content_type='text/html'
+            )
     
     @action(detail=False, methods=['post'], permission_classes=[])
     def generate_bulk_reports(self, request):
         """一括成績表帳票生成エンドポイント"""
         from .utils import generate_bulk_reports_template
-        
+
         try:
             student_ids = request.data.get('studentIds', [])
             year = request.data.get('year')
             period = request.data.get('period')
-            format_type = request.data.get('format', 'word')
-            
+            format_type = request.data.get('format', 'pdf')
+
             if not all([student_ids, year, period]):
                 return Response({
                     'success': False,
                     'error': 'studentIds, year, periodは必須パラメータです'
                 }, status=400)
-            
+
             if not isinstance(student_ids, list) or len(student_ids) == 0:
                 return Response({
                     'success': False,
                     'error': 'studentIdsは空でない配列である必要があります'
                 }, status=400)
-            
+
             result = generate_bulk_reports_template(
                 student_ids=student_ids,
                 year=year,
                 period=period,
                 format_type=format_type
             )
-            
+
             return Response(result)
-            
+
         except Exception as e:
             return Response({
                 'success': False,
                 'error': str(e)
             }, status=500)
+
+    @action(detail=False, methods=['get'], permission_classes=[], url_path='preview-bulk-reports')
+    def preview_bulk_reports(self, request):
+        """一括成績表HTML印刷プレビュー"""
+        from .utils import get_individual_report_data
+        from django.template.loader import render_to_string
+        import os
+        from django.conf import settings
+
+        try:
+            student_ids_str = request.query_params.get('studentIds', '')
+            year = request.query_params.get('year')
+            period = request.query_params.get('period')
+
+            if not all([student_ids_str, year, period]):
+                return HttpResponse(
+                    '<html><body><h1>エラー</h1><p>studentIds, year, periodパラメータが必要です</p></body></html>',
+                    content_type='text/html'
+                )
+
+            # カンマ区切りのstudent_idsを配列に変換
+            student_ids = [s.strip() for s in student_ids_str.split(',') if s.strip()]
+
+            if not student_ids:
+                return HttpResponse(
+                    '<html><body><h1>エラー</h1><p>有効な生徒IDが指定されていません</p></body></html>',
+                    content_type='text/html'
+                )
+
+            # CSS読み込み
+            css_path = os.path.join(settings.BASE_DIR, 'static', 'reports', 'report.css')
+            try:
+                with open(css_path, 'r', encoding='utf-8') as f:
+                    css_content = f.read()
+            except FileNotFoundError:
+                css_content = ''
+
+            # ロゴパス
+            logo_path = os.path.join(settings.BASE_DIR, 'static', 'reports', 'logo.svg')
+
+            # 全生徒のHTMLを生成
+            all_reports_html = []
+            from datetime import datetime
+
+            for student_id in student_ids:
+                # 成績データを取得
+                report_data = get_individual_report_data(student_id, year, period)
+                if not report_data:
+                    continue
+
+                # テンプレートデータ準備
+                template_data = {
+                    'css_content': css_content,
+                    'logo_url': f'file://{logo_path}',
+                    'issue_date': datetime.now().strftime('%Y年%m月%d日'),
+                    **report_data
+                }
+
+                # HTML生成
+                html_content = render_to_string('reports/individual_report.html', template_data)
+                all_reports_html.append(html_content)
+
+            if not all_reports_html:
+                return HttpResponse(
+                    '<html><body><h1>エラー</h1><p>該当する成績データが見つかりません</p></body></html>',
+                    content_type='text/html'
+                )
+
+            # 全てのレポートを結合（ページ区切り付き）
+            combined_html = '''
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>一括成績表 - 全国学力向上テスト</title>
+    <style>
+''' + css_content + '''
+@media screen {
+    .print-button {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        padding: 15px 30px;
+        background: #3498db;
+        color: white;
+        border: none;
+        border-radius: 5px;
+        font-size: 16px;
+        font-weight: bold;
+        cursor: pointer;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        z-index: 9999;
+    }
+    .print-button:hover {
+        background: #2980b9;
+    }
+}
+@media print {
+    .print-button {
+        display: none;
+    }
+    .report-page {
+        page-break-after: always;
+    }
+    .report-page:last-child {
+        page-break-after: auto;
+    }
+}
+    </style>
+</head>
+<body>
+<button class="print-button" onclick="window.print()">🖨️ 印刷 / PDF保存 (全''' + str(len(all_reports_html)) + '''枚)</button>
+'''
+
+            for idx, report_html in enumerate(all_reports_html):
+                # <html>, <head>, <body>タグを除去してコンテンツのみ抽出
+                import re
+                body_content = re.search(r'<body>(.*?)</body>', report_html, re.DOTALL)
+                if body_content:
+                    combined_html += body_content.group(1)
+
+            combined_html += '''
+<script>
+// Ctrl+P または Cmd+P でも印刷可能
+document.addEventListener('keydown', function(e) {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'p') {
+        e.preventDefault();
+        window.print();
+    }
+});
+</script>
+</body>
+</html>
+'''
+
+            return HttpResponse(combined_html, content_type='text/html; charset=utf-8')
+
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            return HttpResponse(
+                f'<html><body><h1>エラー</h1><p>{str(e)}</p></body></html>',
+                content_type='text/html'
+            )
     
     @action(detail=False, methods=['post'], permission_classes=[])
     def save_student_comments(self, request):

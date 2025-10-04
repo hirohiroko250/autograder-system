@@ -27,7 +27,7 @@ services:
       DJANGO_SETTINGS_MODULE: autograder.settings_production
       LOG_DIR: /app/logs
     volumes:
-      - ./backend:/app
+      - ./backend:/app  # Re-enabled for development
       - static_volume:/app/staticfiles
       - media_volume:/app/mediafiles
       - ./logs:/app/logs
@@ -38,7 +38,7 @@ services:
     command: >
       sh -c "python manage.py migrate &&
              python manage.py collectstatic --noinput &&
-             python manage.py runserver 0.0.0.0:8000"
+             gunicorn autograder.wsgi:application --bind 0.0.0.0:8000 --workers 3 --timeout 120 --access-logfile - --error-logfile -"
 
   # Next.js フロントエンド（zyukupage）
   frontend-zyuku:

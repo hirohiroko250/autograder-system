@@ -2014,6 +2014,14 @@ def _generate_trend_chart(points: list[dict], title: str) -> str | None:
         return None
 
 
+def get_individual_report_data(student_id: str, year: str, period: str) -> dict | None:
+    """個別成績表データ取得（HTML用）"""
+    report_data, error = _collect_individual_report_data(student_id, int(year), period)
+    if error or not report_data:
+        return None
+    return _prepare_template_data(report_data, '')
+
+
 def _prepare_template_data(report_data: dict, logo_path: str) -> dict:
     """HTMLテンプレート用のデータを準備"""
     student_info = report_data['student_info']
