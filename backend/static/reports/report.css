@@ -41,19 +41,6 @@ body {
     position: relative;
 }
 
-/* カラー定義 */
-:root {
-    --math-color: #27ae60;
-    --math-light: #2ecc71;
-    --math-bg: #e8f8f0;
-    --japanese-color: #e67e22;
-    --japanese-light: #f39c12;
-    --japanese-bg: #fef5e7;
-    --total-color: #3498db;
-    --total-light: #5dade2;
-    --total-bg: #ebf5fb;
-}
-
 /* ヘッダー */
 .header {
     display: flex;
@@ -75,23 +62,25 @@ body {
 .test-info {
     display: flex;
     align-items: center;
-    gap: 6px;
     margin-bottom: 2mm;
     font-size: 10pt;
 }
 
 .test-info .label {
     color: #7f8c8d;
+    margin-right: 3px;
 }
 
 .test-info .value {
     font-weight: 700;
     color: #2c3e50;
     font-size: 13pt;
+    margin-right: 3px;
 }
 
 .test-info .separator {
     color: #bdc3c7;
+    margin: 0 3px;
 }
 
 .main-title {
@@ -106,19 +95,22 @@ body {
     color: #95a5a6;
 }
 
-/* 生徒情報 */
+/* 生徒情報 - Grid to Table */
 .student-info {
-    display: grid;
-    grid-template-columns: repeat(6, 1fr);
-    gap: 2mm;
+    display: table;
+    width: 100%;
     margin-bottom: 5mm;
     padding: 3mm;
     background: #f8f9fa;
     border-radius: 4px;
+    table-layout: fixed;
 }
 
 .info-item {
+    display: table-cell;
+    width: 16.666%;
     font-size: 7pt;
+    padding: 0 1mm;
 }
 
 .info-item .label {
@@ -132,11 +124,18 @@ body {
     border-bottom: 1px solid #bdc3c7;
 }
 
-/* メインレイアウト */
+/* メインレイアウト - Grid to Flexbox */
 .main-layout {
-    display: grid;
-    grid-template-columns: 0.92fr 1.08fr;
-    gap: 6mm;
+    display: flex;
+}
+
+.left-column {
+    width: 46%;
+    margin-right: 6mm;
+}
+
+.right-column {
+    width: 54%;
 }
 
 /* セクションタイトル */
@@ -158,7 +157,7 @@ body {
 .window-area {
     position: absolute;
     left: 20mm;
-    top: 47mm; /* 297mm - 250mm = 47mm */
+    top: 47mm;
     width: 95mm;
     height: 45mm;
 }
@@ -191,7 +190,7 @@ body {
 
 /* 得点・偏差値・順位 */
 .score-section {
-    margin-top: 55mm; /* 窓の下に配置 */
+    margin-top: 55mm;
     margin-bottom: 4mm;
 }
 
@@ -205,7 +204,7 @@ body {
 }
 
 .score-table thead {
-    background: linear-gradient(135deg, #34495e 0%, #2c3e50 100%);
+    background: #34495e;
 }
 
 .score-table th {
@@ -223,22 +222,21 @@ body {
 }
 
 .score-table .total-th {
-    background: var(--total-color);
+    background: #3498db;
 }
 
 .score-table .japanese-th {
-    background: var(--japanese-color);
+    background: #e67e22;
 }
 
 .score-table .math-th {
-    background: var(--math-color);
+    background: #27ae60;
 }
 
 .score-table td {
     padding: 2mm;
     text-align: center;
     border-bottom: 1px solid #ecf0f1;
-    font-variant-numeric: tabular-nums;
 }
 
 .score-table .label-td {
@@ -250,22 +248,22 @@ body {
 }
 
 .score-table .total-data {
-    background: var(--total-bg);
-    color: var(--total-color);
+    background: #ebf5fb;
+    color: #3498db;
     font-weight: 700;
     font-size: 16pt;
 }
 
 .score-table .japanese-data {
-    background: var(--japanese-bg);
-    color: var(--japanese-color);
+    background: #fef5e7;
+    color: #e67e22;
     font-weight: 700;
     font-size: 16pt;
 }
 
 .score-table .math-data {
-    background: var(--math-bg);
-    color: var(--math-color);
+    background: #e8f8f0;
+    color: #27ae60;
     font-weight: 700;
     font-size: 16pt;
 }
@@ -292,16 +290,21 @@ body {
     margin-bottom: 0;
 }
 
+/* Grid to Flexbox for trend cards */
 .trend-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 3mm;
+    display: flex;
 }
 
 .trend-card {
+    width: 33.333%;
     border: 2px solid #ecf0f1;
     border-radius: 4px;
     overflow: hidden;
+    margin-right: 3mm;
+}
+
+.trend-card:last-child {
+    margin-right: 0;
 }
 
 .trend-header {
@@ -313,15 +316,15 @@ body {
 }
 
 .total-bg {
-    background: linear-gradient(135deg, var(--total-color) 0%, var(--total-light) 100%);
+    background: #3498db;
 }
 
 .japanese-bg {
-    background: linear-gradient(135deg, var(--japanese-color) 0%, var(--japanese-light) 100%);
+    background: #e67e22;
 }
 
 .math-bg {
-    background: linear-gradient(135deg, var(--math-color) 0%, var(--math-light) 100%);
+    background: #27ae60;
 }
 
 .trend-table {
@@ -346,7 +349,6 @@ body {
     padding: 2mm;
     text-align: center;
     border-bottom: 1px solid #f8f9fa;
-    font-variant-numeric: tabular-nums;
 }
 
 .trend-table tr:last-child td {
@@ -396,7 +398,6 @@ body {
     padding: 1.5mm;
     text-align: center;
     border-bottom: 1px solid #f8f9fa;
-    font-variant-numeric: tabular-nums;
 }
 
 .items-table .unit {
@@ -422,15 +423,14 @@ body {
     color: white;
     font-size: 7pt;
     font-weight: 700;
-    transition: width 0.3s ease;
 }
 
 .math-fill {
-    background: linear-gradient(90deg, var(--math-color) 0%, var(--math-light) 100%);
+    background: #27ae60;
 }
 
 .japanese-fill {
-    background: linear-gradient(90deg, var(--japanese-color) 0%, var(--japanese-light) 100%);
+    background: #e67e22;
 }
 
 /* 塾長からのコメント */
@@ -438,16 +438,21 @@ body {
     margin-bottom: 0;
 }
 
+/* Grid to Flexbox for comments */
 .comment-cards {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 3mm;
+    display: flex;
 }
 
 .comment-card {
+    width: 50%;
     border: 2px solid #ecf0f1;
     border-radius: 4px;
     overflow: hidden;
+    margin-right: 3mm;
+}
+
+.comment-card:last-child {
+    margin-right: 0;
 }
 
 .comment-header {
@@ -468,11 +473,9 @@ body {
 @media print {
     body {
         -webkit-print-color-adjust: exact;
-        print-color-adjust: exact;
     }
     
     .report-page {
-        box-shadow: none;
         page-break-inside: avoid;
     }
 }
