@@ -2058,8 +2058,12 @@ def _prepare_template_data(report_data: dict, logo_path: str) -> dict:
             'deviation': f"{t.get('deviation', 0):.1f}",
         })
 
+    # CSS path
+    css_path = os.path.join(settings.BASE_DIR, 'static', 'reports', 'report.css')
+
     return {
         'logo_url': f'file://{logo_path}',
+        'css_url': f'file://{css_path}',
         'issue_date': datetime.now().strftime('%Y年%m月%d日'),
         'test_year': test_info['year'],
         'test_iteration': test_info.get('iteration', '1').replace('第', '').replace('回', ''),
