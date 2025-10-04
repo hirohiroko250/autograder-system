@@ -189,7 +189,7 @@ function StudentManagementContent({ year, period }: { year: string; period: stri
 
   const availableClassrooms = getAvailableClassrooms();
 
-  // 個別帳票ダウンロード
+  // 個別帳票ダウンロード（HTMLプレビュー方式）
   const handleDownloadIndividualReport = async (studentId: string) => {
     try {
       const student = classroomFilteredResults.find((r: any) => r.student_id === studentId);
@@ -198,39 +198,21 @@ function StudentManagementContent({ year, period }: { year: string; period: stri
         return;
       }
 
-      // バックエンドAPIを呼び出して個別帳票を生成
-      const response = await testApi.generateIndividualReport({
-        studentId: studentId,
-        year: parseInt(year),
-        period: period,
-        format: 'pdf'
-      });
+      // 新しいHTMLプレビューエンドポイントを開く
+      const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL?.replace('/api', '') || 'http://162.43.55.80:8000';
+      const previewUrl = `${baseUrl}/api/scores/preview-individual-report/?studentId=${studentId}&year=${year}&period=${period}`;
 
-      if (response.success) {
-        // ファイルダウンロード処理
-        const link = document.createElement('a');
-        const downloadUrl = response.download_url.startsWith('http') 
-          ? response.download_url 
-          : `${process.env.NEXT_PUBLIC_API_BASE_URL?.replace('/api', '') || 'http://162.43.55.80:8000'}${response.download_url}`;
-        link.href = downloadUrl;
-        const fileExt = response.format === 'pdf' ? 'pdf' : 'docx';
-        link.download = `${student.student_name}_成績表_${year}年度${getPeriodLabel(period)}.${fileExt}`;
-        link.target = '_blank';  // 新しいタブで開く
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        
-        toast.success(`${student.student_name}の成績表をダウンロードしました`);
-      } else {
-        toast.error(`帳票生成に失敗しました: ${response.error}`);
-      }
+      // 新しいタブで開く
+      window.open(previewUrl, '_blank');
+
+      toast.success(`${student.student_name}の成績表を開きました。ブラウザの印刷機能でPDF保存できます。`);
     } catch (error) {
-      console.error('個別帳票ダウンロードエラー:', error);
-      toast.error('帳票のダウンロードに失敗しました');
+      console.error('個別帳票プレビューエラー:', error);
+      toast.error('帳票のプレビューに失敗しました');
     }
   };
 
-  // 一括帳票ダウンロード
+  // 一括帳票ダウンロード（HTMLプレビュー方式）
   const handleDownloadBulkReports = async () => {
     if (selectedStudents.length === 0) {
       toast.error('生徒を選択してください');
@@ -238,34 +220,35 @@ function StudentManagementContent({ year, period }: { year: string; period: stri
     }
 
     try {
-      // バックエンドAPIを呼び出して一括帳票を生成
-      const response = await testApi.generateBulkReports({
-        studentIds: selectedStudents,
-        year: parseInt(year),
-        period: period,
-        format: 'pdf'
-      });
+      // 一括帳票プレビューエンドポイントを開く
+      const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL?.replace('/api', '') || 'http://162.43.55.80:8000';
 
-      if (response.success) {
-        // ZIPファイルダウンロード処理
-        const link = document.createElement('a');
-        const downloadUrl = response.download_url.startsWith('http') 
-          ? response.download_url 
-          : `${process.env.NEXT_PUBLIC_API_BASE_URL?.replace('/api', '') || 'http://162.43.55.80:8000'}${response.download_url}`;
-        link.href = downloadUrl;
-        link.download = `成績表一括_${year}年度${getPeriodLabel(period)}_${selectedStudents.length}名.zip`;
-        link.target = '_blank';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        
-        toast.success(`${selectedStudents.length}名の成績表を一括ダウンロードしました`);
+      // 全生徒選択の場合は教室IDでフィルタリング
+      const isAllSelected = selectedStudents.length === filteredResults.length;
+      let previewUrl = '';
+
+      if (isAllSelected && user?.classroom_id) {
+        previewUrl = `${baseUrl}/api/scores/preview-bulk-reports/?year=${year}&period=${period}&classroomId=${user.classroom_id}`;
       } else {
-        toast.error(`一括帳票生成に失敗しました: ${response.error}`);
+        // 個別選択の場合は各生徒のプレビューを順番に開く
+        for (const studentId of selectedStudents) {
+          const student = classroomFilteredResults.find((r: any) => r.student_id === studentId);
+          const studentPreviewUrl = `${baseUrl}/api/scores/preview-individual-report/?studentId=${studentId}&year=${year}&period=${period}`;
+          window.open(studentPreviewUrl, '_blank');
+          // 連続して開く際のブラウザの制限を避けるため少し待機
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
+        toast.success(`${selectedStudents.length}名の成績表を開きました。各タブから印刷できます。`);
+        return;
       }
+
+      // 新しいタブで開く
+      window.open(previewUrl, '_blank');
+
+      toast.success(`${selectedStudents.length}名の成績表を開きました。ブラウザの印刷機能でPDF保存できます。`);
     } catch (error) {
-      console.error('一括帳票ダウンロードエラー:', error);
-      toast.error('一括帳票のダウンロードに失敗しました');
+      console.error('一括帳票プレビューエラー:', error);
+      toast.error('一括帳票のプレビューに失敗しました');
     }
   };
 
