@@ -2078,19 +2078,23 @@ def _prepare_template_data(report_data: dict, logo_path: str) -> dict:
         'japanese_deviation': f"{japanese_data.get('deviation', 0):.1f}" if japanese_data.get('deviation') is not None else '-',
         'total_deviation': f"{combined.get('deviations', {}).get('national', 0):.1f}" if combined.get('deviations', {}).get('national') is not None else '-',
 
-        # ランキングデータ
-        'math_national_rank': math_data.get('rankings', {}).get('national', {}).get('rank') or '-',
+        # ランキングデータ（Noneと0を区別）
+        'math_national_rank': math_data.get('rankings', {}).get('national', {}).get('rank') if math_data.get('rankings', {}).get('national', {}).get('rank') is not None else '-',
         'math_national_total': math_data.get('rankings', {}).get('national', {}).get('total') or 0,
-        'japanese_national_rank': japanese_data.get('rankings', {}).get('national', {}).get('rank') or '-',
+
+        'japanese_national_rank': japanese_data.get('rankings', {}).get('national', {}).get('rank') if japanese_data.get('rankings', {}).get('national', {}).get('rank') is not None else '-',
         'japanese_national_total': japanese_data.get('rankings', {}).get('national', {}).get('total') or 0,
-        'total_national_rank': combined.get('rankings', {}).get('national', {}).get('rank') or '-',
+
+        'total_national_rank': combined.get('rankings', {}).get('national', {}).get('rank') if combined.get('rankings', {}).get('national', {}).get('rank') is not None else '-',
         'total_national_total': combined.get('rankings', {}).get('national', {}).get('total') or 0,
 
-        'math_school_rank': math_data.get('rankings', {}).get('school', {}).get('rank') or '-',
+        'math_school_rank': math_data.get('rankings', {}).get('school', {}).get('rank') if math_data.get('rankings', {}).get('school', {}).get('rank') is not None else '-',
         'math_school_total': math_data.get('rankings', {}).get('school', {}).get('total') or 0,
-        'japanese_school_rank': japanese_data.get('rankings', {}).get('school', {}).get('rank') or '-',
+
+        'japanese_school_rank': japanese_data.get('rankings', {}).get('school', {}).get('rank') if japanese_data.get('rankings', {}).get('school', {}).get('rank') is not None else '-',
         'japanese_school_total': japanese_data.get('rankings', {}).get('school', {}).get('total') or 0,
-        'total_school_rank': combined.get('rankings', {}).get('school', {}).get('rank') or '-',
+
+        'total_school_rank': combined.get('rankings', {}).get('school', {}).get('rank') if combined.get('rankings', {}).get('school', {}).get('rank') is not None else '-',
         'total_school_total': combined.get('rankings', {}).get('school', {}).get('total') or 0,
 
         # 統計データ
@@ -2115,8 +2119,8 @@ def _prepare_template_data(report_data: dict, logo_path: str) -> dict:
         'japanese_questions': japanese_questions,
 
         # コメント
-        'math_comment': math_data.get('comment', 'コメントなし'),
-        'japanese_comment': japanese_data.get('comment', 'コメントなし'),
+        'math_comment': math_data.get('comment') or 'この科目では、基礎から応用まで幅広い問題に取り組みました。今後も継続した学習を心がけましょう。',
+        'japanese_comment': japanese_data.get('comment') or 'この科目では、読解力や表現力を総合的に評価しました。引き続き努力を続けてください。',
         'principal_math_comment': '今回の結果は、未来へのヒントです。今の努力が、これからの可能性を広げていきます。',
         'principal_japanese_comment': '今回の結果は、未来へのヒントです。今の努力が、これからの可能性を広げていきます。',
 
