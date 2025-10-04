@@ -2138,7 +2138,10 @@ def create_individual_report_pdf(report_data: dict) -> tuple[str | None, str | N
         return None, f'PDF生成に必要なライブラリが不足しています: {exc}'
 
     reports_dir = _ensure_reports_dir()
-    logo_path = os.path.join(settings.BASE_DIR, 'static', 'reports', 'logo.png')
+    # SVGロゴを優先的に使用
+    logo_svg = os.path.join(settings.BASE_DIR, 'static', 'reports', 'logo.svg')
+    logo_png = os.path.join(settings.BASE_DIR, 'static', 'reports', 'logo.png')
+    logo_path = logo_svg if os.path.exists(logo_svg) else logo_png
 
     import uuid
     file_name = f"individual_report_{report_data['student_info']['id']}_{report_data['test_info']['year']}_{report_data['test_info']['period']}_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:8]}.pdf"
