@@ -10,10 +10,11 @@ from schools.views import SchoolViewSet
 from students.views import StudentViewSet, StudentEnrollmentViewSet
 from scores.views import (
     ScoreViewSet, TestResultViewSet, CommentTemplateViewSet, CommentTemplateV2ViewSet,
-    StudentCommentViewSet, TestCommentViewSet, 
+    StudentCommentViewSet, TestCommentViewSet,
     QuestionScoreViewSet, TestAttendanceViewSet,
     IndividualProblemViewSet, IndividualProblemScoreViewSet, import_csv_scores
 )
+from scores.report_views import preview_individual_report, preview_bulk_reports
 from notifications.views import NotificationViewSet, UserNotificationViewSet
 from tests.views import TestScheduleViewSet, TestDefinitionViewSet, QuestionGroupViewSet, QuestionViewSet
 from classrooms.views import ClassroomViewSet
@@ -180,6 +181,8 @@ urlpatterns = [
     path('admin/bulk-add-school-billing/', bulk_add_school_billing, name='bulk_add_school_billing'),
     path('admin/', admin.site.urls),
     path('api/auth/', include('accounts.urls')),
+    path('api/scores/preview-individual-report/', preview_individual_report, name='preview_individual_report'),
+    path('api/scores/preview-bulk-reports/', preview_bulk_reports, name='preview_bulk_reports'),
     path('api/', include(router.urls)),
     path('api/tests/', include('tests.urls')),
     path('reports/', include('reports.urls')),

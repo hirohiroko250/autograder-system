@@ -1,7 +1,7 @@
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter, OrderingFilter
 from django.shortcuts import render
@@ -1072,7 +1072,7 @@ class IndividualProblemScoreViewSet(viewsets.ModelViewSet):
                 'error': str(e)
             }, status=500)
 
-    @action(detail=False, methods=['get'], permission_classes=[], url_path='preview-individual-report')
+    @action(detail=False, methods=['get'], permission_classes=[AllowAny], authentication_classes=[], url_path='preview-individual-report')
     def preview_individual_report(self, request):
         """個別成績表HTML印刷プレビュー"""
         from .utils import get_individual_report_data
@@ -1216,7 +1216,7 @@ document.addEventListener('keydown', function(e) {
                 'error': str(e)
             }, status=500)
 
-    @action(detail=False, methods=['get'], permission_classes=[], url_path='preview-bulk-reports')
+    @action(detail=False, methods=['get'], permission_classes=[AllowAny], authentication_classes=[], url_path='preview-bulk-reports')
     def preview_bulk_reports(self, request):
         """一括成績表HTML印刷プレビュー"""
         from .utils import get_individual_report_data
