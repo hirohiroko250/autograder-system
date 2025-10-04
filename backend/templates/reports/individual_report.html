@@ -55,6 +55,10 @@
                         <span class="value">{{ student_grade }}</span>
                     </div>
                     <div class="info-item">
+                        <span class="label">受験ID</span>
+                        <span class="value">{{ student_id }}</span>
+                    </div>
+                    <div class="info-item">
                         <span class="label">生徒ID</span>
                         <span class="value">{{ student_id }}</span>
                     </div>
@@ -65,10 +69,6 @@
                     <div class="info-item">
                         <span class="label">塾ID</span>
                         <span class="value">{{ school_id }}</span>
-                    </div>
-                    <div class="info-item">
-                        <span class="label">テスト年度</span>
-                        <span class="value">{{ test_year }}</span>
                     </div>
                 </div>
             </div>
@@ -117,16 +117,28 @@
                                 <td class="math-cell">{{ math_school_rank }}<span class="unit">位</span><br><span class="sub-value">({{ math_school_total }}人中)</span></td>
                             </tr>
                             <tr>
-                                <td class="label-cell">平均点(全国)</td>
+                                <td class="label-cell">最高点<br><span class="sub-label">(全国)</span></td>
+                                <td>{{ total_national_highest }}<span class="unit">点</span></td>
+                                <td>{{ japanese_national_highest }}<span class="unit">点</span></td>
+                                <td>{{ math_national_highest }}<span class="unit">点</span></td>
+                            </tr>
+                            <tr>
+                                <td class="label-cell">最高点<br><span class="sub-label">(塾内)</span></td>
+                                <td>{{ total_school_highest }}<span class="unit">点</span></td>
+                                <td>{{ japanese_school_highest }}<span class="unit">点</span></td>
+                                <td>{{ math_school_highest }}<span class="unit">点</span></td>
+                            </tr>
+                            <tr>
+                                <td class="label-cell">平均点<br><span class="sub-label">(全国)</span></td>
                                 <td>{{ total_national_avg }}<span class="unit">点</span></td>
                                 <td>{{ japanese_national_avg }}<span class="unit">点</span></td>
                                 <td>{{ math_national_avg }}<span class="unit">点</span></td>
                             </tr>
                             <tr>
-                                <td class="label-cell">最高点(全国)</td>
-                                <td>{{ total_national_highest }}<span class="unit">点</span></td>
-                                <td>{{ japanese_national_highest }}<span class="unit">点</span></td>
-                                <td>{{ math_national_highest }}<span class="unit">点</span></td>
+                                <td class="label-cell">平均点<br><span class="sub-label">(塾内)</span></td>
+                                <td>{{ total_school_avg }}<span class="unit">点</span></td>
+                                <td>{{ japanese_school_avg }}<span class="unit">点</span></td>
+                                <td>{{ math_school_avg }}<span class="unit">点</span></td>
                             </tr>
                         </tbody>
                     </table>
@@ -137,22 +149,37 @@
                     <h2 class="section-title"><span class="diamond">◆</span>成績の推移</h2>
 
                     <div class="trend-graphs">
-                        <div class="trend-graph">
-                            <div class="graph-header total-bg">合計</div>
+                        <!-- 全教科 -->
+                        <div class="trend-graph total-graph">
+                            <div class="graph-header total-bg">全教科</div>
                             <div class="graph-content">
-                                <canvas id="totalChart" class="line-chart" width="300" height="150"></canvas>
+                                <svg viewBox="0 0 200 120" class="line-chart" id="totalChart">
+                                    <!-- グリッド線 -->
+                                    <line x1="30" y1="20" x2="30" y2="100" stroke="#e0e0e0" stroke-width="1"/>
+                                    <line x1="30" y1="100" x2="190" y2="100" stroke="#e0e0e0" stroke-width="1"/>
+                                </svg>
                             </div>
                         </div>
-                        <div class="trend-graph">
-                            <div class="graph-header japanese-bg">国語</div>
-                            <div class="graph-content">
-                                <canvas id="japaneseChart" class="line-chart" width="300" height="150"></canvas>
-                            </div>
-                        </div>
-                        <div class="trend-graph">
+
+                        <!-- 算数 -->
+                        <div class="trend-graph math-graph">
                             <div class="graph-header math-bg">算数</div>
                             <div class="graph-content">
-                                <canvas id="mathChart" class="line-chart" width="300" height="150"></canvas>
+                                <svg viewBox="0 0 200 120" class="line-chart" id="mathChart">
+                                    <line x1="30" y1="20" x2="30" y2="100" stroke="#e0e0e0" stroke-width="1"/>
+                                    <line x1="30" y1="100" x2="190" y2="100" stroke="#e0e0e0" stroke-width="1"/>
+                                </svg>
+                            </div>
+                        </div>
+
+                        <!-- 国語 -->
+                        <div class="trend-graph japanese-graph">
+                            <div class="graph-header japanese-bg">国語</div>
+                            <div class="graph-content">
+                                <svg viewBox="0 0 200 120" class="line-chart" id="japaneseChart">
+                                    <line x1="30" y1="20" x2="30" y2="100" stroke="#e0e0e0" stroke-width="1"/>
+                                    <line x1="30" y1="100" x2="190" y2="100" stroke="#e0e0e0" stroke-width="1"/>
+                                </svg>
                             </div>
                         </div>
                     </div>
@@ -174,9 +201,9 @@
                             <thead>
                                 <tr>
                                     <th class="q-col">大問</th>
-                                    <th class="item-col">項目名</th>
+                                    <th class="item-col">出題項目名</th>
                                     <th class="score-col">得点/配点</th>
-                                    <th class="avg-col">平均点</th>
+                                    <th class="avg-col">全国平均点</th>
                                     <th class="rate-col">正答率</th>
                                 </tr>
                             </thead>
@@ -191,16 +218,14 @@
                                         <div class="rate-container">
                                             <div class="rate-bar math-bar" style="width: {{ question.correct_rate }}%;"></div>
                                             <div class="avg-star" style="left: {{ question.national_avg_rate }}%;">★</div>
-                                            <div class="rate-text">{{ question.correct_rate }}%</div>
+                                            <span class="rate-text">{{ question.correct_rate }}%</span>
                                         </div>
                                     </td>
                                 </tr>
                                 {% endfor %}
                             </tbody>
                         </table>
-                        <div class="chart-note">
-                            <span class="note-star">★</span> = 全国平均正答率
-                        </div>
+                        <p class="chart-note">は出題項目別の正答率です。<span class="note-star">★</span>は全国の平均正答率です。</p>
                     </div>
 
                     <!-- 国語 -->
@@ -212,9 +237,9 @@
                             <thead>
                                 <tr>
                                     <th class="q-col">大問</th>
-                                    <th class="item-col">項目名</th>
+                                    <th class="item-col">出題項目名</th>
                                     <th class="score-col">得点/配点</th>
-                                    <th class="avg-col">平均点</th>
+                                    <th class="avg-col">全国平均点</th>
                                     <th class="rate-col">正答率</th>
                                 </tr>
                             </thead>
@@ -229,16 +254,14 @@
                                         <div class="rate-container">
                                             <div class="rate-bar japanese-bar" style="width: {{ question.correct_rate }}%;"></div>
                                             <div class="avg-star" style="left: {{ question.national_avg_rate }}%;">★</div>
-                                            <div class="rate-text">{{ question.correct_rate }}%</div>
+                                            <span class="rate-text">{{ question.correct_rate }}%</span>
                                         </div>
                                     </td>
                                 </tr>
                                 {% endfor %}
                             </tbody>
                         </table>
-                        <div class="chart-note">
-                            <span class="note-star">★</span> = 全国平均正答率
-                        </div>
+                        <p class="chart-note">は出題項目別の正答率です。<span class="note-star">★</span>は全国の平均正答率です。</p>
                     </div>
                 </section>
 
@@ -247,11 +270,12 @@
                     <h2 class="section-title"><span class="diamond">◆</span>塾長からのコメント</h2>
 
                     <div class="comment-grid">
-                        <div class="comment-box">
+                        <div class="comment-box math-comment">
                             <div class="comment-header math-bg">算数</div>
                             <p class="comment-text">{{ principal_math_comment }}</p>
                         </div>
-                        <div class="comment-box">
+
+                        <div class="comment-box japanese-comment">
                             <div class="comment-header japanese-bg">国語</div>
                             <p class="comment-text">{{ principal_japanese_comment }}</p>
                         </div>
@@ -262,100 +286,118 @@
     </div>
 
     <script>
-    // 成績推移グラフ描画
+    // 成績推移グラフ描画（SVG版）
     (function() {
         const trends = {{ trends|safe }};
         if (!trends || trends.length === 0) return;
 
-        function drawChart(canvasId, scores, avgScore, color, avgColor) {
-            const canvas = document.getElementById(canvasId);
-            if (!canvas) return;
+        function drawSVGChart(svgId, scores, avgScores, color, avgColor) {
+            const svg = document.getElementById(svgId);
+            if (!svg) return;
 
-            const ctx = canvas.getContext('2d');
-            const width = canvas.width;
-            const height = canvas.height;
-            const padding = 30;
-            const chartWidth = width - padding * 2;
-            const chartHeight = height - padding * 2;
+            const ns = "http://www.w3.org/2000/svg";
 
-            // 最大値・最小値
-            const maxScore = Math.max(...scores, avgScore, 100);
+            // データポイントの計算
+            const maxScore = 100;
             const minScore = 0;
+            const points = [];
+            const avgPoints = [];
 
-            // グリッド
-            ctx.strokeStyle = '#f0f0f0';
-            ctx.lineWidth = 1;
-            for (let i = 0; i <= 4; i++) {
-                const y = padding + (chartHeight / 4) * i;
-                ctx.beginPath();
-                ctx.moveTo(padding, y);
-                ctx.lineTo(width - padding, y);
-                ctx.stroke();
+            scores.forEach((score, index) => {
+                const x = 70 + (index * 40);
+                const y = 100 - ((score - minScore) / (maxScore - minScore)) * 80;
+                points.push({ x, y, score });
+            });
+
+            avgScores.forEach((score, index) => {
+                const x = 70 + (index * 40);
+                const y = 100 - ((score - minScore) / (maxScore - minScore)) * 80;
+                avgPoints.push({ x, y });
+            });
+
+            // 全国平均ライン（点線）
+            if (avgPoints.length > 1) {
+                for (let i = 0; i < avgPoints.length - 1; i++) {
+                    const line = document.createElementNS(ns, 'line');
+                    line.setAttribute('x1', avgPoints[i].x);
+                    line.setAttribute('y1', avgPoints[i].y);
+                    line.setAttribute('x2', avgPoints[i + 1].x);
+                    line.setAttribute('y2', avgPoints[i + 1].y);
+                    line.setAttribute('stroke', avgColor);
+                    line.setAttribute('stroke-width', '1');
+                    line.setAttribute('stroke-dasharray', '3,3');
+                    svg.appendChild(line);
+                }
+            }
+
+            // データライン
+            if (points.length > 0) {
+                const polyline = document.createElementNS(ns, 'polyline');
+                const pointsStr = points.map(p => `${p.x},${p.y}`).join(' ');
+                polyline.setAttribute('points', pointsStr);
+                polyline.setAttribute('fill', 'none');
+                polyline.setAttribute('stroke', color);
+                polyline.setAttribute('stroke-width', '3');
+                svg.appendChild(polyline);
             }
 
             // データポイント
-            const points = scores.map((score, index) => {
-                const x = padding + (chartWidth / (scores.length - 1)) * index;
-                const y = padding + chartHeight - ((score - minScore) / (maxScore - minScore)) * chartHeight;
-                return { x, y, score };
-            });
-
-            // 生徒スコアライン
-            ctx.strokeStyle = color;
-            ctx.lineWidth = 2;
-            ctx.beginPath();
-            points.forEach((point, index) => {
-                if (index === 0) ctx.moveTo(point.x, point.y);
-                else ctx.lineTo(point.x, point.y);
-            });
-            ctx.stroke();
-
-            // 生徒スコアポイント
             points.forEach(point => {
-                ctx.fillStyle = color;
-                ctx.beginPath();
-                ctx.arc(point.x, point.y, 4, 0, Math.PI * 2);
-                ctx.fill();
+                const circle = document.createElementNS(ns, 'circle');
+                circle.setAttribute('cx', point.x);
+                circle.setAttribute('cy', point.y);
+                circle.setAttribute('r', '4');
+                circle.setAttribute('fill', color);
+                svg.appendChild(circle);
             });
-
-            // 全国平均ライン
-            const avgY = padding + chartHeight - ((avgScore - minScore) / (maxScore - minScore)) * chartHeight;
-            ctx.strokeStyle = avgColor;
-            ctx.lineWidth = 1.5;
-            ctx.setLineDash([4, 4]);
-            ctx.beginPath();
-            ctx.moveTo(padding, avgY);
-            ctx.lineTo(width - padding, avgY);
-            ctx.stroke();
-            ctx.setLineDash([]);
 
             // 全国平均ポイント
-            points.forEach(point => {
-                ctx.fillStyle = avgColor;
-                ctx.beginPath();
-                ctx.arc(point.x, avgY, 3, 0, Math.PI * 2);
-                ctx.fill();
+            avgPoints.forEach(point => {
+                const circle = document.createElementNS(ns, 'circle');
+                circle.setAttribute('cx', point.x);
+                circle.setAttribute('cy', point.y);
+                circle.setAttribute('r', '3');
+                circle.setAttribute('fill', avgColor);
+                svg.appendChild(circle);
             });
 
-            // X軸ラベル
-            ctx.fillStyle = '#666';
-            ctx.font = '8px sans-serif';
-            ctx.textAlign = 'center';
-            trends.forEach((trend, index) => {
-                const x = padding + (chartWidth / (scores.length - 1)) * index;
-                ctx.fillText(`第${trend.iteration}回`, x, height - 10);
+            // 軸ラベル
+            points.forEach((point, index) => {
+                const text = document.createElementNS(ns, 'text');
+                text.setAttribute('x', point.x);
+                text.setAttribute('y', '115');
+                text.setAttribute('text-anchor', 'middle');
+                text.setAttribute('font-size', '10');
+                text.setAttribute('fill', '#666');
+                text.textContent = `${index + 1}回`;
+                svg.appendChild(text);
+            });
+
+            // 値
+            points.forEach(point => {
+                const text = document.createElementNS(ns, 'text');
+                text.setAttribute('x', point.x);
+                text.setAttribute('y', point.y - 5);
+                text.setAttribute('text-anchor', 'middle');
+                text.setAttribute('font-size', '9');
+                text.setAttribute('fill', color);
+                text.setAttribute('font-weight', '700');
+                text.textContent = Math.round(point.score);
+                svg.appendChild(text);
             });
         }
 
-        // 合計グラフ
-        const totalScores = trends.map(t => t.score || 0);
-        drawChart('totalChart', totalScores, {{ total_national_avg }}, '#3498db', '#e67e22');
+        const totalScores = trends.map(t => t.total_score || 0);
+        const japaneseScores = trends.map(t => t.japanese_score || 0);
+        const mathScores = trends.map(t => t.math_score || 0);
 
-        // 国語グラフ（データがあれば）
-        drawChart('japaneseChart', totalScores, {{ japanese_national_avg }}, '#e67e22', '#f39c12');
+        const totalAvgs = trends.map(t => {{ total_national_avg }});
+        const japaneseAvgs = trends.map(t => {{ japanese_national_avg }});
+        const mathAvgs = trends.map(t => {{ math_national_avg }});
 
-        // 算数グラフ（データがあれば）
-        drawChart('mathChart', totalScores, {{ math_national_avg }}, '#27ae60', '#52c97f');
+        drawSVGChart('totalChart', totalScores, totalAvgs, '#3498db', '#95a5a6');
+        drawSVGChart('mathChart', mathScores, mathAvgs, '#27ae60', '#95a5a6');
+        drawSVGChart('japaneseChart', japaneseScores, japaneseAvgs, '#e67e22', '#95a5a6');
     })();
     </script>
 </body>
