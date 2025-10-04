@@ -2148,9 +2148,11 @@ def create_individual_report_pdf(report_data: dict) -> tuple[str | None, str | N
 
     # PDF生成
     try:
-        HTML(string=html_content).write_pdf(file_path)
+        from weasyprint import HTML as WeasyHTML
+        WeasyHTML(string=html_content).write_pdf(file_path)
     except Exception as e:
-        return None, f'PDF生成中にエラーが発生しました: {str(e)}'
+        import traceback
+        return None, f'PDF生成中にエラーが発生しました: {str(e)}\n{traceback.format_exc()}'
 
     try:
         os.chmod(file_path, 0o644)
