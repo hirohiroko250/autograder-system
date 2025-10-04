@@ -12,6 +12,13 @@ RUN apt-get update && apt-get install -y \
     postgresql-client \
     libpq-dev \
     python3-dev \
+    libpango-1.0-0 \
+    libpangoft2-1.0-0 \
+    libharfbuzz-subset0 \
+    libcairo2 \
+    libgdk-pixbuf-2.0-0 \
+    libffi-dev \
+    fonts-noto-cjk \
     && rm -rf /var/lib/apt/lists/*
 
 # requirements.txtをコピーして依存関係をインストール
