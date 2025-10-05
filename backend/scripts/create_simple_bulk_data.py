@@ -72,10 +72,16 @@ print(f"✓ テストスケジュール: {test_schedule}")
 print(f"✓ テスト定義: {existing_tests.count()}件")
 print()
 
-confirm = input("実行しますか？ (yes/no): ")
-if confirm.lower() != 'yes':
-    print("キャンセルしました")
-    sys.exit(0)
+# スクリプト実行時に --skip-confirm フラグを追加できるように
+skip_confirm = '--skip-confirm' in sys.argv or '-y' in sys.argv
+
+if not skip_confirm:
+    confirm = input("実行しますか？ (yes/no): ")
+    if confirm.lower() != 'yes':
+        print("キャンセルしました")
+        sys.exit(0)
+else:
+    print("確認をスキップして実行します...")
 
 print()
 print("データ生成を開始します...")
