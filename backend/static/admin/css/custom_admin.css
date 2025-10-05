@@ -416,9 +416,10 @@ input[type="submit"].default:hover,
   border: 2px solid var(--brand);
   border-radius: var(--radius-md);
   background: #fff;
-  overflow: hidden;
+  overflow: visible;
   box-shadow: 0 10px 40px -10px rgba(37, 99, 235, 0.3);
-  min-width: 320px;
+  min-width: 420px;
+  width: max-content;
 }
 
 .calendarbox h2 {
@@ -434,20 +435,21 @@ input[type="submit"].default:hover,
 .calendar {
   width: 100%;
   border-collapse: separate;
-  border-spacing: 0;
-  padding: 0.5rem;
+  border-spacing: 2px;
+  padding: 0.8rem;
 }
 
 .calendar thead th {
   background: linear-gradient(135deg, rgba(37, 99, 235, 0.15), rgba(56, 189, 248, 0.12));
-  padding: 0.9rem 0.6rem;
-  font-size: 0.95rem;
+  padding: 0.9rem 0.4rem;
+  font-size: 0.85rem;
   color: var(--text-strong);
   font-weight: 700;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.03em;
   text-align: center;
   text-transform: uppercase;
   border-bottom: 2px solid var(--brand);
+  min-width: 3rem;
 }
 
 .calendar thead th.is-sunday {
@@ -459,22 +461,23 @@ input[type="submit"].default:hover,
 }
 
 .calendar td {
-  padding: 0.6rem;
+  padding: 0.4rem;
   text-align: center;
   border: 1px solid rgba(226, 232, 240, 0.5);
   background: #fff;
+  min-width: 3rem;
 }
 
 .calendar td a {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 2.8rem;
-  height: 2.8rem;
+  width: 3rem;
+  height: 3rem;
   border-radius: var(--radius-sm);
   color: var(--text-strong);
   font-weight: 600;
-  font-size: 1rem;
+  font-size: 1.05rem;
   transition: all 0.2s ease;
   border: 2px solid transparent;
 }
