@@ -1,7 +1,5 @@
 'use client';
 
-export const dynamic = 'force-dynamic';
-
 import { Suspense, useState } from 'react';
 import { PermissionGuard } from '@/components/auth/permission-guard';
 import { DashboardLayout } from '@/components/layout/dashboard-layout';

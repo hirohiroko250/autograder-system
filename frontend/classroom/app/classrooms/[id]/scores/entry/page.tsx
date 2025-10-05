@@ -1,8 +1,6 @@
 import { DashboardLayout } from '@/components/layout/dashboard-layout';
 import { ScoreEntryWizard } from '@/components/tests/score-entry-wizard';
 
-export const dynamic = 'force-dynamic';
-
 interface ClassroomScoreEntryPageProps {
   params: {
     id: string;
