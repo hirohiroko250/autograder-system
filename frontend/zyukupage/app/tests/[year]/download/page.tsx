@@ -12,7 +12,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Download, FileText, CheckCircle, Clock, AlertTriangle, Calendar } from 'lucide-react';
 import { toast } from 'sonner';
 import apiClient from '@/lib/api-client';
-import { Label } from '@/components/ui/label';
 
 function getPeriodLabel(period: string) {
   switch (period) {
@@ -63,7 +62,6 @@ function TestDownloadContent() {
   });
 
   const files = Array.isArray(testFiles) ? testFiles : [];
-  const hasAvailableFiles = files.some((file: any) => file.status === 'available');
 
   const downloadBinary = (blob: Blob, filename: string) => {
     const url = window.URL.createObjectURL(blob);
@@ -100,6 +98,7 @@ function TestDownloadContent() {
   };
 
   const handleBulkDownload = async () => {
+    const hasAvailableFiles = files.some((file: any) => file.status === 'available');
     if (!hasAvailableFiles) {
       toast.warning('ダウンロード可能なファイルがありません');
       return;
@@ -153,169 +152,154 @@ function TestDownloadContent() {
     }
   };
 
-  const getStatusDescription = (status: string) => {
-    switch (status) {
-      case 'available':
-        return 'ダウンロード可能';
-      case 'processing':
-        return '現在準備中です';
-      case 'missing':
-      case 'unavailable':
-        return 'ファイルが登録されていません';
-      case 'error':
-        return 'エラーが発生しました。管理者にお問い合わせください';
-      default:
-        return 'ステータス不明';
-    }
-  };
-
   return (
     <DashboardLayout>
-      <div className="py-6">
-        <div className="flex items-center justify-between mb-6">
+      <div className="space-y-6 animate-fade-in">
+        <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold">テスト問題ダウンロード</h1>
+            <h1 className="text-3xl font-bold">テストファイルダウンロード</h1>
             <p className="text-muted-foreground mt-1">
-              選択した年度・期間のテスト問題と解答をダウンロードできます
+              {selectedYear}年度 {getPeriodLabel(selectedPeriod)} テスト
             </p>
           </div>
-          <Card className="border-primary/10 bg-primary/5">
-            <CardContent className="p-4 flex items-center gap-3">
-              <div className="rounded-full bg-primary text-primary-foreground p-2">
-                <Calendar className="h-5 w-5" />
+          <Button onClick={handleBulkDownload} className="rounded-xl bg-primary hover:bg-primary/90">
+            <Download className="h-4 w-4 mr-2" />
+            全ファイル一括ダウンロード
+          </Button>
+        </div>
+
+        {/* 年度・期間選択セクション */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Calendar className="h-5 w-5" />
+              年度・期間選択
+            </CardTitle>
+            <CardDescription>
+              ダウンロードしたいテストの年度と期間を選択してください
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center gap-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">年度</label>
+                <Select value={selectedYear} onValueChange={handleYearChange}>
+                  <SelectTrigger className="w-40 rounded-xl">
+                    <SelectValue placeholder="年度を選択" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Array.from({ length: 6 }).map((_, index) => {
+                      const targetYear = (2025 + index).toString();
+                      return (
+                        <SelectItem key={targetYear} value={targetYear}>
+                          {targetYear}年度
+                        </SelectItem>
+                      );
+                    })}
+                  </SelectContent>
+                </Select>
               </div>
-              <div>
-                <p className="text-xs text-muted-foreground">選択中の年度</p>
-                <p className="text-sm font-semibold">{selectedYear}年度</p>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">期間</label>
+                <Select value={selectedPeriod} onValueChange={handlePeriodChange}>
+                  <SelectTrigger className="w-40 rounded-xl">
+                    <SelectValue placeholder="期間を選択" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="spring">春期</SelectItem>
+                    <SelectItem value="summer">夏期</SelectItem>
+                    <SelectItem value="winter">冬期</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <div className="grid gap-4 md:grid-cols-2">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">問題ファイル</CardTitle>
+              <CardDescription>テスト問題のPDFファイル</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {isLoading && <p className="text-sm text-muted-foreground">読み込み中...</p>}
+                {isError && <p className="text-sm text-red-600">ファイル情報を取得できませんでした</p>}
+                {!isLoading && files.filter((file: any) => file.type === 'problem').length === 0 && (
+                  <p className="text-sm text-muted-foreground">問題ファイルがありません</p>
+                )}
+                {files.filter((file: any) => file.type === 'problem').map((file: any) => (
+                  <div key={file.id} className="flex items-center justify-between p-3 border rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <FileText className="h-4 w-4 text-blue-500" />
+                      <div>
+                        <p className="font-medium text-sm">{file.name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {file.size || '-'}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {getStatusBadge(file.status)}
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleDownload(file)}
+                        disabled={file.status !== 'available'}
+                        className="rounded-lg"
+                      >
+                        <Download className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">解答ファイル</CardTitle>
+              <CardDescription>テスト解答のPDFファイル</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {isLoading && <p className="text-sm text-muted-foreground">読み込み中...</p>}
+                {isError && <p className="text-sm text-red-600">ファイル情報を取得できませんでした</p>}
+                {!isLoading && files.filter((file: any) => file.type === 'answer').length === 0 && (
+                  <p className="text-sm text-muted-foreground">解答ファイルがありません</p>
+                )}
+                {files.filter((file: any) => file.type === 'answer').map((file: any) => (
+                  <div key={file.id} className="flex items-center justify-between p-3 border rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <FileText className="h-4 w-4 text-green-500" />
+                      <div>
+                        <p className="font-medium text-sm">{file.name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {file.size || '-'}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {getStatusBadge(file.status)}
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleDownload(file)}
+                        disabled={file.status !== 'available'}
+                        className="rounded-lg"
+                      >
+                        <Download className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
               </div>
             </CardContent>
           </Card>
         </div>
 
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle>ダウンロード条件の選択</CardTitle>
-            <CardDescription>年度と期を選択してファイルを確認してください</CardDescription>
-          </CardHeader>
-          <CardContent className="flex flex-wrap items-center gap-4">
-            <div>
-              <Label className="text-sm font-medium text-muted-foreground">年度を選択</Label>
-              <Select value={selectedYear} onValueChange={handleYearChange}>
-                <SelectTrigger className="w-[180px]">
-                  <SelectValue placeholder="年度を選択" />
-                </SelectTrigger>
-                <SelectContent>
-                  {Array.from({ length: 6 }).map((_, index) => {
-                    const targetYear = (2025 + index).toString();
-                    return (
-                      <SelectItem key={targetYear} value={targetYear}>
-                        {targetYear}年度
-                      </SelectItem>
-                    );
-                  })}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div>
-              <Label className="text-sm font-medium text-muted-foreground">期間を選択</Label>
-              <Select value={selectedPeriod} onValueChange={handlePeriodChange}>
-                <SelectTrigger className="w-[180px]">
-                  <SelectValue placeholder="期間を選択" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="spring">春期</SelectItem>
-                  <SelectItem value="summer">夏期</SelectItem>
-                  <SelectItem value="winter">冬期</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <Button
-              variant="outline"
-              className="space-x-2"
-              onClick={handleBulkDownload}
-              disabled={!hasAvailableFiles}
-            >
-              <Download className="h-4 w-4" />
-              <span>全ファイルを一括ダウンロード</span>
-            </Button>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>テストファイル一覧</CardTitle>
-            <CardDescription>
-              {selectedYear}年度 {getPeriodLabel(selectedPeriod)} のテストファイルを確認し、必要に応じてダウンロードしてください
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {isLoading && <p className="text-sm text-muted-foreground">読み込み中...</p>}
-            {isError && (
-              <p className="text-sm text-red-600">
-                ファイル情報を取得できませんでした。時間をおいて再度お試しください。
-              </p>
-            )}
-            {!isLoading && !files.length && (
-              <p className="text-sm text-muted-foreground">
-                この年度・期間には登録されたファイルがありません。
-              </p>
-            )}
-
-            {files.map((file: any) => {
-              const statusBadge = getStatusBadge(file.status);
-              const statusDescription = getStatusDescription(file.status);
-              const updatedAt = file.lastUpdated ? new Date(file.lastUpdated) : null;
-
-              return (
-                <Card key={`file-${file.id}`} className="border-muted">
-                  <CardContent className="p-4">
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex items-start gap-4">
-                        <div className="rounded-full bg-primary/10 p-3 text-primary">
-                          <FileText className="h-5 w-5" />
-                        </div>
-                        <div>
-                          <h3 className="text-lg font-semibold">{file.name || '名称未設定'}</h3>
-                          <p className="text-sm text-muted-foreground mt-1 flex items-center gap-2">
-                            科目: {file.subject || '不明'} / 種別: {file.type || '不明'}
-                          </p>
-                          <dl className="grid grid-cols-2 gap-2 mt-3 text-sm text-muted-foreground">
-                            <div>
-                              <dt>サイズ</dt>
-                              <dd>{file.size || (file.status === 'available' ? '-' : '未登録')}</dd>
-                            </div>
-                            <div>
-                              <dt>最終更新</dt>
-                              <dd>{updatedAt ? updatedAt.toLocaleDateString('ja-JP') : '不明'}</dd>
-                            </div>
-                            <div className="col-span-2 flex items-center gap-2">
-                              <dt className="font-medium">状態</dt>
-                              <dd className="flex items-center gap-2">
-                                {statusBadge}
-                                <span className="text-xs text-muted-foreground">{statusDescription}</span>
-                              </dd>
-                            </div>
-                          </dl>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Button
-                          variant="outline"
-                          onClick={() => handleDownload(file)}
-                          disabled={file.status !== 'available'}
-                        >
-                          <Download className="h-4 w-4 mr-2" />ダウンロード
-                        </Button>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            })}
-          </CardContent>
-        </Card>
       </div>
     </DashboardLayout>
   );
