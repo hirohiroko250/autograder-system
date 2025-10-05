@@ -20,7 +20,7 @@ django.setup()
 from schools.models import School
 from classrooms.models import Classroom
 from students.models import Student, StudentEnrollment
-from test_schedules.models import TestSchedule
+from test_schedules.models import TestScheduleInfo
 from scores.models import Score
 
 # 日本の都道府県
@@ -156,8 +156,8 @@ def create_students_for_classroom(classroom, students_per_grade=10):
 def create_test_schedule():
     """2025年夏季テストのスケジュールを作成"""
     # 既存のスケジュールを確認
-    existing = TestSchedule.objects.filter(
-        year=2025,
+    existing = TestScheduleInfo.objects.filter(
+        year='2025',
         period='summer'
     ).first()
 
@@ -165,13 +165,13 @@ def create_test_schedule():
         print("2025年夏季テストのスケジュールは既に存在します")
         return existing
 
-    test_schedule = TestSchedule.objects.create(
-        year=2025,
+    test_schedule = TestScheduleInfo.objects.create(
+        year='2025',
         period='summer',
-        test_date=date(2025, 7, 15),
-        grade='elementary',
-        status='scheduled',
-        description='2025年度夏季全国学力向上テスト（小学生）'
+        planned_date=date(2025, 7, 15),
+        actual_date=date(2025, 7, 15),
+        deadline=datetime(2025, 7, 31, 23, 59, 59),
+        status='completed',
     )
 
     print("✓ Created 2025年夏季テストスケジュール")
