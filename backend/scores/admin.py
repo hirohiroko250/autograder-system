@@ -101,7 +101,7 @@ class TestResultAdmin(admin.ModelAdmin):
     search_fields = ['student__name', 'student__student_id', 'test__subject', 'student__classroom__school__name']
     ordering = ['test', '-total_score']
     readonly_fields = ['created_at', 'updated_at']
-    actions = ['generate_test_results_from_scores', 'calculate_school_ranks', 'remove_absent_students', 'delete_zero_score_results']
+    actions = ['bulk_calculate_all', 'generate_test_results_from_scores', 'calculate_school_ranks', 'remove_absent_students', 'delete_zero_score_results']
     list_per_page = 50
     
     class Media:
@@ -284,6 +284,134 @@ class TestResultAdmin(admin.ModelAdmin):
     
     
     
+    def bulk_calculate_all(self, request, queryset):
+        """
+        ⚡【一括集計】全自動で集計実行
+        Scoreデータから→TestResult生成→順位・偏差値計算→欠席者(0点)削除を一括実行します。
+        ボタン1つで完了します。
+        """
+        from django.db.models import Sum, Count, Avg, StdDev
+        from .models import Score, TestResult
+        from tests.models import TestDefinition
+        import math
+
+        # STEP 1: ScoreからTestResultを生成
+        generated_count = 0
+        tests = TestDefinition.objects.all()
+
+        for test in tests:
+            student_totals = Score.objects.filter(
+                test=test,
+                attendance=True,
+                score__gte=0
+            ).values('student').annotate(
+                total_score=Sum('score'),
+                question_count=Count('question_group')
+            ).filter(
+                question_count__gt=0
+            )
+
+            for student_total in student_totals:
+                student_id = student_total['student']
+                total_score = student_total['total_score']
+                correct_rate = (total_score / 100.0) * 100 if total_score else 0
+
+                test_result, created = TestResult.objects.get_or_create(
+                    student_id=student_id,
+                    test=test,
+                    defaults={
+                        'total_score': total_score,
+                        'correct_rate': correct_rate,
+                        'is_rank_finalized': False
+                    }
+                )
+
+                if created:
+                    generated_count += 1
+                elif test_result.total_score != total_score:
+                    test_result.total_score = total_score
+                    test_result.correct_rate = correct_rate
+                    test_result.save()
+                    generated_count += 1
+
+        # STEP 2: 順位・偏差値を計算
+        updated_count = 0
+        tests_processed = set()
+
+        for test in tests:
+            test_results = TestResult.objects.filter(test=test)
+            grades = test_results.values_list('student__grade', flat=True).distinct()
+
+            for grade in grades:
+                if not grade:
+                    continue
+
+                grade_results = test_results.filter(student__grade=grade).order_by('-total_score')
+                total_students = grade_results.count()
+
+                if total_students == 0:
+                    continue
+
+                stats = grade_results.aggregate(
+                    avg_score=Avg('total_score'),
+                    std_dev=StdDev('total_score')
+                )
+                avg_score = stats['avg_score'] or 0
+                std_dev = stats['std_dev'] or 1
+
+                rank = 1
+                prev_score = None
+                actual_rank = 1
+
+                for result in grade_results:
+                    if prev_score is not None and result.total_score < prev_score:
+                        rank = actual_rank
+
+                    if std_dev > 0:
+                        deviation_score = 50 + (result.total_score - avg_score) / std_dev * 10
+                        deviation_score = max(0, min(100, deviation_score))
+                    else:
+                        deviation_score = 50
+
+                    result.grade_rank = rank
+                    result.grade_total = total_students
+                    result.grade_deviation_score = round(deviation_score, 2)
+
+                    school_id = result.student.classroom.school.id if result.student.classroom else None
+                    if school_id:
+                        school_grade_results = test_results.filter(
+                            student__classroom__school_id=school_id,
+                            student__grade=grade
+                        )
+                        better_school_results = school_grade_results.filter(total_score__gt=result.total_score).count()
+                        school_total = school_grade_results.count()
+                        result.school_rank_final = better_school_results + 1
+                        result.school_total_final = school_total
+
+                    result.is_rank_finalized = True
+                    result.rank_finalized_at = timezone.now()
+                    result.save(update_fields=[
+                        'grade_rank', 'grade_total', 'grade_deviation_score',
+                        'school_rank_final', 'school_total_final',
+                        'is_rank_finalized', 'rank_finalized_at'
+                    ])
+
+                    prev_score = result.total_score
+                    actual_rank += 1
+                    updated_count += 1
+
+                tests_processed.add(test.id)
+
+        # STEP 3: 0点(欠席者)を削除
+        deleted_count = TestResult.objects.filter(total_score=0).delete()[0]
+
+        self.message_user(
+            request,
+            f"✅ 一括集計完了！ TestResult生成/更新: {generated_count}件、順位・偏差値計算: {updated_count}件、欠席者削除: {deleted_count}件",
+            messages.SUCCESS
+        )
+    bulk_calculate_all.short_description = "⚡ 【一括集計】全自動で集計実行（推奨）"
+
     def generate_test_results_from_scores(self, request, queryset):
         """
         【STEP 1】ScoreからTestResultを生成
