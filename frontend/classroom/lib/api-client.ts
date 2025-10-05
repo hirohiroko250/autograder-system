@@ -16,7 +16,7 @@ import {
 } from './types';
 
 const PUBLIC_API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || '/api';
-const INTERNAL_API_BASE_URL = process.env.INTERNAL_API_BASE_URL || process.env.NEXT_PUBLIC_API_BASE_URL || 'https://kouzyoutest.com/api';
+const INTERNAL_API_BASE_URL = typeof process !== 'undefined' && process.env ? (process.env.INTERNAL_API_BASE_URL || process.env.NEXT_PUBLIC_API_BASE_URL || 'https://kouzyoutest.com/api') : 'https://kouzyoutest.com/api';
 
 const resolveBaseURL = () => (typeof window === 'undefined' ? INTERNAL_API_BASE_URL : PUBLIC_API_BASE_URL);
 
