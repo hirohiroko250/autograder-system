@@ -17,7 +17,7 @@ django.setup()
 from schools.models import School
 from classrooms.models import Classroom
 from students.models import Student, StudentEnrollment
-from tests.models import TestDefinition, QuestionGroup
+from tests.models import TestSchedule, TestDefinition, QuestionGroup
 from scores.models import Score
 
 # 日本の都道府県（一部）
@@ -52,14 +52,21 @@ print("  - 教室: 各塾20教室 (合計2,000教室)")
 print("  - 生徒: 各教室60名、小学1〜6年生各10名 (合計120,000名)")
 print()
 
-# 既存のテストを確認
-existing_tests = TestDefinition.objects.filter(year='2025', period='summer')
+# 既存のテストスケジュールとテスト定義を確認
+test_schedule = TestSchedule.objects.filter(year=2025, period='summer').first()
+if not test_schedule:
+    print("エラー: 2025年夏季のテストスケジュールが見つかりません")
+    print("先にテストスケジュールを作成してください")
+    sys.exit(1)
+
+existing_tests = TestDefinition.objects.filter(schedule=test_schedule)
 if not existing_tests.exists():
     print("エラー: 2025年夏季のテスト定義が見つかりません")
     print("先にテスト定義を作成してください")
     sys.exit(1)
 
-print(f"✓ 既存のテスト定義を使用: {existing_tests.count()}件")
+print(f"✓ テストスケジュール: {test_schedule}")
+print(f"✓ テスト定義: {existing_tests.count()}件")
 print()
 
 confirm = input("実行しますか？ (yes/no): ")
@@ -159,7 +166,7 @@ print("注意: この処理には時間がかかります（数分〜数十分�
 print()
 
 students = Student.objects.all()
-tests = TestDefinition.objects.filter(year='2025', period='summer')
+tests = TestDefinition.objects.filter(schedule=test_schedule)
 
 batch_size = 1000
 score_batch = []
