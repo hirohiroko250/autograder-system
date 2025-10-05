@@ -8,43 +8,24 @@ const nextConfig = {
     ignoreBuildErrors: true,
   },
   images: { unoptimized: true },
-  // 静的生成のエラーを無視してスキップ
-  experimental: {
-    missingSuspenseWithCSRBailout: false,
+  webpack: (config, { isServer }) => {
+    // Increase timeout for CSS loading
+    config.watchOptions = {
+      ...config.watchOptions,
+      poll: 1000,
+      aggregateTimeout: 300
+    }
+    
+    return config
   },
-  // Hydration警告を抑制
+  // Disable strict mode to avoid some timeout issues
   reactStrictMode: false,
+  // Increase build timeout
+  staticPageGenerationTimeout: 120,
   // 開発環境での不要な警告を抑制
   onDemandEntries: {
     maxInactiveAge: 25 * 1000,
     pagesBufferLength: 2,
-  },
-  // CSS preload警告を抑制
-  webpack: (config, { dev, isServer }) => {
-    if (dev && !isServer) {
-      // CSSのpreload警告を抑制
-      config.optimization = {
-        ...config.optimization,
-        splitChunks: {
-          ...config.optimization.splitChunks,
-          cacheGroups: {
-            ...config.optimization.splitChunks?.cacheGroups,
-            styles: {
-              name: 'styles',
-              test: /\.css$/,
-              chunks: 'all',
-              enforce: true,
-            },
-          },
-        },
-      };
-    }
-    return config;
-  },
-  // 開発サーバー設定
-  devIndicators: {
-    buildActivity: false,
-    buildActivityPosition: 'bottom-right',
   },
 };
 

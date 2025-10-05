@@ -1,5 +1,7 @@
 'use client';
 
+export const dynamic = 'force-dynamic';
+
 import { useParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { StudentReport, ReportData } from '@/components/report/student-report';
