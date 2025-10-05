@@ -95,7 +95,7 @@ for i in range(100):
 
     school = School.objects.create(
         name=school_name,
-        school_id=f"{100000 + i}",
+        school_id=f"{200000 + i}",
         address=f"{prefecture}○○市△△町{i+1}-{i+1}",
         email=f"school{i+1:03d}@example.com",
         phone=f"03-1234-{i:04d}",
