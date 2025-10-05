@@ -94,8 +94,10 @@ for i in range(100):
         name=school_name,
         school_id=f"{100000 + i}",
         address=f"{prefecture}○○市△△町{i+1}-{i+1}",
-        contact_info=f"03-1234-{i:04d}",
-        is_active=True,
+        email=f"school{i+1:03d}@example.com",
+        phone=f"03-1234-{i:04d}",
+        status='active',
+        membership_type='general',
         can_register_students=True,
         can_input_scores=True,
         can_view_reports=True,
@@ -110,7 +112,6 @@ for i in range(100):
             school=school,
             name=classroom_name,
             classroom_id=f"{school.school_id}{j+1:06d}",
-            is_active=True,
         )
         total_classrooms += 1
 
@@ -146,7 +147,6 @@ for i in range(100):
                     student=student,
                     classroom=classroom,
                     enrollment_date=date(2025, 4, 1),
-                    is_active=True,
                 )
 
                 total_students += 1
