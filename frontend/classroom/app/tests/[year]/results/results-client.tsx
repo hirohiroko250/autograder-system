@@ -209,7 +209,7 @@ export function ResultsClient({ year }: ResultsClientProps) {
     }
   };
 
-  // 個別帳票ダウンロード
+  // 個別帳票プレビュー（HTMLプレビュー）
   const handleDownloadIndividualReport = async (studentId: string) => {
     try {
       const student = results.find(r => r.student_id === studentId);
@@ -218,37 +218,21 @@ export function ResultsClient({ year }: ResultsClientProps) {
         return;
       }
 
-      // バックエンドAPIを呼び出して個別帳票を生成
-      const response = await testApi.generateIndividualReport({
-        studentId: studentId,
-        year: parseInt(year),
-        period: period,
-        format: reportFormat
-      });
+      // 新しいHTMLプレビューエンドポイントを開く
+      const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL?.replace('/api', '') || 'https://kouzyoutest.com';
+      const previewUrl = `${baseUrl}/api/scores/preview-individual-report/?studentId=${studentId}&year=${year}&period=${period}`;
 
-      if (response.success) {
-        // ファイルダウンロード処理
-        const link = document.createElement('a');
-        const downloadUrl = response.download_url.startsWith('http')
-          ? response.download_url
-          : `${process.env.NEXT_PUBLIC_API_BASE_URL?.replace('/api', '') || 'http://162.43.55.80:8000'}${response.download_url}`;
-        link.href = downloadUrl;
-        const periodLabel = { spring: '春期', summer: '夏期', winter: '冬期' }[period] || period;
-        const extension = response.format === 'pdf' || reportFormat === 'pdf' ? 'pdf' : 'docx';
-        link.download = `${student.student_name}_成績表_${year}年度${periodLabel}.${extension}`;
-        link.click();
-        
-        toast.success(`${student.student_name}の成績表をダウンロードしました`);
-      } else {
-        toast.error(`帳票生成に失敗しました: ${response.error}`);
-      }
+      // 新しいタブで開く
+      window.open(previewUrl, '_blank');
+
+      toast.success(`${student.student_name}の成績表を開きました。ブラウザの印刷機能でPDF保存できます。`);
     } catch (error) {
-      console.error('個別帳票ダウンロードエラー:', error);
-      toast.error('帳票のダウンロードに失敗しました');
+      console.error('個別帳票プレビューエラー:', error);
+      toast.error('帳票のプレビューに失敗しました');
     }
   };
 
-  // 一括帳票ダウンロード
+  // 一括帳票プレビュー（HTMLプレビュー）
   const handleDownloadBulkReports = async () => {
     if (selectedStudents.length === 0) {
       toast.error('生徒を選択してください');
@@ -256,32 +240,18 @@ export function ResultsClient({ year }: ResultsClientProps) {
     }
 
     try {
-      // バックエンドAPIを呼び出して一括帳票を生成
-      const response = await testApi.generateBulkReports({
-        studentIds: selectedStudents,
-        year: parseInt(year),
-        period: period,
-        format: reportFormat
-      });
+      // 新しいHTMLプレビューエンドポイントを開く
+      const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL?.replace('/api', '') || 'https://kouzyoutest.com';
+      const studentIdsParam = selectedStudents.join(',');
+      const previewUrl = `${baseUrl}/api/scores/preview-bulk-reports/?year=${year}&period=${period}&studentIds=${studentIdsParam}`;
 
-      if (response.success) {
-        // ZIPファイルダウンロード処理
-        const link = document.createElement('a');
-        const downloadUrl = response.download_url.startsWith('http')
-          ? response.download_url
-          : `${process.env.NEXT_PUBLIC_API_BASE_URL?.replace('/api', '') || 'http://162.43.55.80:8000'}${response.download_url}`;
-        link.href = downloadUrl;
-        const periodLabel = { spring: '春期', summer: '夏期', winter: '冬期' }[period] || period;
-        link.download = `成績表一括_${year}年度${periodLabel}_${selectedStudents.length}名.zip`;
-        link.click();
-        
-        toast.success(`${selectedStudents.length}名の成績表を一括ダウンロードしました`);
-      } else {
-        toast.error(`一括帳票生成に失敗しました: ${response.error}`);
-      }
+      // 新しいタブで開く
+      window.open(previewUrl, '_blank');
+
+      toast.success(`${selectedStudents.length}名の成績表を開きました。ブラウザの印刷機能でPDF保存できます。`);
     } catch (error) {
-      console.error('一括帳票ダウンロードエラー:', error);
-      toast.error('一括帳票のダウンロードに失敗しました');
+      console.error('一括帳票プレビューエラー:', error);
+      toast.error('一括帳票のプレビューに失敗しました');
     }
   };
 

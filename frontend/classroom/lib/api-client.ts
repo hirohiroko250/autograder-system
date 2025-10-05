@@ -146,6 +146,11 @@ export const schoolApi = {
     return response.data;
   },
 
+  updateSchool: async (id: number, data: { name?: string; is_active?: boolean; can_register_students?: boolean; can_input_scores?: boolean; can_view_reports?: boolean }): Promise<School> => {
+    const response = await apiClient.patch<School>(`/schools/${id}/`, data);
+    return response.data;
+  },
+
   createClassroom: async (schoolId: number, data: CreateClassroomRequest): Promise<CreateClassroomResponse> => {
     const response = await apiClient.post<CreateClassroomResponse>('/classrooms/', data);
     return response.data;
@@ -221,6 +226,40 @@ export const studentApi = {
 
   deleteStudentEnrollment: async (id: number): Promise<void> => {
     await apiClient.delete(`/student-enrollments/${id}/`);
+  },
+
+  // 生徒データエクスポート（CSV形式）
+  exportStudents: async (): Promise<any> => {
+    const response = await apiClient.get('/students/export_data_csv/', {
+      responseType: 'blob'
+    });
+
+    // Blobレスポンスをファイルダウンロード用に処理
+    const blob = new Blob([response.data], {
+      type: 'text/csv; charset=utf-8-sig'
+    });
+
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+
+    // レスポンスヘッダーからファイル名を取得
+    const contentDisposition = response.headers['content-disposition'] || response.headers['Content-Disposition'];
+    let filename = `生徒データ_${new Date().toISOString().split('T')[0]}.csv`;
+
+    if (contentDisposition) {
+      const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+      if (filenameMatch && filenameMatch[1]) {
+        filename = filenameMatch[1].replace(/['"]/g, '');
+      }
+    }
+
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(link.href);
+
+    return { success: true, message: 'CSVファイルをダウンロードしました' };
   },
 };
 
@@ -389,10 +428,39 @@ export const testApi = {
     return response.data;
   },
 
-  // 全学年対応スコアテンプレート生成（小学生・中学生全教科対応）
+  // 全学年対応スコアテンプレート生成（CSV形式）
   generateAllGradesTemplate: async (params: { year: number; period: string }): Promise<any> => {
-    const response = await apiClient.get<any>('/scores/generate_all_grades_template/', { params });
-    return response.data;
+    const response = await apiClient.get('/scores/generate_all_grades_template/', {
+      params,
+      responseType: 'blob'
+    });
+
+    // Blobレスポンスをファイルダウンロード用に処理
+    const blob = new Blob([response.data], {
+      type: 'text/csv; charset=utf-8-sig'
+    });
+
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+
+    // レスポンスヘッダーからファイル名を取得
+    const contentDisposition = response.headers['content-disposition'] || response.headers['Content-Disposition'];
+    let filename = `スコア入力テンプレート_${params.year}_${params.period}.csv`;
+
+    if (contentDisposition) {
+      const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+      if (filenameMatch && filenameMatch[1]) {
+        filename = filenameMatch[1].replace(/['"]/g, '');
+      }
+    }
+
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(link.href);
+
+    return { success: true, message: 'CSVファイルをダウンロードしました' };
   },
 
   // スコアデータファイルインポート
