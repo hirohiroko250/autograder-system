@@ -8,25 +8,6 @@ const nextConfig = {
     ignoreBuildErrors: true,
   },
   images: { unoptimized: true },
-  // Skip static page generation errors during build
-  experimental: {
-    // Allow build to continue even with static generation errors
-    fallbackNodePolyfills: false,
-  },
-  // Force dynamic rendering for all pages
-  async headers() {
-    return [
-      {
-        source: '/:path*',
-        headers: [
-          {
-            key: 'x-prerender-revalidate',
-            value: '0',
-          },
-        ],
-      },
-    ]
-  },
   webpack: (config, { isServer }) => {
     // Increase timeout for CSS loading
     config.watchOptions = {
@@ -34,7 +15,7 @@ const nextConfig = {
       poll: 1000,
       aggregateTimeout: 300
     }
-
+    
     return config
   },
   // Disable strict mode to avoid some timeout issues
