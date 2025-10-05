@@ -20,6 +20,9 @@ from students.models import Student, StudentEnrollment
 from tests.models import TestSchedule, TestDefinition, QuestionGroup
 from scores.models import Score
 
+# 小学生の学年表記
+GRADE_NAMES = ['小1', '小2', '小3', '小4', '小5', '小6']
+
 # 日本の都道府県（一部）
 PREFECTURES = [
     '東京都', '神奈川県', '埼玉県', '千葉県', '大阪府', '兵庫県', '京都府',
@@ -116,7 +119,7 @@ for i in range(100):
         total_classrooms += 1
 
         # 各教室に60名の生徒（小学1〜6年生、各学年10名）
-        for grade in range(1, 7):
+        for grade_idx in range(6):  # 0-5 for 小1-小6
             for k in range(10):
                 gender = random.choice(['male', 'female'])
                 last_name = random.choice(LAST_NAMES)
@@ -129,24 +132,21 @@ for i in range(100):
                 student_name = f"{last_name} {first_name}"
                 student_id = generate_student_id()
 
-                # 生年月日を計算
-                birth_year = 2025 - grade - 6
-                birth_month = random.randint(4, 12)
-                birth_day = random.randint(1, 28)
-
+                # 生徒を作成（classroomに直接紐付け）
                 student = Student.objects.create(
                     student_id=student_id,
                     name=student_name,
-                    grade=grade,
-                    date_of_birth=date(birth_year, birth_month, birth_day),
-                    school=school,
+                    grade=GRADE_NAMES[grade_idx],  # '小1', '小2', etc.
+                    classroom=classroom,
+                    is_active=True,
                 )
 
-                # 教室への登録
+                # 2025年夏期への登録
                 StudentEnrollment.objects.create(
                     student=student,
-                    classroom=classroom,
-                    enrollment_date=date(2025, 4, 1),
+                    year=2025,
+                    period='summer',
+                    is_active=True,
                 )
 
                 total_students += 1
