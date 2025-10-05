@@ -235,7 +235,7 @@ class ClassroomAdmin(admin.ModelAdmin):
     search_fields = ('classroom_id', 'name', 'school__name')
     readonly_fields = ('created_at', 'updated_at')
     inlines = [StudentInline, ClassroomPermissionInline]
-    
+
     def get_membership_type(self, obj):
         return obj.school.get_membership_type_display()
     get_membership_type.short_description = '会員種別'
@@ -265,7 +265,7 @@ class StudentAdmin(admin.ModelAdmin):
     readonly_fields = ('created_at', 'updated_at', 'get_grade_display_readonly')
     ordering = ('classroom__school__school_id', 'classroom__classroom_id', 'student_id')
     actions = ['export_students', 'export_students_by_school', 'export_test_participants', 'export_all_test_participants']
-    
+
     def get_school_id(self, obj):
         return obj.classroom.school.school_id
     get_school_id.short_description = '塾ID'
@@ -1013,6 +1013,11 @@ class StudentAdmin(admin.ModelAdmin):
 # 標準管理サイトにモデルを登録
 admin.site.register(User, CustomUserAdmin)
 admin.site.register(School, SchoolAdmin)
+
+# 塾管理セクションに統合するためapp_labelを変更
+Classroom._meta.app_label = 'schools'
+Student._meta.app_label = 'schools'
+
 admin.site.register(Classroom, ClassroomAdmin)
 admin.site.register(Student, StudentAdmin)
 
@@ -1456,97 +1461,6 @@ class TestResultAdmin(admin.ModelAdmin):
         return response
     
     export_test_results.short_description = "テスト結果をエクスポート"
-    
-    def get_urls(self):
-        """カスタムURLを追加"""
-        from django.urls import path
-        urls = super().get_urls()
-        custom_urls = [
-            path('summary/', self.admin_site.admin_view(self.test_result_summary_view), name='tests_testresult_summary'),
-        ]
-        return custom_urls + urls
-    
-    def test_result_summary_view(self, request):
-        """テスト結果集計画面（年度・時期のみで集計、結果をDB保存）"""
-        from django.shortcuts import render, redirect
-        from django.contrib import messages
-        from scores.utils import get_available_tests, calculate_and_save_test_summary, get_test_summary, calculate_and_save_test_summary_by_school_type, get_test_summary_by_school_type
-        
-        available_tests = get_available_tests()
-        
-        # 年度・時期・科目の選択肢を生成
-        years = sorted(list(set([test['year'] for test in available_tests])), reverse=True)
-        # テストスケジュールモデルの期間を使用
-        from tests.models import TestSchedule
-        periods = TestSchedule.PERIODS
-        # 学校種別の選択肢（テンプレートで直接定義するため不要）
-        school_types = [
-            ('elementary', '小学生'),
-            ('middle', '中学生'),
-        ]
-        
-        summary_data = None
-        action = request.POST.get('action', '')
-        
-        # 選択された値を保持
-        selected_year = ''
-        selected_period = ''
-        selected_school_type = ''
-        
-        if request.method == 'POST':
-            year = request.POST.get('year')
-            period = request.POST.get('period')
-            school_type = request.POST.get('school_type')
-            
-            # 選択された値を保持（文字列として）
-            selected_year = str(year) if year else ''
-            selected_period = period or ''
-            selected_school_type = school_type or ''
-            
-            if year and period and school_type:
-                if action == 'calculate':
-                    # 集計実行
-                    try:
-                        result = calculate_and_save_test_summary_by_school_type(int(year), period, school_type)
-                        
-                        if result['success']:
-                            messages.success(request, 
-                                f"集計が完了しました。対象: {result['total_students']}名、塾数: {result['schools_count']}")
-                            # 集計後、結果を表示
-                            summary_result = get_test_summary_by_school_type(int(year), period, school_type)
-                            if summary_result['success']:
-                                summary_data = summary_result
-                        else:
-                            messages.error(request, f"集計に失敗しました: {result['error']}")
-                            
-                    except Exception as e:
-                        messages.error(request, f"集計エラー: {str(e)}")
-                        
-                elif action == 'view':
-                    # 既存の集計結果を表示
-                    try:
-                        result = get_test_summary_by_school_type(int(year), period, school_type)
-                        if result['success']:
-                            summary_data = result
-                        else:
-                            messages.error(request, f"集計結果が見つかりません: {result['error']}")
-                    except Exception as e:
-                        messages.error(request, f"表示エラー: {str(e)}")
-            else:
-                messages.error(request, "年度、時期、学校種別をすべて選択してください。")
-        
-        context = {
-            'title': 'テスト結果集計',
-            'opts': TestResult._meta,
-            'years': years,
-            'periods': periods,
-            'school_types': school_types,
-            'summary_data': summary_data,
-            'selected_year': selected_year,
-            'selected_period': selected_period,
-            'selected_school_type': selected_school_type,
-        }
-        return render(request, 'admin/test_result_summary.html', context)
 
 class CommentTemplateAdmin(admin.ModelAdmin):
     list_display = ('school', 'subject', 'score_range_min', 'score_range_max', 'is_default', 'is_active')
@@ -1554,51 +1468,52 @@ class CommentTemplateAdmin(admin.ModelAdmin):
     search_fields = ('template_text', 'school__name')
 
 
-class TestSummaryAdmin(admin.ModelAdmin):
-    list_display = ('__str__', 'total_students', 'average_score', 'average_correct_rate', 'calculated_at')
-    list_filter = ('year', 'period', 'subject', 'calculated_at')
-    search_fields = ('year', 'subject')
-    readonly_fields = ('calculated_at', 'updated_at')
-    
-    fieldsets = (
-        ('基本情報', {
-            'fields': ('test', 'year', 'period', 'subject', 'max_score')
-        }),
-        ('統計情報', {
-            'fields': ('total_students', 'average_score', 'average_correct_rate')
-        }),
-        ('詳細データ', {
-            'fields': ('grade_statistics', 'school_statistics'),
-            'classes': ('collapse',)
-        }),
-        ('日時情報', {
-            'fields': ('calculated_at', 'updated_at'),
-            'classes': ('collapse',)
-        }),
-    )
+# GUI上で使用していないため管理画面から除外
+# class TestSummaryAdmin(admin.ModelAdmin):
+#     list_display = ('__str__', 'total_students', 'average_score', 'average_correct_rate', 'calculated_at')
+#     list_filter = ('year', 'period', 'subject', 'calculated_at')
+#     search_fields = ('year', 'subject')
+#     readonly_fields = ('calculated_at', 'updated_at')
+#
+#     fieldsets = (
+#         ('基本情報', {
+#             'fields': ('test', 'year', 'period', 'subject', 'max_score')
+#         }),
+#         ('統計情報', {
+#             'fields': ('total_students', 'average_score', 'average_correct_rate')
+#         }),
+#         ('詳細データ', {
+#             'fields': ('grade_statistics', 'school_statistics'),
+#             'classes': ('collapse',)
+#         }),
+#         ('日時情報', {
+#             'fields': ('calculated_at', 'updated_at'),
+#             'classes': ('collapse',)
+#         }),
+#     )
 
-class SchoolTestSummaryAdmin(admin.ModelAdmin):
-    list_display = ('test_summary', 'school', 'student_count', 'average_score', 'rank_among_schools')
-    list_filter = ('test_summary__year', 'test_summary__period', 'test_summary__subject', 'rank_among_schools')
-    search_fields = ('school__name', 'school__school_id')
-    readonly_fields = ('created_at', 'updated_at')
-    
-    fieldsets = (
-        ('基本情報', {
-            'fields': ('test_summary', 'school', 'rank_among_schools')
-        }),
-        ('統計情報', {
-            'fields': ('student_count', 'average_score', 'average_correct_rate')
-        }),
-        ('詳細データ', {
-            'fields': ('grade_details',),
-            'classes': ('collapse',)
-        }),
-        ('日時情報', {
-            'fields': ('created_at', 'updated_at'),
-            'classes': ('collapse',)
-        }),
-    )
+# class SchoolTestSummaryAdmin(admin.ModelAdmin):
+#     list_display = ('test_summary', 'school', 'student_count', 'average_score', 'rank_among_schools')
+#     list_filter = ('test_summary__year', 'test_summary__period', 'test_summary__subject', 'rank_among_schools')
+#     search_fields = ('school__name', 'school__school_id')
+#     readonly_fields = ('created_at', 'updated_at')
+#
+#     fieldsets = (
+#         ('基本情報', {
+#             'fields': ('test_summary', 'school', 'rank_among_schools')
+#         }),
+#         ('統計情報', {
+#             'fields': ('student_count', 'average_score', 'average_correct_rate')
+#         }),
+#         ('詳細データ', {
+#             'fields': ('grade_details',),
+#             'classes': ('collapse',)
+#         }),
+#         ('日時情報', {
+#             'fields': ('created_at', 'updated_at'),
+#             'classes': ('collapse',)
+#         }),
+#     )
 
 # 解答管理
 class AnswerKeyAdmin(admin.ModelAdmin):
@@ -1625,13 +1540,15 @@ admin.site.register(TestSchedule, TestScheduleAdmin)
 # TestDefinitionは scores.admin で拡張版を登録
 # admin.site.register(TestDefinition, TestDefinitionAdmin)
 admin.site.register(QuestionGroup, QuestionGroupAdmin)
-admin.site.register(Question, QuestionAdmin)
-admin.site.register(AnswerKey, AnswerKeyAdmin)
+# Question と AnswerKey は使用しないため非表示
+# admin.site.register(Question, QuestionAdmin)
+# admin.site.register(AnswerKey, AnswerKeyAdmin)
 admin.site.register(Score, ScoreAdmin)
 admin.site.register(TestResult, TestResultAdmin)
 admin.site.register(CommentTemplate, CommentTemplateAdmin)
-admin.site.register(TestSummary, TestSummaryAdmin)
-admin.site.register(SchoolTestSummary, SchoolTestSummaryAdmin)
+# テスト集計結果機能は削除されたため、管理画面から除外
+# admin.site.register(TestSummary, TestSummaryAdmin)
+# admin.site.register(SchoolTestSummary, SchoolTestSummaryAdmin)
 
 # 会員種別・課金管理
 class MembershipTypeAdmin(admin.ModelAdmin):
@@ -1639,7 +1556,7 @@ class MembershipTypeAdmin(admin.ModelAdmin):
     list_filter = ('is_active', 'created_at')
     search_fields = ('name', 'type_code')
     readonly_fields = ('created_at', 'updated_at')
-    
+
     fieldsets = (
         ('基本情報', {
             'fields': ('type_code', 'name', 'description', 'price_per_student', 'is_active')
@@ -2014,6 +1931,8 @@ class MembershipTypeAdmin(admin.ModelAdmin):
         }),
     )
 
+# 塾管理セクションに統合
+MembershipType._meta.app_label = 'schools'
 admin.site.register(MembershipType, MembershipTypeAdmin)
 # 教室ベースの課金レポートは非表示（塾ベースに統一）
 # admin.site.register(BillingReport, BillingReportAdmin)
@@ -2260,6 +2179,8 @@ class SchoolBillingReportAdmin(admin.ModelAdmin):
     )
 
 from classrooms.models import SchoolBillingReport
+# 塾管理セクションに統合
+SchoolBillingReport._meta.app_label = 'schools'
 admin.site.register(SchoolBillingReport, SchoolBillingReportAdmin)
 
 # Django管理画面のカスタマイズ

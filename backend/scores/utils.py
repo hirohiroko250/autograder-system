@@ -1849,9 +1849,22 @@ def _collect_individual_report_data(student_id: str, year: int, period: str) -> 
             .annotate(avg=Avg('score'))
         }
 
+        # 問題ごとの学年平均
+        grade_group_averages = {
+            item['question_group_id']: item['avg']
+            for item in Score.objects.filter(test=test, student__grade=student.grade)
+            .values('question_group_id')
+            .annotate(avg=Avg('score'))
+        }
+
         subject_results_qs = TestResult.objects.filter(test=test)
         national_average = subject_results_qs.aggregate(avg=Avg('total_score'))['avg'] or 0
         national_total = subject_results_qs.count()
+
+        # 学年平均を計算
+        grade_results = subject_results_qs.filter(student__grade=student.grade)
+        grade_average = grade_results.aggregate(avg=Avg('total_score'))['avg'] or 0
+        grade_total_count = grade_results.count()
 
         school_average = 0
         school_high = None
@@ -1881,15 +1894,15 @@ def _collect_individual_report_data(student_id: str, year: int, period: str) -> 
             score_obj = student_scores.get(group.id)
             score_value = score_obj.score if score_obj else None
             max_score = group.max_score
-            national_avg = group_averages.get(group.id, 0)
+            grade_avg = grade_group_averages.get(group.id, 0)
             question_details.append({
                 'number': group.group_number,
                 'title': group.title,
                 'score': score_value,
                 'max_score': max_score,
-                'national_average': national_avg,
+                'grade_average': grade_avg,
                 'correct_rate': round((score_value / max_score) * 100, 1) if score_value is not None and max_score else None,
-                'national_correct_rate': round((national_avg / max_score) * 100, 1) if max_score else None,
+                'grade_correct_rate': round((grade_avg / max_score) * 100, 1) if max_score else None,
             })
 
         subjects_data[subject_code] = {
@@ -1906,6 +1919,7 @@ def _collect_individual_report_data(student_id: str, year: int, period: str) -> 
             },
             'statistics': {
                 'national_average': round(float(national_average), 1) if national_average is not None else 0,
+                'grade_average': round(float(grade_average), 1) if grade_average is not None else 0,
                 'school_average': round(float(school_average), 1) if school_average else 0,
                 'school_highest': school_high,
                 'school_lowest': school_low,
@@ -2040,9 +2054,9 @@ def _prepare_template_data(report_data: dict, logo_path: str) -> dict:
             'title': q.get('title', ''),
             'score': q.get('score', 0),
             'max_score': q.get('max_score', 0),
-            'national_avg': f"{q.get('national_average', 0):.1f}",
+            'grade_avg': f"{q.get('grade_average', 0):.1f}",
             'correct_rate': int(q.get('correct_rate', 0)),
-            'national_avg_rate': int((q.get('national_average', 0) / q.get('max_score', 1) * 100) if q.get('max_score', 0) > 0 else 0),
+            'grade_avg_rate': int((q.get('grade_average', 0) / q.get('max_score', 1) * 100) if q.get('max_score', 0) > 0 else 0),
         })
 
     japanese_questions = []
@@ -2052,18 +2066,26 @@ def _prepare_template_data(report_data: dict, logo_path: str) -> dict:
             'title': q.get('title', ''),
             'score': q.get('score', 0),
             'max_score': q.get('max_score', 0),
-            'national_avg': f"{q.get('national_average', 0):.1f}",
+            'grade_avg': f"{q.get('grade_average', 0):.1f}",
             'correct_rate': int(q.get('correct_rate', 0)),
-            'national_avg_rate': int((q.get('national_average', 0) / q.get('max_score', 1) * 100) if q.get('max_score', 0) > 0 else 0),
+            'grade_avg_rate': int((q.get('grade_average', 0) / q.get('max_score', 1) * 100) if q.get('max_score', 0) > 0 else 0),
         })
 
     # 推移データ
     trends = []
-    for i, t in enumerate(report_data.get('trend', {}).get('overall', [])[:3]):
+    trend_data = report_data.get('trend', {})
+    overall_trends = trend_data.get('overall', [])[:3]
+    subjects_data = trend_data.get('subjects', {})
+    math_trends = subjects_data.get('math', [])[:3]
+    japanese_trends = subjects_data.get('japanese', [])[:3]
+
+    max_len = max(len(overall_trends), len(math_trends), len(japanese_trends))
+    for i in range(max_len):
         trends.append({
             'iteration': i + 1,
-            'score': t.get('total_score', 0),
-            'deviation': f"{t.get('deviation', 0):.1f}",
+            'total_score': overall_trends[i].get('score', 0) if i < len(overall_trends) else 0,
+            'math_score': math_trends[i].get('score', 0) if i < len(math_trends) else 0,
+            'japanese_score': japanese_trends[i].get('score', 0) if i < len(japanese_trends) else 0,
         })
 
     # Read CSS content
@@ -2096,15 +2118,17 @@ def _prepare_template_data(report_data: dict, logo_path: str) -> dict:
         'total_deviation': f"{combined.get('deviations', {}).get('national', 0):.1f}" if combined.get('deviations', {}).get('national') is not None else '-',
 
         # ランキングデータ（Noneと0を区別）
-        'math_national_rank': math_data.get('rankings', {}).get('national', {}).get('rank') if math_data.get('rankings', {}).get('national', {}).get('rank') is not None else '-',
-        'math_national_total': math_data.get('rankings', {}).get('national', {}).get('total') or 0,
+        # 学年順位
+        'math_grade_rank': math_data.get('rankings', {}).get('grade', {}).get('rank') if math_data.get('rankings', {}).get('grade', {}).get('rank') is not None else '-',
+        'math_grade_total': math_data.get('rankings', {}).get('grade', {}).get('total') or 0,
 
-        'japanese_national_rank': japanese_data.get('rankings', {}).get('national', {}).get('rank') if japanese_data.get('rankings', {}).get('national', {}).get('rank') is not None else '-',
-        'japanese_national_total': japanese_data.get('rankings', {}).get('national', {}).get('total') or 0,
+        'japanese_grade_rank': japanese_data.get('rankings', {}).get('grade', {}).get('rank') if japanese_data.get('rankings', {}).get('grade', {}).get('rank') is not None else '-',
+        'japanese_grade_total': japanese_data.get('rankings', {}).get('grade', {}).get('total') or 0,
 
-        'total_national_rank': combined.get('rankings', {}).get('national', {}).get('rank') if combined.get('rankings', {}).get('national', {}).get('rank') is not None else '-',
-        'total_national_total': combined.get('rankings', {}).get('national', {}).get('total') or 0,
+        'total_grade_rank': combined.get('rankings', {}).get('grade', {}).get('rank') if combined.get('rankings', {}).get('grade', {}).get('rank') is not None else '-',
+        'total_grade_total': combined.get('rankings', {}).get('grade', {}).get('total') or 0,
 
+        # 塾内順位
         'math_school_rank': math_data.get('rankings', {}).get('school', {}).get('rank') if math_data.get('rankings', {}).get('school', {}).get('rank') is not None else '-',
         'math_school_total': math_data.get('rankings', {}).get('school', {}).get('total') or 0,
 
@@ -2123,10 +2147,12 @@ def _prepare_template_data(report_data: dict, logo_path: str) -> dict:
         'japanese_school_highest': japanese_data.get('statistics', {}).get('school_highest', 100),
         'total_school_highest': combined.get('school_highest', 100) if 'school_highest' in combined else 100,
 
-        'math_national_avg': f"{math_data.get('statistics', {}).get('national_average', 0):.1f}",
-        'japanese_national_avg': f"{japanese_data.get('statistics', {}).get('national_average', 0):.1f}",
-        'total_national_avg': f"{combined.get('averages', {}).get('national', 0):.1f}",
+        # 学年平均
+        'math_grade_avg': f"{math_data.get('statistics', {}).get('grade_average', 0):.1f}",
+        'japanese_grade_avg': f"{japanese_data.get('statistics', {}).get('grade_average', 0):.1f}",
+        'total_grade_avg': f"{combined.get('averages', {}).get('grade', 0):.1f}",
 
+        # 塾内平均
         'math_school_avg': f"{math_data.get('statistics', {}).get('school_average', 0):.1f}",
         'japanese_school_avg': f"{japanese_data.get('statistics', {}).get('school_average', 0):.1f}",
         'total_school_avg': f"{combined.get('averages', {}).get('school', 0):.1f}",

@@ -3,9 +3,90 @@
 
 {% block object-tools-items %}
     {{ block.super }}
-    <li>
-        <a href="/admin/scores/testresult/summary/" class="addlink">
-            📊 テスト結果集計
-        </a>
-    </li>
+{% endblock %}
+
+{% block extrastyle %}
+{{ block.super }}
+<style>
+/* テーブルを横スクロール対応 */
+#changelist-form .results {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+#result_list {
+    min-width: max-content;
+    white-space: nowrap;
+}
+
+#result_list th,
+#result_list td {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 200px;
+}
+
+/* アクションチェックボックス列は固定幅 */
+#result_list th.action-checkbox-column,
+#result_list td.action-checkbox {
+    max-width: 50px;
+    width: 50px;
+}
+
+/* 各カラムの最適な幅設定 */
+#result_list .field-student_name {
+    max-width: 120px;
+}
+
+#result_list .field-student_id_display {
+    max-width: 100px;
+}
+
+#result_list .field-grade_display {
+    max-width: 80px;
+}
+
+#result_list .field-school_display {
+    max-width: 150px;
+}
+
+#result_list .field-test_display {
+    max-width: 200px;
+}
+
+#result_list .field-total_score_display {
+    max-width: 100px;
+}
+
+#result_list .field-deviation_score_display {
+    max-width: 80px;
+}
+
+#result_list .field-grade_rank_display {
+    max-width: 120px;
+}
+
+#result_list .field-school_rank_display {
+    max-width: 120px;
+}
+
+#result_list .field-question_scores_display {
+    max-width: 300px;
+}
+
+#result_list .field-updated_at {
+    max-width: 150px;
+}
+
+/* ホバー時にツールチップ的に全文表示 */
+#result_list td:hover {
+    overflow: visible;
+    white-space: normal;
+    position: relative;
+    z-index: 10;
+    background: white;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+}
+</style>
 {% endblock %}

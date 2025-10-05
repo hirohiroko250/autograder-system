@@ -267,36 +267,39 @@ export default function StudentsPage() {
 
   return (
     <DashboardLayout>
-      <div className="space-y-6 animate-fade-in">
-        <div className="flex items-center justify-between">
-          <h1 className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold whitespace-nowrap">
+      <div className="space-y-4 sm:space-y-6 animate-fade-in">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0">
+          <h1 className="text-xl sm:text-2xl md:text-3xl font-bold">
             <span className="hidden sm:inline">生徒管理</span>
             <span className="sm:hidden">生徒</span>
           </h1>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
             <Button
               variant="outline"
               onClick={() => setImportModalOpen(true)}
-              className="rounded-xl"
+              className="rounded-xl text-xs sm:text-sm flex-1 sm:flex-none"
             >
-              <Upload className="h-4 w-4 mr-2" />
-              インポート
+              <Upload className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+              <span className="hidden sm:inline">インポート</span>
+              <span className="sm:hidden">Import</span>
             </Button>
             <Button
               variant="outline"
               onClick={handleExportStudents}
-              className="rounded-xl"
+              className="rounded-xl text-xs sm:text-sm flex-1 sm:flex-none"
             >
-              <FileDown className="h-4 w-4 mr-2" />
-              生徒一括エクスポート
+              <FileDown className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+              <span className="hidden sm:inline">生徒一括エクスポート</span>
+              <span className="sm:hidden">Export</span>
             </Button>
             <Button
               variant="outline"
               onClick={handleExportTemplate}
-              className="rounded-xl"
+              className="rounded-xl text-xs sm:text-sm flex-1 sm:flex-none"
             >
-              <Download className="h-4 w-4 mr-2" />
-              テンプレートダウンロード
+              <Download className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+              <span className="hidden sm:inline">テンプレートダウンロード</span>
+              <span className="sm:hidden">Template</span>
             </Button>
             <Button
               onClick={() => setRegistrationModalOpen(true)}

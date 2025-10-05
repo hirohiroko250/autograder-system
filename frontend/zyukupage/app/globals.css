@@ -79,66 +79,88 @@
   }
 }
 
-/* グローバルなモバイル対応 */
+/* スマホ最適化 */
 @media (max-width: 640px) {
-  /* 小さな画面でのテキストサイズ調整 */
-  .table-cell-text {
+  /* コンテナとパディングの調整 */
+  .container {
+    padding-left: 1rem !important;
+    padding-right: 1rem !important;
+  }
+
+  /* カードの余白調整 */
+  .card {
+    padding: 0.75rem !important;
+  }
+
+  /* テーブルをスクロール可能に */
+  table {
+    display: block;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    white-space: nowrap;
+  }
+
+  table thead {
+    display: table;
+    width: 100%;
+    table-layout: fixed;
+  }
+
+  table tbody {
+    display: table;
+    width: 100%;
+    table-layout: fixed;
+  }
+
+  /* テーブルセルのフォントサイズ調整 */
+  table th,
+  table td {
     font-size: 0.75rem !important;
-    line-height: 1rem !important;
+    padding: 0.5rem !important;
   }
-  
-  /* 非常に長いテキストの処理 */
-  .long-text-mobile {
-    max-width: 80px !important;
-    overflow: hidden !important;
-    text-overflow: ellipsis !important;
-    white-space: nowrap !important;
+
+  /* ボタンのタッチ対応 */
+  button, .btn {
+    min-height: 44px;
+    min-width: 44px;
+    padding: 0.5rem 1rem !important;
   }
-  
-  /* 全てのタイトル要素に縦書き防止を強制適用 - より強力 */
-  h1, h2, h3, h4, h5, h6, .card-title, 
-  [class*="text-"], [class*="font-"], 
-  button, .btn, a, span, div, p {
-    white-space: nowrap !important;
-    overflow: hidden !important;
-    text-overflow: ellipsis !important;
-    word-break: keep-all !important;
-    writing-mode: horizontal-tb !important;
-    max-width: 150px !important;
+
+  /* フォームインプットの調整 */
+  input, select, textarea {
+    font-size: 16px !important; /* iOS zoom防止 */
   }
-  
-  /* 特にタイトル要素は小さいサイズに */
-  h1, h2, h3, h4, h5, h6 {
-    font-size: 0.75rem !important; /* text-xs */
-    line-height: 1rem !important;
-    max-width: 100px !important;
+
+  /* ナビゲーションの調整 */
+  nav {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
   }
-  
-  /* ナビゲーション・メニュー項目 */
-  nav *, .sidebar *, .menu * {
-    font-size: 0.625rem !important; /* text-2xs */
-    line-height: 0.875rem !important;
-    max-width: 80px !important;
+
+  /* 見出しサイズ調整 */
+  h1 {
+    font-size: 1.5rem !important;
   }
-  
-  /* ボタンテキスト */
-  button, .btn, .button {
-    font-size: 0.625rem !important;
-    line-height: 0.875rem !important;
-    max-width: 60px !important;
-    padding: 0.25rem 0.5rem !important;
+
+  h2 {
+    font-size: 1.25rem !important;
   }
-  
-  /* CardTitle 専用設定 */
-  [data-card-title], .card-title {
-    font-size: 0.625rem !important; /* text-2xs */
-    line-height: 0.875rem !important;
-    max-width: 70px !important;
+
+  h3 {
+    font-size: 1.125rem !important;
   }
-  
-  /* 特定の長いテキストの省略 */
-  .mobile-ultra-short {
-    font-size: 0.625rem !important;
-    max-width: 40px !important;
+
+  /* モーダル・ダイアログの調整 */
+  [role="dialog"] {
+    max-width: 95vw !important;
+    margin: 1rem !important;
+  }
+}
+
+/* タブレット最適化 */
+@media (min-width: 641px) and (max-width: 1024px) {
+  .container {
+    padding-left: 1.5rem !important;
+    padding-right: 1.5rem !important;
   }
 }

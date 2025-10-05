@@ -401,12 +401,12 @@ function StudentManagementContent({ year, period }: { year: string; period: stri
           </div>
           
           {/* フィルタリングとソートコントロール */}
-          <div className="flex flex-wrap items-center gap-4 pt-4 border-t">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-4 border-t">
             <div className="flex items-center gap-2">
-              <Filter className="h-4 w-4 text-gray-500" />
-              <Label className="text-sm font-medium">ステータス:</Label>
+              <Filter className="h-4 w-4 text-gray-500 hidden sm:block" />
+              <Label className="text-xs sm:text-sm font-medium whitespace-nowrap">ステータス:</Label>
               <Select value={filterStatus} onValueChange={setFilterStatus}>
-                <SelectTrigger className="w-32">
+                <SelectTrigger className="w-full sm:w-32 text-xs sm:text-sm">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -418,11 +418,11 @@ function StudentManagementContent({ year, period }: { year: string; period: stri
                 </SelectContent>
               </Select>
             </div>
-            
+
             <div className="flex items-center gap-2">
-              <Label className="text-sm font-medium">教室:</Label>
+              <Label className="text-xs sm:text-sm font-medium whitespace-nowrap">教室:</Label>
               <Select value={filterClassroom} onValueChange={setFilterClassroom}>
-                <SelectTrigger className="w-40">
+                <SelectTrigger className="w-full sm:w-40 text-xs sm:text-sm">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -435,11 +435,11 @@ function StudentManagementContent({ year, period }: { year: string; period: stri
                 </SelectContent>
               </Select>
             </div>
-            
+
             <div className="flex items-center gap-2">
-              <Label className="text-sm font-medium">並び順:</Label>
+              <Label className="text-xs sm:text-sm font-medium whitespace-nowrap">並び順:</Label>
               <Select value={sortOrder} onValueChange={setSortOrder}>
-                <SelectTrigger className="w-32">
+                <SelectTrigger className="w-full sm:w-32 text-xs sm:text-sm">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -454,15 +454,16 @@ function StudentManagementContent({ year, period }: { year: string; period: stri
                 variant="ghost"
                 size="sm"
                 onClick={() => setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')}
+                className="shrink-0"
               >
                 {sortDirection === 'asc' ? <SortAsc className="h-4 w-4" /> : <SortDesc className="h-4 w-4" />}
               </Button>
             </div>
-            
-            <div className="flex items-center gap-2 ml-auto">
-              <Users className="h-4 w-4 text-gray-500" />
-              <span className="text-sm text-gray-600">
-                表示中: {filteredResults.length}名 | 選択中: {selectedStudents.length}名
+
+            <div className="flex items-center gap-2 col-span-1 sm:col-span-2 lg:col-span-1">
+              <Users className="h-4 w-4 text-gray-500 hidden sm:block" />
+              <span className="text-xs sm:text-sm text-gray-600 whitespace-nowrap">
+                表示: {filteredResults.length}名 | 選択: {selectedStudents.length}名
               </span>
             </div>
           </div>
@@ -490,31 +491,59 @@ function StudentManagementContent({ year, period }: { year: string; period: stri
                 return (
                   <div
                     key={result.student_id}
-                    className={`flex items-center gap-4 p-4 border rounded-lg transition-colors ${
-                      selectedStudents.includes(result.student_id) 
-                        ? 'bg-blue-50 border-blue-200 dark:bg-blue-900/20 dark:border-blue-700' 
+                    className={`flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4 p-3 sm:p-4 border rounded-lg transition-colors ${
+                      selectedStudents.includes(result.student_id)
+                        ? 'bg-blue-50 border-blue-200 dark:bg-blue-900/20 dark:border-blue-700'
                         : 'hover:bg-gray-50 dark:hover:bg-gray-800'
                     } ${statusConfig.border}`}
                   >
-                    <Checkbox
-                      checked={selectedStudents.includes(result.student_id)}
-                      onCheckedChange={(checked) => handleSelectStudent(result.student_id, checked as boolean)}
-                    />
-                    
-                    {/* 入力状況インジケーター */}
-                    <div className={`flex items-center gap-2 px-3 py-1 rounded-full ${statusConfig.bg} ${statusConfig.border} border`}>
-                      <StatusIcon className={`h-4 w-4 ${statusConfig.color}`} />
-                      <span className={`text-xs font-medium ${statusConfig.color}`}>
-                        {statusConfig.text}
-                      </span>
-                    </div>
-                    
-                    <div className="flex items-center gap-4 flex-1">
-                      <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-bold">
+                    {/* モバイル: 1行目 */}
+                    <div className="flex items-center gap-3 w-full sm:w-auto">
+                      <Checkbox
+                        checked={selectedStudents.includes(result.student_id)}
+                        onCheckedChange={(checked) => handleSelectStudent(result.student_id, checked as boolean)}
+                        className="shrink-0"
+                      />
+
+                      {/* 入力状況インジケーター */}
+                      <div className={`flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1 rounded-full ${statusConfig.bg} ${statusConfig.border} border shrink-0`}>
+                        <StatusIcon className={`h-3 sm:h-4 w-3 sm:w-4 ${statusConfig.color}`} />
+                        <span className={`text-xs font-medium ${statusConfig.color} hidden sm:inline`}>
+                          {statusConfig.text}
+                        </span>
+                      </div>
+
+                      <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-bold text-xs sm:text-base shrink-0">
                         {result.combined_results?.grade_rank || '-'}
                       </div>
-                      <div>
-                        <div className="flex items-center gap-2">
+
+                      {/* スマホ: 名前と基本情報 */}
+                      <div className="flex-1 min-w-0 sm:hidden">
+                        <button
+                          onClick={() => handleStudentNameClick(result)}
+                          className="font-medium text-blue-600 hover:text-blue-800 hover:underline cursor-pointer flex items-center gap-1 text-sm truncate"
+                        >
+                          {result.student_name}
+                          <Edit className="h-3 w-3 shrink-0" />
+                        </button>
+                        <p className="text-xs text-gray-500 truncate">
+                          {result.grade}年 | {result.classroom_name}
+                        </p>
+                      </div>
+
+                      {/* スマホ: 合計点 */}
+                      <div className="text-right sm:hidden shrink-0">
+                        <p className="text-lg font-bold">{result.combined_results?.total_score || '-'}</p>
+                        <p className="text-xs text-gray-500">
+                          {result.combined_results?.grade_rank || '-'}位
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* デスクトップ: 詳細情報 */}
+                    <div className="hidden sm:flex items-center gap-4 flex-1">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <button
                             onClick={() => handleStudentNameClick(result)}
                             className="font-medium text-blue-600 hover:text-blue-800 hover:underline cursor-pointer flex items-center gap-1"
@@ -522,13 +551,13 @@ function StudentManagementContent({ year, period }: { year: string; period: stri
                             {result.student_name}
                             <Edit className="h-3 w-3" />
                           </button>
-                          <Badge variant="outline">{result.grade}年生</Badge>
-                          <Badge variant="outline">{result.classroom_name}</Badge>
+                          <Badge variant="outline" className="text-xs">{result.grade}年生</Badge>
+                          <Badge variant="outline" className="text-xs">{result.classroom_name}</Badge>
                         </div>
-                        <p className="text-sm text-gray-500 dark:text-gray-400">
+                        <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 truncate">
                           ID: {result.student_id} | {result.school_name} | 学年平均: {result.combined_results?.grade_average?.toFixed(1)}点 | 塾内平均: {result.combined_results?.school_average?.toFixed(1)}点
                         </p>
-                        <div className="flex gap-2 mt-1">
+                        <div className="flex gap-1 sm:gap-2 mt-1 flex-wrap">
                           {Object.entries(result.subject_results || {}).map(([subject, data]: [string, any]) => (
                             <Badge key={subject} variant="secondary" className="text-xs">
                               {subject}: {data.total_score}点 (学年{data.rankings.grade_rank}位)
@@ -537,8 +566,9 @@ function StudentManagementContent({ year, period }: { year: string; period: stri
                         </div>
                       </div>
                     </div>
-                    
-                    <div className="flex items-center gap-4">
+
+                    {/* デスクトップ: スコアとボタン */}
+                    <div className="hidden sm:flex items-center gap-4 shrink-0">
                       <div className="text-right">
                         <p className="text-xl font-bold">{result.combined_results?.total_score || '-'}</p>
                         <p className="text-sm text-gray-500 dark:text-gray-400">
@@ -559,6 +589,20 @@ function StudentManagementContent({ year, period }: { year: string; period: stri
                           帳票
                         </Button>
                       </div>
+                    </div>
+
+                    {/* モバイル: ダウンロードボタン */}
+                    <div className="w-full sm:hidden">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleDownloadIndividualReport(result.student_id)}
+                        disabled={inputStatus === 'not_started' || inputStatus === 'absent'}
+                        className="w-full"
+                      >
+                        <Download className="h-3 w-3 mr-1" />
+                        帳票ダウンロード
+                      </Button>
                     </div>
                   </div>
                 );

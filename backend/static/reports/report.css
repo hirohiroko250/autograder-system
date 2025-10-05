@@ -64,7 +64,7 @@ body {
 }
 
 .logo img {
-    height: 42px;
+    height: 56px;
 }
 
 .header-right {
@@ -296,6 +296,36 @@ body {
 /* 成績の推移 */
 .trend-section {
     margin-bottom: 0;
+}
+
+.trend-legend {
+    font-size: 7pt;
+    color: #666;
+    margin-bottom: 2mm;
+    display: flex;
+    gap: 4mm;
+}
+
+.legend-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 1mm;
+}
+
+.legend-bar {
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    background: #666;
+    border-radius: 2px;
+    opacity: 0.8;
+}
+
+.legend-star {
+    display: inline-block;
+    color: #ffd700;
+    font-size: 12pt;
+    line-height: 1;
 }
 
 .trend-graphs {

@@ -83,8 +83,7 @@ a:hover {
   color: #fff;
 }
 
-.breadcrumbs,
-#nav-sidebar {
+.breadcrumbs {
   display: none !important;
 }
 

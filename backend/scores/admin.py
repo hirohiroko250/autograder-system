@@ -9,16 +9,40 @@ from .models import IndividualProblem, IndividualProblemScore, Score, TestResult
 from .utils import bulk_calculate_test_results
 from tests.models import TestDefinition
 
+# IndividualProblem と IndividualProblemScore を admin から明示的に除外
+try:
+    admin.site.unregister(IndividualProblem)
+except admin.sites.NotRegistered:
+    pass
+
+try:
+    admin.site.unregister(IndividualProblemScore)
+except admin.sites.NotRegistered:
+    pass
+
+# TestSummary と SchoolTestSummary も非表示（削除された集計機能の一部）
+from .models import TestSummary, SchoolTestSummary
+
+try:
+    admin.site.unregister(TestSummary)
+except admin.sites.NotRegistered:
+    pass
+
+try:
+    admin.site.unregister(SchoolTestSummary)
+except admin.sites.NotRegistered:
+    pass
+
 class ZeroScoreFilter(admin.SimpleListFilter):
     title = '合計点フィルター'
     parameter_name = 'total_score_filter'
-    
+
     def lookups(self, request, model_admin):
         return (
             ('zero', '0点のみ（欠席者）'),
             ('non_zero', '1点以上'),
         )
-    
+
     def queryset(self, request, queryset):
         if self.value() == 'zero':
             return queryset.filter(total_score=0)
@@ -26,27 +50,28 @@ class ZeroScoreFilter(admin.SimpleListFilter):
             return queryset.filter(total_score__gt=0)
         return queryset
 
-@admin.register(IndividualProblem)
-class IndividualProblemAdmin(admin.ModelAdmin):
-    list_display = ['test', 'problem_number', 'max_score', 'description']
-    list_filter = ['test', 'max_score']
-    search_fields = ['test__name', 'description']
-    ordering = ['test', 'problem_number']
-    
-@admin.register(IndividualProblemScore)
-class IndividualProblemScoreAdmin(admin.ModelAdmin):
-    list_display = ['student', 'test', 'problem_number_display', 'score', 'max_score_display', 'created_at']
-    list_filter = ['test', 'problem__problem_number', 'created_at']
-    search_fields = ['student__name', 'student__student_id']
-    ordering = ['test', 'student', 'problem__problem_number']
-    
-    def problem_number_display(self, obj):
-        return f"問題{obj.problem.problem_number}"
-    problem_number_display.short_description = '問題番号'
-    
-    def max_score_display(self, obj):
-        return f"{obj.problem.max_score}点"
-    max_score_display.short_description = '満点'
+# GUI上で使用していないため管理画面から除外
+# @admin.register(IndividualProblem)
+# class IndividualProblemAdmin(admin.ModelAdmin):
+#     list_display = ['test', 'problem_number', 'max_score', 'description']
+#     list_filter = ['test', 'max_score']
+#     search_fields = ['test__name', 'description']
+#     ordering = ['test', 'problem_number']
+
+# @admin.register(IndividualProblemScore)
+# class IndividualProblemScoreAdmin(admin.ModelAdmin):
+#     list_display = ['student', 'test', 'problem_number_display', 'score', 'max_score_display', 'created_at']
+#     list_filter = ['test', 'problem__problem_number', 'created_at']
+#     search_fields = ['student__name', 'student__student_id']
+#     ordering = ['test', 'student', 'problem__problem_number']
+
+#     def problem_number_display(self, obj):
+#         return f"問題{obj.problem.problem_number}"
+#     problem_number_display.short_description = '問題番号'
+
+#     def max_score_display(self, obj):
+#         return f"{obj.problem.max_score}点"
+#     max_score_display.short_description = '満点'
 
 class ScoreAdmin(admin.ModelAdmin):
     list_display = ['student_name', 'test_display', 'question_group_display', 'score', 'attendance', 'created_at']
