@@ -2,6 +2,10 @@ import './globals.css';
 import type { Metadata } from 'next';
 import { Providers } from './providers';
 
+export const dynamic = 'force-dynamic';
+export const dynamicParams = true;
+export const revalidate = 0;
+
 export const metadata: Metadata = {
   title: '全国学力向上テスト - Classroom Admin',
   description: '教室管理者向けダッシュボード',
