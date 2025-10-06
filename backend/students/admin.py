@@ -1,1 +1,0 @@
-# admin登録は autograder/admin.py で一括管理

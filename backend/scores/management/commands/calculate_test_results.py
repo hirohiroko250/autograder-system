@@ -34,32 +34,59 @@ class Command(BaseCommand):
                 question_count__gt=0
             )
 
+            # 既存のTestResultを取得（更新用）
+            existing_results = {
+                (r.student_id, r.test_id): r
+                for r in TestResult.objects.filter(test=test).select_related('student')
+            }
+
+            create_batch = []
+            update_batch = []
+
             for idx, student_total in enumerate(student_totals):
                 student_id = student_total['student']
                 total_score = student_total['total_score']
                 correct_rate = (total_score / 100.0) * 100 if total_score else 0
 
-                test_result, created = TestResult.objects.get_or_create(
-                    student_id=student_id,
-                    test=test,
-                    defaults={
-                        'total_score': total_score,
-                        'correct_rate': correct_rate,
-                        'is_rank_finalized': False
-                    }
-                )
+                key = (student_id, test.id)
+                if key in existing_results:
+                    # 既存レコードを更新
+                    result = existing_results[key]
+                    if result.total_score != total_score:
+                        result.total_score = total_score
+                        result.correct_rate = correct_rate
+                        update_batch.append(result)
+                else:
+                    # 新規レコードを作成
+                    create_batch.append(TestResult(
+                        student_id=student_id,
+                        test=test,
+                        total_score=total_score,
+                        correct_rate=correct_rate,
+                        is_rank_finalized=False
+                    ))
 
-                if created:
-                    generated_count += 1
-                elif test_result.total_score != total_score:
-                    test_result.total_score = total_score
-                    test_result.correct_rate = correct_rate
-                    test_result.save()
-                    generated_count += 1
-
-                if (idx + 1) % batch_size == 0:
+                # バッチ処理
+                if len(create_batch) >= batch_size:
+                    TestResult.objects.bulk_create(create_batch, ignore_conflicts=True)
+                    generated_count += len(create_batch)
+                    create_batch = []
                     gc.collect()
-                    self.stdout.write(f'  処理中: {idx + 1}件')
+                    self.stdout.write(f'  生成: {generated_count}件')
+
+                if len(update_batch) >= batch_size:
+                    TestResult.objects.bulk_update(update_batch, ['total_score', 'correct_rate'])
+                    generated_count += len(update_batch)
+                    update_batch = []
+                    gc.collect()
+
+            # 残りのバッチを処理
+            if create_batch:
+                TestResult.objects.bulk_create(create_batch, ignore_conflicts=True)
+                generated_count += len(create_batch)
+            if update_batch:
+                TestResult.objects.bulk_update(update_batch, ['total_score', 'correct_rate'])
+                generated_count += len(update_batch)
 
         self.stdout.write(self.style.SUCCESS(f'✓ TestResult生成/更新: {generated_count}件'))
 
