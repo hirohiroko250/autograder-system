@@ -2076,8 +2076,8 @@ def _get_principal_comment(student_id: str, year: int, period: str, subject: str
         comment_type='general'
     ).first()
 
-    if student_comment and student_comment.comment_text:
-        return student_comment.comment_text
+    if student_comment and student_comment.content:
+        return student_comment.content
 
     return default_comment
 
