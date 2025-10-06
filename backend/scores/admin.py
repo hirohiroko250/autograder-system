@@ -295,9 +295,10 @@ class TestResultAdmin(admin.ModelAdmin):
         from tests.models import TestDefinition
         import math
 
-        # STEP 1: ScoreからTestResultを生成
+        # STEP 1: ScoreからTestResultを生成（バッチ処理）
         generated_count = 0
         tests = TestDefinition.objects.all()
+        batch_size = 500
 
         for test in tests:
             student_totals = Score.objects.filter(
@@ -311,7 +312,8 @@ class TestResultAdmin(admin.ModelAdmin):
                 question_count__gt=0
             )
 
-            for student_total in student_totals:
+            batch_results = []
+            for idx, student_total in enumerate(student_totals):
                 student_id = student_total['student']
                 total_score = student_total['total_score']
                 correct_rate = (total_score / 100.0) * 100 if total_score else 0
@@ -334,36 +336,51 @@ class TestResultAdmin(admin.ModelAdmin):
                     test_result.save()
                     generated_count += 1
 
-        # STEP 2: 順位・偏差値を計算
+                # バッチごとにガベージコレクション
+                if (idx + 1) % batch_size == 0:
+                    import gc
+                    gc.collect()
+
+        # STEP 2: 順位・偏差値を計算（メモリ効率改善）
         updated_count = 0
         tests_processed = set()
 
         for test in tests:
-            test_results = TestResult.objects.filter(test=test)
-            grades = test_results.values_list('student__grade', flat=True).distinct()
+            grades = TestResult.objects.filter(test=test).values_list('student__grade', flat=True).distinct()
 
             for grade in grades:
                 if not grade:
                     continue
 
-                grade_results = test_results.filter(student__grade=grade).order_by('-total_score')
-                total_students = grade_results.count()
+                # 統計情報のみ先に取得
+                stats = TestResult.objects.filter(
+                    test=test,
+                    student__grade=grade
+                ).aggregate(
+                    avg_score=Avg('total_score'),
+                    std_dev=StdDev('total_score'),
+                    total_count=Count('id')
+                )
 
+                total_students = stats['total_count'] or 0
                 if total_students == 0:
                     continue
 
-                stats = grade_results.aggregate(
-                    avg_score=Avg('total_score'),
-                    std_dev=StdDev('total_score')
-                )
                 avg_score = stats['avg_score'] or 0
                 std_dev = stats['std_dev'] or 1
+
+                # iterator()を使ってメモリ使用を削減
+                grade_results = TestResult.objects.filter(
+                    test=test,
+                    student__grade=grade
+                ).select_related('student', 'student__classroom', 'student__classroom__school').order_by('-total_score')
 
                 rank = 1
                 prev_score = None
                 actual_rank = 1
+                update_batch = []
 
-                for result in grade_results:
+                for result in grade_results.iterator(chunk_size=100):
                     if prev_score is not None and result.total_score < prev_score:
                         rank = actual_rank
 
@@ -379,26 +396,51 @@ class TestResultAdmin(admin.ModelAdmin):
 
                     school_id = result.student.classroom.school.id if result.student.classroom else None
                     if school_id:
-                        school_grade_results = test_results.filter(
+                        # カウントクエリのみ実行（メモリ効率的）
+                        better_school_results = TestResult.objects.filter(
+                            test=test,
+                            student__classroom__school_id=school_id,
+                            student__grade=grade,
+                            total_score__gt=result.total_score
+                        ).count()
+                        school_total = TestResult.objects.filter(
+                            test=test,
                             student__classroom__school_id=school_id,
                             student__grade=grade
-                        )
-                        better_school_results = school_grade_results.filter(total_score__gt=result.total_score).count()
-                        school_total = school_grade_results.count()
+                        ).count()
                         result.school_rank_final = better_school_results + 1
                         result.school_total_final = school_total
 
                     result.is_rank_finalized = True
                     result.rank_finalized_at = timezone.now()
-                    result.save(update_fields=[
-                        'grade_rank', 'grade_total', 'grade_deviation_score',
-                        'school_rank_final', 'school_total_final',
-                        'is_rank_finalized', 'rank_finalized_at'
-                    ])
+
+                    update_batch.append(result)
+
+                    # バッチ更新
+                    if len(update_batch) >= 100:
+                        TestResult.objects.bulk_update(
+                            update_batch,
+                            ['grade_rank', 'grade_total', 'grade_deviation_score',
+                             'school_rank_final', 'school_total_final',
+                             'is_rank_finalized', 'rank_finalized_at']
+                        )
+                        updated_count += len(update_batch)
+                        update_batch = []
+                        import gc
+                        gc.collect()
 
                     prev_score = result.total_score
                     actual_rank += 1
-                    updated_count += 1
+
+                # 残りを更新
+                if update_batch:
+                    TestResult.objects.bulk_update(
+                        update_batch,
+                        ['grade_rank', 'grade_total', 'grade_deviation_score',
+                         'school_rank_final', 'school_total_final',
+                         'is_rank_finalized', 'rank_finalized_at']
+                    )
+                    updated_count += len(update_batch)
 
                 tests_processed.add(test.id)
 
