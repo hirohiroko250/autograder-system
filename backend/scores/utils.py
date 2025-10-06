@@ -2059,16 +2059,15 @@ def _get_principal_comment(student_id: str, year: int, period: str, subject: str
     if not test:
         return default_comment
 
-    # TestCommentから科目別コメントを取得
+    # TestCommentからテスト全体のコメントを取得
     test_comment = TestComment.objects.filter(
         student=student,
         test=test,
-        comment_scope='subject_area',
-        subject_area=subject
+        scope='test_overall'
     ).first()
 
-    if test_comment and test_comment.comment_text:
-        return test_comment.comment_text
+    if test_comment and test_comment.content:
+        return test_comment.content
 
     # StudentCommentから総合コメントを取得（フォールバック）
     student_comment = StudentComment.objects.filter(
