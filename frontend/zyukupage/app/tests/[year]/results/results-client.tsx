@@ -1,0 +1,699 @@
+'use client';
+
+import { useState } from 'react';
+import { useSearchParams } from 'next/navigation';
+import { useQuery } from '@tanstack/react-query';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { CommentManager } from '@/components/comments';
+import Link from 'next/link';
+import { 
+  Download, 
+  FileText, 
+  TrendingUp,
+  Award,
+  BarChart3,
+  Printer,
+  FileOutput,
+  Loader2,
+  MessageSquare,
+  ArrowLeft,
+  CheckCircle,
+  XCircle,
+  Clock,
+  Filter,
+  SortAsc,
+  SortDesc,
+  Users
+} from 'lucide-react';
+import { toast } from 'sonner';
+import { testApi } from '@/lib/api-client';
+import { TestResult, TestStatistics } from '@/lib/types';
+
+interface ResultsClientProps {
+  year: string;
+}
+
+export function ResultsClient({ year }: ResultsClientProps) {
+  const searchParams = useSearchParams();
+  const subject = searchParams.get('subject') || '';
+
+  const [selectedStudents, setSelectedStudents] = useState<string[]>([]);
+  const [isReportDialogOpen, setIsReportDialogOpen] = useState(false);
+  const [reportType, setReportType] = useState<string>('individual');
+  const [reportFormat, setReportFormat] = useState<string>('pdf');
+  const [sortOrder, setSortOrder] = useState<string>('rank');
+  const [selectedStudent, setSelectedStudent] = useState<any>(null);
+  const [filterStatus, setFilterStatus] = useState<string>('all');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+
+  // バックエンドからテスト結果データを取得
+  const { 
+    data: testResultsData, 
+    isLoading: isLoadingResults,
+    error: resultsError 
+  } = useQuery({
+    queryKey: ['testResults', year, subject],
+    queryFn: () => testApi.getTestResults({ year, period: 'summer', subject: subject || undefined }),
+    enabled: !!year
+  });
+
+  // バックエンドからテスト統計データを取得
+  const { 
+    data: testStatistics, 
+    isLoading: isLoadingStats,
+    error: statsError 
+  } = useQuery({
+    queryKey: ['testStatistics', year, subject],
+    queryFn: () => testApi.getTestStatistics({ year, period: 'summer', subject: subject || undefined }),
+    enabled: !!year
+  });
+
+  // ローディング状態
+  if (isLoadingResults || isLoadingStats) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
+          <p className="text-muted-foreground">テスト結果を読み込み中...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // エラー状態
+  if (resultsError || statsError) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <p className="text-red-600 mb-4">テスト結果の取得に失敗しました</p>
+          <Button onClick={() => window.location.reload()}>
+            再読み込み
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  const results = testResultsData?.results || [];
+  const testInfo = testStatistics || {
+    subject: subject,
+    year: year,
+    completed_date: '',
+    total_students: 0,
+    average_score: 0,
+    max_score: 0,
+    min_score: 0,
+    attendance_rate: 0
+  };
+
+  const handleStudentCommentClick = (student: any) => {
+    setSelectedStudent(student);
+  };
+
+  // 生徒の点数入力状況を判定
+  const getScoreInputStatus = (student: any) => {
+    if (!student.attendance) return 'absent'; // 欠席
+    
+    const scores = Object.values(student.scores);
+    const hasScores = scores.some((score: any) => score !== null && score !== undefined && score !== '');
+    const allScoresComplete = scores.every((score: any) => score !== null && score !== undefined && score !== '');
+    
+    if (allScoresComplete) return 'complete'; // 完了
+    if (hasScores) return 'partial'; // 部分入力
+    return 'not_started'; // 未入力
+  };
+
+  // フィルターとソートを適用
+  const getFilteredAndSortedResults = () => {
+    let filtered = results;
+
+    // ステータスフィルター
+    if (filterStatus !== 'all') {
+      filtered = results.filter(result => {
+        const status = getScoreInputStatus(result);
+        return status === filterStatus;
+      });
+    }
+
+    // ソート
+    filtered = [...filtered].sort((a, b) => {
+      let comparison = 0;
+      
+      switch (sortOrder) {
+        case 'name':
+          comparison = a.student_name.localeCompare(b.student_name, 'ja');
+          break;
+        case 'id':
+          comparison = a.student_id.localeCompare(b.student_id);
+          break;
+        case 'total_score':
+          comparison = (a.total_score || 0) - (b.total_score || 0);
+          break;
+        case 'rank':
+        default:
+          comparison = (a.rank || 999) - (b.rank || 999);
+          break;
+      }
+      
+      return sortDirection === 'desc' ? -comparison : comparison;
+    });
+
+    return filtered;
+  };
+
+  const filteredResults = getFilteredAndSortedResults();
+
+  // 大問数を動的に取得（最大10問まで対応）
+  const getQuestionCount = () => {
+    if (results.length === 0) return 0;
+    const firstResult = results[0];
+    return Object.keys(firstResult.scores).length;
+  };
+
+  const questionCount = getQuestionCount();
+
+  // 大問数に応じてグリッドのカラム数を決定
+  const getGridCols = (count: number) => {
+    if (count <= 4) return 'grid-cols-4';
+    if (count <= 5) return 'grid-cols-5';
+    if (count <= 6) return 'grid-cols-6';
+    if (count <= 8) return 'grid-cols-8';
+    return 'grid-cols-10';
+  };
+
+  const gridColsClass = getGridCols(questionCount);
+
+  const handleSelectStudent = (studentId: string, checked: boolean) => {
+    if (checked) {
+      setSelectedStudents(prev => [...prev, studentId]);
+    } else {
+      setSelectedStudents(prev => prev.filter(id => id !== studentId));
+    }
+  };
+
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
+      setSelectedStudents(results.map(r => r.id));
+    } else {
+      setSelectedStudents([]);
+    }
+  };
+
+  // 個別帳票ダウンロード
+  const handleDownloadIndividualReport = async (studentId: string) => {
+    try {
+      const student = results.find(r => r.student_id === studentId);
+      if (!student) {
+        toast.error('生徒データが見つかりません');
+        return;
+      }
+
+      // バックエンドAPIを呼び出して個別帳票を生成
+      const response = await testApi.generateIndividualReport({
+        studentId: studentId,
+        year: parseInt(year),
+        period: 'summer',
+        format: reportFormat
+      });
+
+      if (response.success) {
+        // ファイルダウンロード処理
+        const link = document.createElement('a');
+        let downloadUrl = response.download_url.startsWith('http')
+          ? response.download_url
+          : `${process.env.NEXT_PUBLIC_API_BASE_URL?.replace('/api', '') || 'https://kouzyoutest.com'}${response.download_url}`;
+
+        // キャッシュバスティング用のタイムスタンプを追加
+        const timestamp = new Date().getTime();
+        downloadUrl += downloadUrl.includes('?') ? `&t=${timestamp}` : `?t=${timestamp}`;
+
+        link.href = downloadUrl;
+        const extension = response.format === 'pdf' || reportFormat === 'pdf' ? 'pdf' : 'docx';
+        link.download = `${student.student_name}_成績表_${year}年度夏期.${extension}`;
+        link.click();
+
+        toast.success(`${student.student_name}の成績表をダウンロードしました`);
+      } else {
+        toast.error(`帳票生成に失敗しました: ${response.error}`);
+      }
+    } catch (error) {
+      console.error('個別帳票ダウンロードエラー:', error);
+      toast.error('帳票のダウンロードに失敗しました');
+    }
+  };
+
+  // 一括帳票ダウンロード
+  const handleDownloadBulkReports = async () => {
+    if (selectedStudents.length === 0) {
+      toast.error('生徒を選択してください');
+      return;
+    }
+
+    try {
+      // バックエンドAPIを呼び出して一括帳票を生成
+      const response = await testApi.generateBulkReports({
+        studentIds: selectedStudents,
+        year: parseInt(year),
+        period: 'summer',
+        format: reportFormat
+      });
+
+      if (response.success) {
+        // ZIPファイルダウンロード処理
+        const link = document.createElement('a');
+        let downloadUrl = response.download_url.startsWith('http')
+          ? response.download_url
+          : `${process.env.NEXT_PUBLIC_API_BASE_URL?.replace('/api', '') || 'https://kouzyoutest.com'}${response.download_url}`;
+
+        // キャッシュバスティング用のタイムスタンプを追加
+        const timestamp = new Date().getTime();
+        downloadUrl += downloadUrl.includes('?') ? `&t=${timestamp}` : `?t=${timestamp}`;
+
+        link.href = downloadUrl;
+        link.download = `成績表一括_${year}年度夏期_${selectedStudents.length}名.zip`;
+        link.click();
+
+        toast.success(`${selectedStudents.length}名の成績表を一括ダウンロードしました`);
+      } else {
+        toast.error(`一括帳票生成に失敗しました: ${response.error}`);
+      }
+    } catch (error) {
+      console.error('一括帳票ダウンロードエラー:', error);
+      toast.error('一括帳票のダウンロードに失敗しました');
+    }
+  };
+
+  const handleGenerateReport = () => {
+    if (reportType === 'individual' && selectedStudents.length === 0) {
+      toast.error('生徒を選択してください');
+      return;
+    }
+
+    const reportTypeText = {
+      individual: '個人成績表',
+      class: 'クラス成績表',
+      ranking: '成績順位表',
+      summary: '成績集計表'
+    }[reportType];
+
+    const formatText = {
+      pdf: 'PDF',
+      word: 'Word',
+    }[reportFormat] || 'PDF';
+
+    // 帳票生成のシミュレーション
+    toast.success(`${reportTypeText}を${formatText}形式で生成しました`);
+    setIsReportDialogOpen(false);
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div className="flex items-center gap-4">
+          <Link href="/tests/results">
+            <Button variant="ghost" size="sm" className="rounded-xl">
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              戻る
+            </Button>
+          </Link>
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+              {year}年度 テスト結果
+            </h1>
+            <p className="text-gray-500 dark:text-gray-400">
+              テスト結果の閲覧と分析{testInfo.subject && ` - ${testInfo.subject}`}
+            </p>
+          </div>
+        </div>
+        <div className="flex gap-2">
+          <Button onClick={handleDownloadBulkReports} variant="outline" disabled={selectedStudents.length === 0}>
+            <Download className="h-4 w-4 mr-2" />
+            一括ダウンロード ({selectedStudents.length})
+          </Button>
+          <Dialog open={isReportDialogOpen} onOpenChange={setIsReportDialogOpen}>
+            <DialogTrigger asChild>
+              <Button>
+                <FileOutput className="h-4 w-4 mr-2" />
+                帳票設定
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[500px]">
+              <DialogHeader>
+                <DialogTitle>帳票出力設定</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-6">
+                <div className="space-y-3">
+                  <Label className="text-sm font-medium">帳票形式</Label>
+                  <p className="text-sm text-gray-600 mb-2">A3横向き二つ折り帳票（左：国語/英語、右：算数/数学）</p>
+                  <RadioGroup value={reportType} onValueChange={setReportType}>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="individual" id="individual" />
+                      <Label htmlFor="individual">個別成績表（差し込み済み）</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="bulk" id="bulk" />
+                      <Label htmlFor="bulk">一括成績表（選択した生徒全員）</Label>
+                    </div>
+                  </RadioGroup>
+                </div>
+
+                <div className="space-y-3">
+                  <Label className="text-sm font-medium">出力形式</Label>
+                  <Select value={reportFormat} onValueChange={setReportFormat}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="pdf">PDF（推奨）</SelectItem>
+                    <SelectItem value="word">Word</SelectItem>
+                  </SelectContent>
+                  </Select>
+                  <p className="text-xs text-gray-500">
+                    PDFはブラウザでの閲覧と印刷に適したレイアウトです
+                  </p>
+                </div>
+
+                <div className="space-y-3">
+                  <Label className="text-sm font-medium">並び順</Label>
+                  <Select value={sortOrder} onValueChange={setSortOrder}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="rank">成績順</SelectItem>
+                      <SelectItem value="name">名前順</SelectItem>
+                      <SelectItem value="id">学籍番号順</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {reportType === 'individual' && (
+                  <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-lg">
+                    <p className="text-sm text-blue-700 dark:text-blue-300">
+                      対象生徒: {selectedStudents.length > 0 ? `${selectedStudents.length}名選択済み` : '生徒を選択してください'}
+                    </p>
+                  </div>
+                )}
+              </div>
+              <div className="flex gap-2 pt-4">
+                <Button onClick={handleGenerateReport} className="flex-1">
+                  <Printer className="h-4 w-4 mr-2" />
+                  帳票生成
+                </Button>
+                <Button variant="outline" onClick={() => setIsReportDialogOpen(false)}>
+                  キャンセル
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+        </div>
+      </div>
+
+      {/* Test Summary */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">
+              受験者数
+            </CardTitle>
+            <FileText className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{testInfo.total_students}</div>
+            <p className="text-xs text-muted-foreground">
+              出席率 {Math.round(testInfo.attendance_rate)}%
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">
+              平均点
+            </CardTitle>
+            <BarChart3 className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{testInfo.average_score.toFixed(1)}</div>
+            <p className="text-xs text-muted-foreground">
+              {testInfo.max_score}点満点
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">
+              最高点
+            </CardTitle>
+            <TrendingUp className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{testInfo.max_score}</div>
+            <p className="text-xs text-muted-foreground">
+              {results.find(r => r.total_score === testInfo.max_score)?.student_name}
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">
+              最低点
+            </CardTitle>
+            <Award className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{testInfo.min_score}</div>
+            <p className="text-xs text-muted-foreground">
+              改善の余地あり
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Tabbed Content */}
+      <Tabs defaultValue="results" className="space-y-6">
+        <TabsList>
+          <TabsTrigger value="results">
+            <BarChart3 className="h-4 w-4 mr-2" />
+            テスト結果
+          </TabsTrigger>
+          {selectedStudent && (
+            <TabsTrigger value="comments">
+              <MessageSquare className="h-4 w-4 mr-2" />
+              コメント管理
+            </TabsTrigger>
+          )}
+        </TabsList>
+
+        <TabsContent value="results">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle>
+                  <span className="hidden sm:inline">生徒管理</span>
+                  <span className="sm:hidden">生徒</span>
+                  {" "}({filteredResults.length}名)
+                </CardTitle>
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    id="select-all"
+                    checked={selectedStudents.length === filteredResults.length && filteredResults.length > 0}
+                    onCheckedChange={handleSelectAll}
+                  />
+                  <Label htmlFor="select-all" className="text-sm">
+                    全選択
+                  </Label>
+                </div>
+              </div>
+              
+              {/* フィルタリングとソートコントロール */}
+              <div className="flex flex-wrap items-center gap-4 pt-4 border-t">
+                <div className="flex items-center gap-2">
+                  <Filter className="h-4 w-4 text-gray-500" />
+                  <Label className="text-sm font-medium">フィルター:</Label>
+                  <Select value={filterStatus} onValueChange={setFilterStatus}>
+                    <SelectTrigger className="w-40">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">全て</SelectItem>
+                      <SelectItem value="complete">入力完了</SelectItem>
+                      <SelectItem value="partial">部分入力</SelectItem>
+                      <SelectItem value="not_started">未入力</SelectItem>
+                      <SelectItem value="absent">欠席</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <div className="flex items-center gap-2">
+                  <Label className="text-sm font-medium">並び順:</Label>
+                  <Select value={sortOrder} onValueChange={setSortOrder}>
+                    <SelectTrigger className="w-32">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="rank">順位</SelectItem>
+                      <SelectItem value="name">名前</SelectItem>
+                      <SelectItem value="id">生徒ID</SelectItem>
+                      <SelectItem value="total_score">合計点</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')}
+                  >
+                    {sortDirection === 'asc' ? <SortAsc className="h-4 w-4" /> : <SortDesc className="h-4 w-4" />}
+                  </Button>
+                </div>
+                
+                <div className="flex items-center gap-2 ml-auto">
+                  <Users className="h-4 w-4 text-gray-500" />
+                  <span className="text-sm text-gray-600">
+                    選択中: {selectedStudents.length}名
+                  </span>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {filteredResults.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <p className="text-lg mb-2">該当する生徒がいません</p>
+                    <p className="text-sm">
+                      フィルター条件を変更してください
+                    </p>
+                  </div>
+                ) : (
+                  filteredResults.map((result) => {
+                    const inputStatus = getScoreInputStatus(result);
+                    const statusConfig = {
+                      complete: { icon: CheckCircle, color: 'text-green-600', bg: 'bg-green-50', border: 'border-green-200', text: '入力完了' },
+                      partial: { icon: Clock, color: 'text-yellow-600', bg: 'bg-yellow-50', border: 'border-yellow-200', text: '部分入力' },
+                      not_started: { icon: XCircle, color: 'text-red-600', bg: 'bg-red-50', border: 'border-red-200', text: '未入力' },
+                      absent: { icon: XCircle, color: 'text-gray-600', bg: 'bg-gray-50', border: 'border-gray-200', text: '欠席' }
+                    }[inputStatus];
+                    const StatusIcon = statusConfig.icon;
+
+                    return (
+                      <div
+                        key={result.student_id}
+                        className={`flex items-center gap-4 p-4 border rounded-lg transition-colors ${
+                          selectedStudents.includes(result.student_id) 
+                            ? 'bg-blue-50 border-blue-200 dark:bg-blue-900/20 dark:border-blue-700' 
+                            : 'hover:bg-gray-50 dark:hover:bg-gray-800'
+                        } ${statusConfig.border}`}
+                      >
+                        <Checkbox
+                          checked={selectedStudents.includes(result.student_id)}
+                          onCheckedChange={(checked) => handleSelectStudent(result.student_id, checked as boolean)}
+                        />
+                        
+                        {/* 入力状況インジケーター */}
+                        <div className={`flex items-center gap-2 px-3 py-1 rounded-full ${statusConfig.bg} ${statusConfig.border} border`}>
+                          <StatusIcon className={`h-4 w-4 ${statusConfig.color}`} />
+                          <span className={`text-xs font-medium ${statusConfig.color}`}>
+                            {statusConfig.text}
+                          </span>
+                        </div>
+                        
+                        <div className="flex items-center gap-4 flex-1">
+                          <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-bold">
+                            {result.rank || '-'}
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <p className="font-medium">{result.student_name}</p>
+                              <Badge variant="outline">{result.grade}</Badge>
+                              <Badge variant="outline">{result.classroom_name}</Badge>
+                              {result.improvement && result.improvement > 0 && (
+                                <Badge className="bg-green-100 text-green-800">
+                                  +{result.improvement}
+                                </Badge>
+                              )}
+                              {result.improvement && result.improvement < 0 && (
+                                <Badge className="bg-red-100 text-red-800">
+                                  {result.improvement}
+                                </Badge>
+                              )}
+                              {!result.attendance && (
+                                <Badge variant="destructive">欠席</Badge>
+                              )}
+                            </div>
+                            <p className="text-sm text-gray-500 dark:text-gray-400">
+                              ID: {result.student_id}
+                            </p>
+                          </div>
+                        </div>
+                        
+                        <div className="flex items-center gap-8">
+                          <div className={`grid ${gridColsClass} gap-2 text-sm`}>
+                            {Object.entries(result.scores).map(([question, score]) => (
+                              <div key={question} className="text-center">
+                                <p className="text-gray-500 dark:text-gray-400 text-xs">{question.replace('q', '大問')}</p>
+                                <p className="font-medium">{score || '-'}</p>
+                              </div>
+                            ))}
+                          </div>
+                          <div className="text-right">
+                            <p className="text-2xl font-bold">{result.total_score || '-'}</p>
+                            <p className="text-sm text-gray-500 dark:text-gray-400">
+                              {result.rank ? `${result.rank}位` : '-'}
+                            </p>
+                          </div>
+                          <div className="flex flex-col gap-1">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleDownloadIndividualReport(result.student_id)}
+                              disabled={inputStatus === 'not_started' || inputStatus === 'absent'}
+                            >
+                              <Download className="h-3 w-3 mr-1" />
+                              帳票
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => handleStudentCommentClick(result)}
+                            >
+                              <MessageSquare className="h-3 w-3 mr-1" />
+                              コメント
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {selectedStudent && (
+          <TabsContent value="comments">
+            <CommentManager
+              studentId={selectedStudent.student_id}
+              studentName={selectedStudent.student_name}
+              testId={selectedStudent.id}
+              testName={selectedStudent.test_name}
+              showTestComments={true}
+            />
+          </TabsContent>
+        )}
+      </Tabs>
+    </div>
+  );
+}
