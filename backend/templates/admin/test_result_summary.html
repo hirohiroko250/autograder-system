@@ -1,0 +1,324 @@
+{% extends "admin/base_site.html" %}
+{% load i18n admin_urls static admin_modify %}
+
+{% block title %}{{ title }} | {{ site_title|default:_('Django site admin') }}{% endblock %}
+
+{% block extrahead %}
+<style>
+.custom-select {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 14px;
+    color: #333 !important;
+    background-color: white !important;
+}
+
+.custom-select option {
+    color: #333 !important;
+    background-color: white !important;
+    padding: 5px;
+}
+
+.custom-select option:checked {
+    font-weight: bold;
+}
+
+.form-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 20px;
+    margin-bottom: 20px;
+}
+
+.form-label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: bold;
+    color: #333;
+}
+
+.button-container {
+    text-align: center;
+    margin-top: 20px;
+}
+
+.btn {
+    padding: 10px 20px;
+    margin: 0 10px;
+    border: none;
+    border-radius: 4px;
+    font-size: 14px;
+    cursor: pointer;
+    text-decoration: none;
+    display: inline-block;
+}
+
+.btn-primary {
+    background-color: #007cba;
+    color: white;
+}
+
+.btn-secondary {
+    background-color: #6c757d;
+    color: white;
+}
+
+.btn:hover {
+    opacity: 0.9;
+}
+</style>
+{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+<a href="{% url 'admin:index' %}">{% trans 'Home' %}</a>
+&rsaquo; <a href="{% url 'admin:app_list' app_label='scores' %}">得点</a>  
+&rsaquo; <a href="{% url 'admin:scores_testresult_changelist' %}">テスト結果</a>
+&rsaquo; 集計
+</div>
+{% endblock %}
+
+{% block content %}
+<div style="max-width: 800px; margin: 0 auto; padding: 20px;">
+    <h1>テスト結果集計</h1>
+    
+    <div style="background: white; border: 1px solid #ddd; border-radius: 4px; padding: 20px; margin-bottom: 20px;">
+        <h2>集計条件選択</h2>
+        <p>年度・時期・学校種別を選択して集計を実行してください</p>
+        
+        <form method="post">
+            {% csrf_token %}
+            <div class="form-grid">
+                    
+                <!-- 年度選択 -->
+                <div>
+                    <label class="form-label">年度:</label>
+                    <select name="year" required class="custom-select">
+                        <option value="">選択してください</option>
+                        {% for year in years %}
+                            {% if selected_year|stringformat:"s" == year|stringformat:"s" %}
+                            <option value="{{ year }}" selected>{{ year }}年度 [選択中]</option>
+                            {% else %}
+                            <option value="{{ year }}">{{ year }}年度</option>
+                            {% endif %}
+                        {% endfor %}
+                    </select>
+                </div>
+                    
+                <!-- 時期選択 -->
+                <div>
+                    <label class="form-label">時期:</label>
+                    <select name="period" required class="custom-select">
+                        <option value="">選択してください</option>
+                        {% for period_value, period_display in periods %}
+                            {% if selected_period == period_value %}
+                            <option value="{{ period_value }}" selected>{{ period_display }} [選択中]</option>
+                            {% else %}
+                            <option value="{{ period_value }}">{{ period_display }}</option>
+                            {% endif %}
+                        {% endfor %}
+                    </select>
+                </div>
+                    
+                <!-- 学校種別選択 -->
+                <div>
+                    <label class="form-label">学校種別:</label>
+                    <select name="school_type" required class="custom-select">
+                        <option value="">選択してください</option>
+                        {% if selected_school_type == 'elementary' %}
+                        <option value="elementary" selected>小学生 [選択中]</option>
+                        {% else %}
+                        <option value="elementary">小学生</option>
+                        {% endif %}
+                        {% if selected_school_type == 'middle' %}
+                        <option value="middle" selected>中学生 [選択中]</option>
+                        {% else %}
+                        <option value="middle">中学生</option>
+                        {% endif %}
+                    </select>
+                </div>
+            </div>
+                
+            <div class="button-container">
+                <button type="submit" name="action" value="calculate" class="btn btn-primary">
+                    集計実行
+                </button>
+                <button type="submit" name="action" value="view" class="btn btn-secondary">
+                    結果表示
+                </button>
+            </div>
+        </form>
+    </div>
+    
+    {% if no_data_message %}
+    <div style="background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 4px; padding: 20px; margin-bottom: 20px; text-align: center;">
+        <h3 style="color: #856404; margin-bottom: 10px;">⚠️ データが見つかりません</h3>
+        <p style="color: #856404; margin: 0;">{{ no_data_message }}</p>
+        <p style="color: #6c757d; margin-top: 10px; font-size: 14px;">※ テスト結果データが登録されているか確認してください</p>
+    </div>
+    {% endif %}
+    
+    {% if summary_data %}
+    <!-- 集計結果表示 -->
+    <div style="background: white; border-radius: 10px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); overflow: hidden;">
+        
+        <!-- 結果ヘッダー -->
+        <div style="
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+            color: white;
+            padding: 25px;
+            text-align: center;
+        ">
+            <h2 style="margin: 0; font-size: 24px;">📈 集計結果</h2>
+            <p style="margin: 10px 0 0 0; opacity: 0.9;">
+                {{ summary_data.test_summary.year }}年度{{ summary_data.test_summary.period }} 
+                {% if summary_data.test_summary.school_type == 'elementary' %}小学生{% else %}中学生{% endif %}
+                全学年・全科目
+            </p>
+        </div>
+        
+        <!-- 全体統計 -->
+        <div style="padding: 30px 40px; border-bottom: 1px solid #eee;">
+            <h3 style="color: #28a745; margin-bottom: 20px;">📊 全体統計</h3>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px;">
+                <div style="text-align: center; padding: 20px; background: #f8f9fa; border-radius: 8px;">
+                    <div style="font-size: 28px; font-weight: bold; color: #6f42c1;">{{ summary_data.test_summary.total_students }}</div>
+                    <div style="color: #6c757d; margin-top: 5px;">受験者数</div>
+                </div>
+                <div style="text-align: center; padding: 20px; background: #f8f9fa; border-radius: 8px;">
+                    <div style="font-size: 28px; font-weight: bold; color: #fd7e14;">{{ summary_data.test_summary.average_score|floatformat:1 }}</div>
+                    <div style="color: #6c757d; margin-top: 5px;">平均点</div>
+                </div>
+                <div style="text-align: center; padding: 20px; background: #f8f9fa; border-radius: 8px;">
+                    <div style="font-size: 28px; font-weight: bold; color: #20c997;">{{ summary_data.test_summary.average_correct_rate|floatformat:1 }}%</div>
+                    <div style="color: #6c757d; margin-top: 5px;">平均正答率</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 学年別統計 -->
+        <div style="padding: 30px 40px; border-bottom: 1px solid #eee;">
+            <h3 style="color: #28a745; margin-bottom: 20px;">📚 学年別統計</h3>
+            
+            {% for grade, grade_data in summary_data.grade_statistics.items %}
+            <div style="margin-bottom: 25px; border: 1px solid #dee2e6; border-radius: 8px; overflow: hidden;">
+                <div style="background: #f8f9fa; padding: 15px 20px; border-bottom: 1px solid #dee2e6;">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <div>
+                            <strong style="font-size: 18px; color: #495057;">{{ grade }}年生</strong>
+                        </div>
+                        <div style="text-align: right;">
+                            <div style="font-size: 20px; font-weight: bold; color: #fd7e14;">平均 {{ grade_data.average_score|floatformat:1 }}点</div>
+                            <div style="color: #6c757d;">{{ grade_data.student_count }}名受験</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div style="padding: 20px; background: #fafafa;">
+                    <h5 style="margin: 0 0 15px 0; color: #495057;">📊 大問別平均点</h5>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 15px;">
+                        {% for question_num, avg_score in grade_data.question_averages.items %}
+                        <div style="background: white; padding: 15px; border-radius: 6px; text-align: center; border: 1px solid #dee2e6;">
+                            <div style="font-weight: bold; color: #6f42c1; margin-bottom: 5px;">大問{{ question_num }}</div>
+                            <div style="font-size: 16px; font-weight: bold; color: #fd7e14;">{{ avg_score|floatformat:1 }}点</div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        
+        <!-- 塾別結果 -->
+        <div style="padding: 30px 40px;">
+            <h3 style="color: #28a745; margin-bottom: 20px;">🏫 塾別結果（平均点順）</h3>
+            
+            {% for school_summary in summary_data.school_summaries %}
+            <div style="margin-bottom: 30px; border: 1px solid #dee2e6; border-radius: 8px; overflow: hidden;">
+                <!-- 塾ヘッダー -->
+                <div style="background: #f8f9fa; padding: 15px 20px; border-bottom: 1px solid #dee2e6;">
+                    <div style="display: flex; justify-content: between; align-items: center;">
+                        <div>
+                            <strong style="font-size: 18px; color: #495057;">{{ school_summary.school.name }}</strong>
+                            <span style="color: #6c757d; margin-left: 10px;">（{{ school_summary.school.school_id }}）</span>
+                            <span style="background: #fd7e14; color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px; margin-left: 10px;">{{ school_summary.rank_among_schools }}位</span>
+                        </div>
+                        <div style="text-align: right;">
+                            <div style="font-size: 20px; font-weight: bold; color: #fd7e14;">平均 {{ school_summary.average_score|floatformat:1 }}点</div>
+                            <div style="color: #6c757d;">{{ school_summary.student_count }}名受験</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 学年別統計 -->
+                <div style="padding: 20px; background: #fafafa;">
+                    <h5 style="margin: 0 0 15px 0; color: #495057;">📚 学年別統計</h5>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px;">
+                        {% for grade, grade_data in school_summary.grade_details.items %}
+                        <div style="background: white; padding: 15px; border-radius: 6px; text-align: center; border: 1px solid #dee2e6;">
+                            <div style="font-weight: bold; color: #6f42c1; margin-bottom: 5px;">{{ grade }}年生</div>
+                            <div style="font-size: 18px; font-weight: bold; color: #fd7e14;">{{ grade_data.average_score|floatformat:1 }}点</div>
+                            <div style="color: #6c757d; font-size: 14px;">{{ grade_data.count }}名</div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                
+                <!-- 生徒詳細（学年別） -->
+                {% for grade, grade_data in school_summary.grade_details.items %}
+                <div style="margin: 20px;">
+                    <h5 style="color: #6f42c1; margin-bottom: 15px;">{{ grade }}年生の結果</h5>
+                    <div style="overflow-x: auto;">
+                        <table style="width: 100%; border-collapse: collapse;">
+                            <thead>
+                                <tr style="background: #f1f3f4;">
+                                    <th style="padding: 10px; text-align: left; border-bottom: 1px solid #dee2e6;">生徒名</th>
+                                    <th style="padding: 10px; text-align: left; border-bottom: 1px solid #dee2e6;">生徒ID</th>
+                                    <th style="padding: 10px; text-align: left; border-bottom: 1px solid #dee2e6;">教室</th>
+                                    <th style="padding: 10px; text-align: center; border-bottom: 1px solid #dee2e6;">得点</th>
+                                    <th style="padding: 10px; text-align: center; border-bottom: 1px solid #dee2e6;">正答率</th>
+                                    <th style="padding: 10px; text-align: center; border-bottom: 1px solid #dee2e6;">塾内順位</th>
+                                    <th style="padding: 10px; text-align: center; border-bottom: 1px solid #dee2e6;">全体順位</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for student in grade_data.students %}
+                                <tr style="border-bottom: 1px solid #f1f3f4;">
+                                    <td style="padding: 10px;">{{ student.name }}</td>
+                                    <td style="padding: 10px; color: #6c757d;">{{ student.student_id }}</td>
+                                    <td style="padding: 10px; color: #6c757d;">{{ student.classroom_name }}</td>
+                                    <td style="padding: 10px; text-align: center; font-weight: bold; color: #fd7e14;">{{ student.total_score }}点</td>
+                                    <td style="padding: 10px; text-align: center;">{{ student.correct_rate|floatformat:1 }}%</td>
+                                    <td style="padding: 10px; text-align: center;">{{ student.school_rank }}位</td>
+                                    <td style="padding: 10px; text-align: center;">{{ student.national_rank }}位</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% endfor %}
+        </div>
+        
+        <!-- エクスポートボタン -->
+        <div style="padding: 20px 40px; background: #f8f9fa; text-align: center;">
+            <p style="color: #6c757d; margin: 0;">
+                集計結果は「{{ summary_data.test_summary.calculated_at|date:'Y年n月j日 H:i' }}」に保存されました
+            </p>
+        </div>
+    </div>
+    {% endif %}
+    
+    <!-- 戻るボタン -->
+    <div class="button-container">
+        <a href="{% url 'admin:scores_testresult_changelist' %}" 
+           class="btn btn-secondary">
+            ← テスト結果一覧に戻る
+        </a>
+    </div>
+</div>
+{% endblock %}

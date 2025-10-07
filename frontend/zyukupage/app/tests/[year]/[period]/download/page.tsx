@@ -142,7 +142,7 @@ function StudentManagementContent({ year, period }: { year: string; period: stri
 
   const availableClassrooms = getAvailableClassrooms();
 
-  // 個別帳票ダウンロード
+  // 個別帳票プレビュー
   const handleDownloadIndividualReport = async (studentId: string) => {
     try {
       const student = results.find((r: any) => r.student_id === studentId);
@@ -151,44 +151,21 @@ function StudentManagementContent({ year, period }: { year: string; period: stri
         return;
       }
 
-      // バックエンドAPIを呼び出して個別帳票を生成
-      const response = await testApi.generateIndividualReport({
-        studentId: studentId,
-        year: parseInt(year),
-        period: period,
-        format: 'pdf'
-      });
+      // HTMLプレビューを新しいタブで開く
+      const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL?.replace('/api', '') || 'https://kouzyoutest.com';
+      const previewUrl = `${baseUrl}/reports/preview/?studentId=${studentId}&year=${year}&period=${period}`;
 
-      if (response.success) {
-        // ファイルダウンロード処理
-        const link = document.createElement('a');
-        let downloadUrl = response.download_url.startsWith('http')
-          ? response.download_url
-          : `${process.env.NEXT_PUBLIC_API_BASE_URL?.replace('/api', '') || 'https://kouzyoutest.com'}${response.download_url}`;
+      // 新しいタブで開く
+      window.open(previewUrl, '_blank');
 
-        // キャッシュバスティング用のタイムスタンプを追加
-        const timestamp = new Date().getTime();
-        downloadUrl += downloadUrl.includes('?') ? `&t=${timestamp}` : `?t=${timestamp}`;
-
-        link.href = downloadUrl;
-        const fileExt = response.format === 'pdf' ? 'pdf' : 'docx';
-        link.download = `${student.student_name}_成績表_${year}年度${getPeriodLabel(period)}.${fileExt}`;
-        link.target = '_blank';  // 新しいタブで開く
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        
-        toast.success(`${student.student_name}の成績表をダウンロードしました`);
-      } else {
-        toast.error(`帳票生成に失敗しました: ${response.error}`);
-      }
+      toast.success(`${student.student_name}の成績表を表示しました`);
     } catch (error) {
-      console.error('個別帳票ダウンロードエラー:', error);
-      toast.error('帳票のダウンロードに失敗しました');
+      console.error('個別帳票プレビューエラー:', error);
+      toast.error('帳票の表示に失敗しました');
     }
   };
 
-  // 一括帳票ダウンロード
+  // 一括帳票プレビュー
   const handleDownloadBulkReports = async () => {
     if (selectedStudents.length === 0) {
       toast.error('生徒を選択してください');
@@ -196,39 +173,18 @@ function StudentManagementContent({ year, period }: { year: string; period: stri
     }
 
     try {
-      // バックエンドAPIを呼び出して一括帳票を生成
-      const response = await testApi.generateBulkReports({
-        studentIds: selectedStudents,
-        year: parseInt(year),
-        period: period,
-        format: 'pdf'
-      });
+      // HTMLプレビューを新しいタブで開く
+      const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL?.replace('/api', '') || 'https://kouzyoutest.com';
+      const studentIdsParam = selectedStudents.join(',');
+      const previewUrl = `${baseUrl}/reports/preview-bulk/?year=${year}&period=${period}&studentIds=${studentIdsParam}`;
 
-      if (response.success) {
-        // ZIPファイルダウンロード処理
-        const link = document.createElement('a');
-        let downloadUrl = response.download_url.startsWith('http')
-          ? response.download_url
-          : `${process.env.NEXT_PUBLIC_API_BASE_URL?.replace('/api', '') || 'https://kouzyoutest.com'}${response.download_url}`;
+      // 新しいタブで開く
+      window.open(previewUrl, '_blank');
 
-        // キャッシュバスティング用のタイムスタンプを追加
-        const timestamp = new Date().getTime();
-        downloadUrl += downloadUrl.includes('?') ? `&t=${timestamp}` : `?t=${timestamp}`;
-
-        link.href = downloadUrl;
-        link.download = `成績表一括_${year}年度${getPeriodLabel(period)}_${selectedStudents.length}名.zip`;
-        link.target = '_blank';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        
-        toast.success(`${selectedStudents.length}名の成績表を一括ダウンロードしました`);
-      } else {
-        toast.error(`一括帳票生成に失敗しました: ${response.error}`);
-      }
+      toast.success(`${selectedStudents.length}名の成績表を表示しました`);
     } catch (error) {
-      console.error('一括帳票ダウンロードエラー:', error);
-      toast.error('一括帳票のダウンロードに失敗しました');
+      console.error('一括帳票プレビューエラー:', error);
+      toast.error('一括帳票の表示に失敗しました');
     }
   };
 

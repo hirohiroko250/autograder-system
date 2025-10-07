@@ -4,9 +4,11 @@
 from django.core.management.base import BaseCommand
 from django.db.models import Sum, Count, Avg, StdDev
 from django.utils import timezone
+from django.db import OperationalError
 from scores.models import Score, TestResult
 from tests.models import TestDefinition
 import gc
+import time
 
 class Command(BaseCommand):
     help = 'ScoreからTestResultを生成し、順位・偏差値を計算します'
@@ -20,7 +22,7 @@ class Command(BaseCommand):
         self.stdout.write('\n[STEP 1] TestResult生成中...')
         generated_count = 0
         tests = TestDefinition.objects.all()
-        batch_size = 500
+        batch_size = 100  # バッチサイズを小さく
 
         for test in tests:
             student_totals = Score.objects.filter(
@@ -66,19 +68,36 @@ class Command(BaseCommand):
                         is_rank_finalized=False
                     ))
 
-                # バッチ処理
+                # バッチ処理（リトライロジック付き）
                 if len(create_batch) >= batch_size:
-                    TestResult.objects.bulk_create(create_batch, ignore_conflicts=True)
-                    generated_count += len(create_batch)
-                    create_batch = []
-                    gc.collect()
-                    self.stdout.write(f'  生成: {generated_count}件')
+                    for retry in range(3):
+                        try:
+                            TestResult.objects.bulk_create(create_batch, ignore_conflicts=True)
+                            generated_count += len(create_batch)
+                            create_batch = []
+                            gc.collect()
+                            self.stdout.write(f'  生成: {generated_count}件')
+                            break
+                        except OperationalError as e:
+                            if 'database is locked' in str(e) and retry < 2:
+                                self.stdout.write(f'  [警告] DBロック検出、{retry+1}秒待機...')
+                                time.sleep(retry + 1)
+                            else:
+                                raise
 
                 if len(update_batch) >= batch_size:
-                    TestResult.objects.bulk_update(update_batch, ['total_score', 'correct_rate'])
-                    generated_count += len(update_batch)
-                    update_batch = []
-                    gc.collect()
+                    for retry in range(3):
+                        try:
+                            TestResult.objects.bulk_update(update_batch, ['total_score', 'correct_rate'])
+                            generated_count += len(update_batch)
+                            update_batch = []
+                            gc.collect()
+                            break
+                        except OperationalError as e:
+                            if 'database is locked' in str(e) and retry < 2:
+                                time.sleep(retry + 1)
+                            else:
+                                raise
 
             # 残りのバッチを処理
             if create_batch:
