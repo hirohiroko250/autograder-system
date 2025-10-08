@@ -30,10 +30,18 @@ class ClassroomViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"DEBUG Classroom queryset: user={user.username}, role={user.role}, school_id={getattr(user, 'school_id', None)}, classroom_id={getattr(user, 'classroom_id', None)}")
+
         if user.role == 'school_admin':
-            return Classroom.objects.filter(school__school_id=user.school_id)
+            queryset = Classroom.objects.filter(school__school_id=user.school_id)
+            logger.error(f"DEBUG School admin queryset count: {queryset.count()}")
+            return queryset
         elif user.role == 'classroom_admin':
-            return Classroom.objects.filter(classroom_id=user.classroom_id)
+            queryset = Classroom.objects.filter(classroom_id=user.classroom_id)
+            logger.error(f"DEBUG Classroom admin queryset count: {queryset.count()}")
+            return queryset
         return Classroom.objects.all()
     
     def list(self, request, *args, **kwargs):

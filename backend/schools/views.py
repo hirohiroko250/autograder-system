@@ -31,36 +31,72 @@ class SchoolViewSet(viewsets.ModelViewSet):
         print(f"  User: {request.user.username} (role: {request.user.role})")
         print(f"  School ID: {kwargs.get('pk')}")
         print(f"  Data: {request.data}")
-        
+
         instance = self.get_object()
         print(f"  Target school: {instance.name} ({instance.school_id})")
         print(f"  Before update - permissions: register={instance.can_register_students}, input={instance.can_input_scores}, view={instance.can_view_reports}")
-        
+
         response = super().update(request, *args, **kwargs)
-        
+
         # 更新後の状態を確認
         instance.refresh_from_db()
         print(f"  After update - permissions: register={instance.can_register_students}, input={instance.can_input_scores}, view={instance.can_view_reports}")
-        
+
+        # 権限が更新された場合、この学校の全教室の権限も同期
+        permission_fields = ['can_register_students', 'can_input_scores', 'can_view_reports']
+        permission_updates = {field: request.data.get(field) for field in permission_fields if field in request.data}
+
+        if permission_updates:
+            from classrooms.models import ClassroomPermission
+            classrooms = Classroom.objects.filter(school=instance)
+            updated_count = 0
+
+            for classroom in classrooms:
+                permission, created = ClassroomPermission.objects.get_or_create(classroom=classroom)
+                for field, value in permission_updates.items():
+                    setattr(permission, field, value)
+                permission.save()
+                updated_count += 1
+
+            print(f"  Synchronized permissions to {updated_count} classrooms")
+
         return response
     
     def partial_update(self, request, *args, **kwargs):
         """学校情報の部分更新（PATCH用）"""
         print(f"School partial_update request received:")
-        print(f"  User: {request.user.username} (role: {request.user.role})")  
+        print(f"  User: {request.user.username} (role: {request.user.role})")
         print(f"  School ID: {kwargs.get('pk')}")
         print(f"  Data: {request.data}")
-        
+
         instance = self.get_object()
         print(f"  Target school: {instance.name} ({instance.school_id})")
         print(f"  Before update - permissions: register={instance.can_register_students}, input={instance.can_input_scores}, view={instance.can_view_reports}")
-        
+
         response = super().partial_update(request, *args, **kwargs)
-        
+
         # 更新後の状態を確認
         instance.refresh_from_db()
         print(f"  After update - permissions: register={instance.can_register_students}, input={instance.can_input_scores}, view={instance.can_view_reports}")
-        
+
+        # 権限が更新された場合、この学校の全教室の権限も同期
+        permission_fields = ['can_register_students', 'can_input_scores', 'can_view_reports']
+        permission_updates = {field: request.data.get(field) for field in permission_fields if field in request.data}
+
+        if permission_updates:
+            from classrooms.models import ClassroomPermission
+            classrooms = Classroom.objects.filter(school=instance)
+            updated_count = 0
+
+            for classroom in classrooms:
+                permission, created = ClassroomPermission.objects.get_or_create(classroom=classroom)
+                for field, value in permission_updates.items():
+                    setattr(permission, field, value)
+                permission.save()
+                updated_count += 1
+
+            print(f"  Synchronized permissions to {updated_count} classrooms")
+
         return response
     
     def get_queryset(self):

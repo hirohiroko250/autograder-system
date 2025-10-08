@@ -787,12 +787,23 @@ class TestResultViewSet(viewsets.ModelViewSet):
         # リクエスト元を判別してフィルタリングを決定
         # classroom管理者かつclassroomページからのリクエストの場合のみ、自分の教室に制限
         is_classroom_page = 'classroom' in request.META.get('HTTP_REFERER', '') or request.query_params.get('app_context') == 'classroom'
-        
-        if request.user.role == 'classroom_admin' and hasattr(request.user, 'classroom_id') and is_classroom_page:
+
+        if request.user.role == 'classroom_admin' and hasattr(request.user, 'classroom_id') and request.user.classroom_id and is_classroom_page:
+            # 教室管理者は自分の教室のみに制限
             test_filter &= Q(student__classroom__classroom_id=request.user.classroom_id)
-        elif school_id and not (request.user.role == 'classroom_admin' and is_classroom_page):
-            # 教室ページからのリクエスト以外の場合のみschool_idでフィルタリング
+        elif request.user.role == 'school_admin':
+            # 塾管理者は必ず自分の塾のみに制限
+            if hasattr(request.user, 'school_id') and request.user.school_id:
+                test_filter &= Q(student__classroom__school__school_id=request.user.school_id)
+            else:
+                # school_idが取得できない場合はエラー
+                return Response({'error': 'School ID not found for this user'}, status=403)
+        elif school_id:
+            # その他のケースでschool_idパラメータがある場合
             test_filter &= Q(student__classroom__school_id=school_id)
+        else:
+            # パラメータもユーザー情報もない場合はエラー
+            return Response({'error': 'Insufficient permissions or missing school parameter'}, status=403)
         
         # 生徒別の科目ごと合計点を計算
         student_subject_totals = Score.objects.filter(test_filter).values(
@@ -995,6 +1006,27 @@ class TestResultViewSet(viewsets.ModelViewSet):
                 'subjects_available': list(set().union(*[list(r['subject_results'].keys()) for r in results])),
                 'grade_distribution': {}
             }
+        })
+
+    @action(detail=False, methods=['get'], permission_classes=[])
+    def available_periods(self, request):
+        """利用可能な年度と期間の一覧を返す"""
+        from test_schedules.models import TestSchedule
+
+        # 全てのTestScheduleから年度と期間を取得
+        schedules = TestSchedule.objects.all().values('year', 'period').distinct().order_by('-year', 'period')
+
+        # 年度のリストを作成
+        years = sorted(list(set([s['year'] for s in schedules])), reverse=True)
+
+        # 期間のリストを作成（期間の順序を定義）
+        period_order = {'spring': 1, 'summer': 2, 'winter': 3}
+        periods_set = set([s['period'] for s in schedules])
+        periods = sorted(list(periods_set), key=lambda x: period_order.get(x, 999))
+
+        return Response({
+            'years': years,
+            'periods': periods
         })
 
 class CommentTemplateViewSet(viewsets.ModelViewSet):
@@ -1804,3 +1836,64 @@ class CommentTemplateV2ViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         return CommentTemplateV2.objects.filter(is_active=True)
+
+    @action(detail=False, methods=['get'], url_path='subject-comments')
+    def get_subject_comments(self, request):
+        """教科別・点数範囲別のコメントテンプレートを取得"""
+        subject = request.query_params.get('subject')
+
+        if not subject:
+            return Response(
+                {'error': 'subject parameter is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # 5つの点数範囲のテンプレートを取得
+        score_ranges = ['0-20', '21-40', '41-60', '61-80', '81-100']
+        templates = []
+
+        for score_range in score_ranges:
+            template = CommentTemplateV2.objects.filter(
+                category=f"{subject}_{score_range}",
+                is_active=True
+            ).first()
+
+            templates.append({
+                'score_range': score_range,
+                'template_id': template.id if template else None,
+                'title': template.title if template else f'{subject} {score_range}点',
+                'content': template.template_text if template else ''
+            })
+
+        return Response(templates)
+
+    @action(detail=False, methods=['post'], url_path='update-subject-comment')
+    def update_subject_comment(self, request):
+        """教科別コメントテンプレートを更新"""
+        subject = request.data.get('subject')
+        score_range = request.data.get('score_range')
+        content = request.data.get('content')
+
+        if not all([subject, score_range, content]):
+            return Response(
+                {'error': 'subject, score_range, and content are required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        category = f"{subject}_{score_range}"
+        template, created = CommentTemplateV2.objects.update_or_create(
+            category=category,
+            defaults={
+                'title': f'{subject} {score_range}点',
+                'template_text': content,
+                'applicable_scope': 'specific_subject',
+                'subject_filter': subject,
+                'is_active': True
+            }
+        )
+
+        return Response({
+            'success': True,
+            'template_id': template.id,
+            'created': created
+        })

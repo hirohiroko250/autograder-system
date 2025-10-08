@@ -186,9 +186,16 @@ function TestResultsContent({ year, period }: { year: string; period: string }) 
         return;
       }
 
+      // 認証トークンを取得
+      const token = localStorage.getItem('access_token');
+      if (!token) {
+        toast.error('認証トークンが見つかりません。再ログインしてください。');
+        return;
+      }
+
       // 新しいHTMLプレビューエンドポイントを開く
       const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL?.replace('/api', '') || 'https://kouzyoutest.com';
-      const previewUrl = `${baseUrl}/api/scores/preview-individual-report/?studentId=${studentId}&year=${year}&period=${period}`;
+      const previewUrl = `${baseUrl}/api/scores/preview-individual-report/?studentId=${studentId}&year=${year}&period=${period}&token=${token}`;
 
       // 新しいタブで開く
       window.open(previewUrl, '_blank');
@@ -208,10 +215,17 @@ function TestResultsContent({ year, period }: { year: string; period: string }) 
     }
 
     try {
+      // 認証トークンを取得
+      const token = localStorage.getItem('access_token');
+      if (!token) {
+        toast.error('認証トークンが見つかりません。再ログインしてください。');
+        return;
+      }
+
       // 新しいHTMLプレビューエンドポイントを開く
       const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL?.replace('/api', '') || 'https://kouzyoutest.com';
       const studentIdsParam = selectedStudents.join(',');
-      const previewUrl = `${baseUrl}/api/scores/preview-bulk-reports/?year=${year}&period=${period}&studentIds=${studentIdsParam}`;
+      const previewUrl = `${baseUrl}/api/scores/preview-bulk-reports/?year=${year}&period=${period}&studentIds=${studentIdsParam}&token=${token}`;
 
       // 新しいタブで開く
       window.open(previewUrl, '_blank');
