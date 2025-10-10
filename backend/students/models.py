@@ -4,7 +4,8 @@ from classrooms.models import Classroom
 
 class Student(models.Model):
     student_id = models.CharField(
-        max_length=10, 
+        max_length=10,
+        unique=True,  # 塾全体でユニーク
         validators=[RegexValidator(r'^\d{1,10}$', '1〜10桁の数字で入力してください')],
         verbose_name='生徒ID'
     )
@@ -14,14 +15,14 @@ class Student(models.Model):
     is_active = models.BooleanField(default=True, verbose_name='アクティブ')
     created_at = models.DateTimeField(auto_now_add=True, verbose_name='作成日時')
     updated_at = models.DateTimeField(auto_now=True, verbose_name='更新日時')
-    
+
     class Meta:
         db_table = 'students'
         verbose_name = '生徒'
         verbose_name_plural = '生徒'
-        unique_together = ['classroom', 'student_id']
         indexes = [
             models.Index(fields=['classroom', 'student_id']),
+            models.Index(fields=['student_id']),  # ユニーク制約用
             models.Index(fields=['is_active']),
         ]
     

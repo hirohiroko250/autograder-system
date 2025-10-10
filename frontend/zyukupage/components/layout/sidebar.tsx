@@ -86,7 +86,7 @@ export function Sidebar() {
               <img
                 src="/logo.png"
                 alt="全国学力向上テスト"
-                className="h-10 w-10 object-cover object-left"
+                className="h-10 w-auto object-contain"
               />
             </div>
           ) : (
@@ -95,7 +95,7 @@ export function Sidebar() {
                 <img
                   src="/logo.png"
                   alt="全国学力向上テスト"
-                  className="h-10 w-auto"
+                  className="h-10 w-auto object-contain"
                 />
               </div>
               <Button

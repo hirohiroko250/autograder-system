@@ -243,7 +243,7 @@ export function AdvancedSearch({
   return (
     <div className={`space-y-4 ${className}`}>
       {/* メイン検索バー */}
-      <div className="flex items-center gap-2">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
           <Input
@@ -254,85 +254,89 @@ export function AdvancedSearch({
             className="pl-10"
           />
         </div>
-        <Button onClick={executeSearch} className="px-6">
-          検索
-        </Button>
-        <Button
-          variant="outline"
-          onClick={() => setIsAdvancedOpen(!isAdvancedOpen)}
-          className="px-4"
-        >
-          <Filter className="h-4 w-4 mr-2" />
-          フィルター
-          {activeFilterCount > 0 && (
-            <Badge variant="secondary" className="ml-2 text-xs">
-              {activeFilterCount}
-            </Badge>
-          )}
-          {isAdvancedOpen ? (
-            <ChevronUp className="h-4 w-4 ml-2" />
-          ) : (
-            <ChevronDown className="h-4 w-4 ml-2" />
-          )}
-        </Button>
-        {(searchQuery || activeFilterCount > 0) && (
-          <Button variant="ghost" onClick={clearSearch} size="sm">
-            <X className="h-4 w-4" />
+        <div className="flex gap-2">
+          <Button onClick={executeSearch} className="flex-1 sm:flex-none sm:px-6">
+            検索
           </Button>
-        )}
+          <Button
+            variant="outline"
+            onClick={() => setIsAdvancedOpen(!isAdvancedOpen)}
+            className="flex-1 sm:flex-none sm:px-4"
+          >
+            <Filter className="h-4 w-4 sm:mr-2" />
+            <span className="hidden sm:inline">フィルター</span>
+            {activeFilterCount > 0 && (
+              <Badge variant="secondary" className="ml-2 text-xs">
+                {activeFilterCount}
+              </Badge>
+            )}
+            {isAdvancedOpen ? (
+              <ChevronUp className="h-4 w-4 ml-2" />
+            ) : (
+              <ChevronDown className="h-4 w-4 ml-2" />
+            )}
+          </Button>
+          {(searchQuery || activeFilterCount > 0) && (
+            <Button variant="ghost" onClick={clearSearch} size="sm" className="flex-shrink-0">
+              <X className="h-4 w-4" />
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* 結果件数表示 */}
       {showResultCount && (
-        <div className="flex items-center justify-between text-sm text-gray-600">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-sm text-gray-600">
           <span>{resultCount}件の結果</span>
           {(searchQuery || activeFilterCount > 0) && (
-            <div className="flex items-center gap-2">
-              <span>検索条件:</span>
-              {searchQuery && (
-                <Badge variant="outline">
-                  "{searchQuery}"
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-auto p-0 ml-1"
-                    onClick={() => setSearchQuery('')}
-                  >
-                    <X className="h-3 w-3" />
-                  </Button>
-                </Badge>
-              )}
-              {Object.entries(filters).map(([key, value]) => {
-                if (!value || (Array.isArray(value) && value.length === 0)) return null;
-                const option = filterOptions.find(opt => opt.key === key);
-                if (!option) return null;
-                
-                let displayValue: string;
-                if (Array.isArray(value)) {
-                  displayValue = `${value.length}個選択`;
-                } else if (option.type === 'range' && typeof value === 'object' && value !== null) {
-                  displayValue = `${value.min || '?'} - ${value.max || '?'}`;
-                } else if (option.options) {
-                  const selectedOption = option.options.find(opt => opt.value === value);
-                  displayValue = selectedOption?.label || String(value);
-                } else {
-                  displayValue = String(value);
-                }
-                
-                return (
-                  <Badge key={key} variant="secondary">
-                    {option.label}: {displayValue}
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+              <span className="hidden sm:inline">検索条件:</span>
+              <div className="flex flex-wrap items-center gap-2">
+                {searchQuery && (
+                  <Badge variant="outline">
+                    "{searchQuery}"
                     <Button
                       variant="ghost"
                       size="sm"
                       className="h-auto p-0 ml-1"
-                      onClick={() => removeFilter(key)}
+                      onClick={() => setSearchQuery('')}
                     >
                       <X className="h-3 w-3" />
                     </Button>
                   </Badge>
-                );
-              })}
+                )}
+                {Object.entries(filters).map(([key, value]) => {
+                  if (!value || (Array.isArray(value) && value.length === 0)) return null;
+                  const option = filterOptions.find(opt => opt.key === key);
+                  if (!option) return null;
+
+                  let displayValue: string;
+                  if (Array.isArray(value)) {
+                    displayValue = `${value.length}個選択`;
+                  } else if (option.type === 'range' && typeof value === 'object' && value !== null) {
+                    displayValue = `${value.min || '?'} - ${value.max || '?'}`;
+                  } else if (option.options) {
+                    const selectedOption = option.options.find(opt => opt.value === value);
+                    displayValue = selectedOption?.label || String(value);
+                  } else {
+                    displayValue = String(value);
+                  }
+
+                  return (
+                    <Badge key={key} variant="secondary" className="text-xs">
+                      {option.label}: {displayValue}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-auto p-0 ml-1"
+                        onClick={() => removeFilter(key)}
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
+                    </Badge>
+                  );
+                })}
+              </div>
             </div>
           )}
         </div>

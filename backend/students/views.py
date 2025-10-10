@@ -104,22 +104,29 @@ class StudentViewSet(viewsets.ModelViewSet):
     
     @action(detail=False, methods=['get'])
     def next_id(self, request):
-        classroom_id = request.query_params.get('classroom')
-        if not classroom_id:
+        from .utils import generate_student_id
+        from classrooms.models import Classroom
+
+        classroom_param = request.query_params.get('classroom')
+        if not classroom_param:
             return Response(
                 {'error': 'classroom パラメータが必要です'},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        
-        last_student = Student.objects.filter(
-            classroom__classroom_id=classroom_id
-        ).order_by('-student_id').first()
-        
-        if last_student:
-            next_id = str(int(last_student.student_id) + 1).zfill(6)
-        else:
-            next_id = '000001'
-        
+
+        try:
+            # まずprimary keyで検索を試み、見つからなければclassroom_idで検索
+            try:
+                classroom = Classroom.objects.get(id=int(classroom_param))
+            except (ValueError, Classroom.DoesNotExist):
+                classroom = Classroom.objects.get(classroom_id=classroom_param)
+        except Classroom.DoesNotExist:
+            return Response(
+                {'error': '教室が見つかりません'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        next_id = generate_student_id(classroom)
         return Response({'next_id': next_id})
     
     @action(detail=False, methods=['post'])
@@ -425,7 +432,7 @@ class StudentViewSet(viewsets.ModelViewSet):
     
     @action(detail=False, methods=['get'])
     def export_data(self, request):
-        """生徒データをExcelファイルでエクスポート（新形式：受講履歴を含む）"""
+        """生徒データをCSVファイルでエクスポート（新形式：受講履歴を含む）"""
         students = self.get_queryset().select_related('classroom__school').prefetch_related('enrollments')
         
         # データをDataFrameに変換（受講履歴ごとに行を作成）
@@ -468,19 +475,19 @@ class StudentViewSet(viewsets.ModelViewSet):
                     })
         
         df = pd.DataFrame(data)
-        
-        # Excelファイルを生成
-        with tempfile.NamedTemporaryFile(delete=False, suffix='.xlsx') as tmp_file:
-            df.to_excel(tmp_file.name, index=False)
+
+        # CSVファイルを生成（BOM付きUTF-8）
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.csv', mode='w', encoding='utf-8-sig') as tmp_file:
+            df.to_csv(tmp_file, index=False)
             tmp_file_path = tmp_file.name
-        
+
         try:
             with open(tmp_file_path, 'rb') as f:
                 response = HttpResponse(
                     f.read(),
-                    content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+                    content_type='text/csv; charset=utf-8-sig'
                 )
-                response['Content-Disposition'] = 'attachment; filename="students_data.xlsx"'
+                response['Content-Disposition'] = 'attachment; filename="students_data.csv"'
                 return response
         finally:
             os.unlink(tmp_file_path)

@@ -117,14 +117,14 @@ export default function ClassroomsPage() {
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold">教室管理</h1>
-            <p className="text-muted-foreground">
+            <h1 className="text-2xl sm:text-3xl font-bold">教室管理</h1>
+            <p className="text-sm sm:text-base text-muted-foreground">
               教室の登録・管理を行います
             </p>
           </div>
-          <Button onClick={() => setIsModalOpen(true)}>
+          <Button onClick={() => setIsModalOpen(true)} className="w-full sm:w-auto" size="sm">
             <Plus className="mr-2 h-4 w-4" />
             新しい教室を登録
           </Button>
@@ -185,7 +185,7 @@ export default function ClassroomsPage() {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
                 <input
@@ -196,12 +196,14 @@ export default function ClassroomsPage() {
                   className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 />
               </div>
-              <Button onClick={() => handleSearch(searchQuery, {})}>
-                検索
-              </Button>
-              <Button variant="outline" onClick={handleClearSearch}>
-                クリア
-              </Button>
+              <div className="flex gap-2">
+                <Button onClick={() => handleSearch(searchQuery, {})} className="flex-1 sm:flex-none" size="sm">
+                  検索
+                </Button>
+                <Button variant="outline" onClick={handleClearSearch} className="flex-1 sm:flex-none" size="sm">
+                  クリア
+                </Button>
+              </div>
             </div>
             <div className="mt-2 text-sm text-gray-600">
               {filteredClassrooms.length}件の結果
@@ -222,14 +224,14 @@ export default function ClassroomsPage() {
               {filteredClassrooms.map((classroom) => (
                 <div
                   key={classroom.id}
-                  className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 transition-colors"
+                  className="flex flex-col sm:flex-row sm:items-center gap-4 p-4 border rounded-lg hover:bg-gray-50 transition-colors"
                 >
-                  <Link 
+                  <Link
                     href={`/classrooms/${classroom.id}`}
-                    className="flex items-center space-x-4 flex-1 cursor-pointer"
+                    className="flex items-center justify-between flex-1 cursor-pointer group"
                   >
-                    <div>
-                      <h3 className="font-semibold hover:text-blue-600 transition-colors">
+                    <div className="flex-1">
+                      <h3 className="font-semibold group-hover:text-blue-600 transition-colors">
                         {classroom.name}
                       </h3>
                       <p className="text-sm text-muted-foreground">
@@ -239,29 +241,28 @@ export default function ClassroomsPage() {
                         学校: {classroom.school_name}
                       </p>
                     </div>
-                    <div className="flex items-center">
-                      <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                    </div>
+                    <ChevronRight className="hidden sm:block h-5 w-5 text-muted-foreground flex-shrink-0" />
                   </Link>
-                  
-                  <div className="flex items-center space-x-4">
-                    <div className="text-right">
+
+                  <div className="flex items-center justify-between sm:justify-end gap-3 sm:gap-4">
+                    <div className="text-left sm:text-right">
                       <p className="font-medium">{(classroom as any).student_count || 0}名</p>
-                      <p className="text-sm text-muted-foreground">生徒数</p>
+                      <p className="text-xs text-muted-foreground">生徒数</p>
                     </div>
-                    
-                    <Badge variant={classroom.is_active ? 'default' : 'secondary'}>
+
+                    <Badge variant={classroom.is_active ? 'default' : 'secondary'} className="flex-shrink-0">
                       {classroom.is_active ? 'アクティブ' : '非アクティブ'}
                     </Badge>
-                    
-                    <Button 
-                      variant="outline" 
+
+                    <Button
+                      variant="outline"
                       size="sm"
                       onClick={(e) => {
                         e.preventDefault();
                         setSelectedClassroom(classroom as any);
                         setIsEditModalOpen(true);
                       }}
+                      className="flex-shrink-0"
                     >
                       <Settings className="h-4 w-4" />
                     </Button>

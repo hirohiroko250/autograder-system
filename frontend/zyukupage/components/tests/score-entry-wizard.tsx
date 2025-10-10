@@ -473,22 +473,28 @@ export function ScoreEntryWizard({ year, period }: ScoreEntryWizardProps) {
     }
 
     try {
-      toast.info('全学年対応テンプレートをダウンロードしています...');
-      
-      // 全学年対応テンプレートAPIを呼び出し（ファイルダウンロード）
-      const response = await testApi.generateAllGradesTemplate({
+      toast.info('生徒データ（得点入り）をダウンロードしています...');
+
+      // 実データエクスポートAPIを呼び出し（生徒情報+既存の点数）
+      const response = await testApi.exportScoresWithStudents({
         year: parseInt(year),
         period: currentPeriod
       });
 
-      if (response.success) {
-        toast.success('全学年対応テンプレートファイルをダウンロードしました');
-      } else {
-        toast.error(`テンプレート生成に失敗しました: ${response.message || '不明なエラー'}`);
+      console.log('Export response:', response);
+
+      // responseがundefinedでないことを確認
+      if (response && response.success === true) {
+        toast.success('生徒データ（得点入り）をダウンロードしました');
+      } else if (response && response.success === false) {
+        // 明示的にfalseの場合のみエラー表示
+        console.error('Export failed:', response);
+        toast.error(`エクスポートに失敗しました: ${response.message || response.error || '不明なエラー'}`);
       }
-    } catch (error) {
-      console.error('All grades template download error:', error);
-      toast.error('全学年対応テンプレートのダウンロードに失敗しました');
+      // response.successが未定義の場合は何も表示しない（ダウンロードは成功している）
+    } catch (error: any) {
+      console.error('Export error:', error);
+      toast.error(`生徒データのエクスポートに失敗しました: ${error.message || ''}`);
     }
   };
 

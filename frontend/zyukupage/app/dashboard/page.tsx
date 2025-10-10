@@ -82,9 +82,9 @@ export default function DashboardPage() {
   return (
     <ProtectedRoute>
       <DashboardLayout>
-        <div className="space-y-6 animate-fade-in">
-        <div className="flex items-center justify-between">
-          <h1 className="text-3xl font-bold">ダッシュボード</h1>
+        <div className="space-y-4 sm:space-y-6 animate-fade-in">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
+          <h1 className="text-xl sm:text-2xl md:text-3xl font-bold">ダッシュボード</h1>
           <div className="flex items-center gap-4">
             <YearPicker value={selectedYear} onValueChange={setSelectedYear} />
           </div>
@@ -125,34 +125,36 @@ export default function DashboardPage() {
             <CardContent>
               <div className="space-y-4">
                 {(enrolledStudents?.length || 0) > 0 ? (
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>生徒</TableHead>
-                        <TableHead>学年</TableHead>
-                        <TableHead>教室</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {enrolledStudents?.slice(0, 5).map((student: any) => (
-                        <TableRow key={student.id}>
-                          <TableCell>
-                            <div className="flex items-center gap-3">
-                              <Avatar className="h-8 w-8">
-                                <AvatarFallback>{student.name?.charAt(0) || 'S'}</AvatarFallback>
-                              </Avatar>
-                              <div>
-                                <div className="font-medium">{student.name}</div>
-                                <div className="text-sm text-muted-foreground">ID: {student.student_id}</div>
-                              </div>
-                            </div>
-                          </TableCell>
-                          <TableCell>{formatGrade(student.grade)}</TableCell>
-                          <TableCell>{student.classroom?.name || student.classroom_name || '未設定'}</TableCell>
+                  <div className="overflow-x-auto -mx-4 sm:mx-0">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="px-2 sm:px-4">生徒</TableHead>
+                          <TableHead className="px-2 sm:px-4">学年</TableHead>
+                          <TableHead className="px-2 sm:px-4 hidden sm:table-cell">教室</TableHead>
                         </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
+                      </TableHeader>
+                      <TableBody>
+                        {enrolledStudents?.slice(0, 5).map((student: any) => (
+                          <TableRow key={student.id}>
+                            <TableCell className="px-2 sm:px-4">
+                              <div className="flex items-center gap-2 sm:gap-3">
+                                <Avatar className="h-8 w-8">
+                                  <AvatarFallback>{student.name?.charAt(0) || 'S'}</AvatarFallback>
+                                </Avatar>
+                                <div>
+                                  <div className="font-medium text-sm sm:text-base">{student.name}</div>
+                                  <div className="text-xs sm:text-sm text-muted-foreground">ID: {student.student_id}</div>
+                                </div>
+                              </div>
+                            </TableCell>
+                            <TableCell className="px-2 sm:px-4 text-sm sm:text-base">{formatGrade(student.grade)}</TableCell>
+                            <TableCell className="px-2 sm:px-4 text-sm sm:text-base hidden sm:table-cell">{student.classroom?.name || student.classroom_name || '未設定'}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
                 ) : (
                   <div className="text-center py-8 text-muted-foreground">
                     選択した期間に受講している生徒はいません

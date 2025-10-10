@@ -452,36 +452,21 @@ export function ScoreEntryWizard({ year, period }: ScoreEntryWizardProps) {
     }
 
     try {
-      toast.info('全学年対応テンプレートをダウンロードしています...');
-      
-      // 全学年対応テンプレートAPIを呼び出し
-      const response = await testApi.generateAllGradesTemplate({
+      toast.info('生徒データ（得点入り）をダウンロードしています...');
+
+      // 実データエクスポートAPIを呼び出し（生徒情報+既存の点数、classroom用）
+      const response = await testApi.exportScoresWithStudents({
         year: parseInt(year),
         period: currentPeriod
       });
 
-      if (response.success && response.csv_data) {
-        // BOM付きUTF-8でCSVファイルを作成
-        const csv = response.csv_data;
-        const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
-        const link = document.createElement('a');
-        link.href = URL.createObjectURL(blob);
-        
-        // 全教科情報を含むファイル名
-        const subjectsDisplay = response.subjects.map((s: any) => s.subject_display).join('_');
-        
-        link.download = `全国学力向上テスト_${year}_${currentPeriod}_全学年_${subjectsDisplay}.csv`;
-        link.click();
-        
-        toast.success(
-          `全学年対応テンプレートファイルをダウンロードしました（${response.total_subjects}教科対応）`
-        );
-      } else {
-        toast.error(`テンプレート生成に失敗しました: ${response.error || '不明なエラー'}`);
+      if (response && response.success === true) {
+        toast.success('生徒データ（得点入り）をダウンロードしました');
+      } else if (response && response.success === false) {
+        toast.error(`エクスポートに失敗しました: ${response.message || response.error || '不明なエラー'}`);
       }
-    } catch (error) {
-      console.error('All grades template download error:', error);
-      toast.error('全学年対応テンプレートのダウンロードに失敗しました');
+    } catch (error: any) {
+      toast.error(`生徒データのエクスポートに失敗しました: ${error.message || ''}`);
     }
   };
 

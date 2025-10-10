@@ -7,10 +7,38 @@ import random
 import string
 
 def generate_student_id(classroom):
-    """生徒IDを生成（教室ID + 連番3桁）"""
-    existing_students = Student.objects.filter(classroom=classroom).count()
-    next_number = existing_students + 1
-    return f"{classroom.classroom_id}{next_number:03d}"
+    """
+    生徒IDを生成（塾ID + 連番4桁）
+    例: 塾ID=999999 → 999999001, 999999002, ...
+
+    競合を防ぐため、データベースから最大値を取得して+1する
+    """
+    from django.db.models import Max
+
+    school_id = classroom.school.school_id
+
+    # この塾の既存の生徒IDから最大値を取得
+    # student_idは文字列なので、塾IDで始まるものをフィルタリング
+    max_student = Student.objects.filter(
+        student_id__startswith=school_id
+    ).aggregate(Max('student_id'))
+
+    max_id = max_student['student_id__max']
+
+    if max_id:
+        # 既存の最大IDから連番部分を抽出して+1
+        try:
+            last_number = int(max_id[len(school_id):])
+            next_number = last_number + 1
+        except (ValueError, IndexError):
+            # パースエラーの場合は1から開始
+            next_number = 1
+    else:
+        # この塾の最初の生徒
+        next_number = 1
+
+    # 塾ID + 4桁の連番（最大9999人）
+    return f"{school_id}{next_number:04d}"
 
 def import_students_from_excel(file_path, classroom_id):
     """

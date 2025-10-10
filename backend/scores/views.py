@@ -209,7 +209,201 @@ class ScoreViewSet(viewsets.ModelViewSet):
                 'success': False,
                 'error': str(e)
             }, status=500)
-    
+
+    @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
+    def export_scores_with_students(self, request):
+        """実際の生徒データと既存の点数を含むCSVエクスポート"""
+        try:
+            year = request.query_params.get('year')
+            period = request.query_params.get('period')
+
+            if not year or not period:
+                return Response({
+                    'success': False,
+                    'error': 'year と period パラメータが必要です'
+                }, status=400)
+
+            from students.models import Student, StudentEnrollment
+            from tests.models import TestDefinition, TestSchedule, QuestionGroup
+            from django.db.models import Q
+            import pandas as pd
+            import tempfile
+            import os
+
+            # 指定された年度・期間のテストスケジュールを取得
+            try:
+                schedule = TestSchedule.objects.get(year=int(year), period=period)
+            except TestSchedule.DoesNotExist:
+                return Response({
+                    'success': False,
+                    'error': f'{year}年度{period}期のテストスケジュールが見つかりません'
+                }, status=404)
+
+            # その期間に登録されている生徒を取得（StudentEnrollment経由）
+            enrollments = StudentEnrollment.objects.filter(
+                year=int(year),
+                period=period
+            ).select_related('student', 'student__classroom', 'student__classroom__school')
+
+            # ユーザーの権限に応じてフィルタリング
+            user = request.user
+            if user.role == 'school_admin' and hasattr(user, 'school_id'):
+                enrollments = enrollments.filter(
+                    student__classroom__school__school_id=user.school_id
+                )
+            elif user.role == 'classroom_admin' and hasattr(user, 'classroom_id'):
+                enrollments = enrollments.filter(
+                    student__classroom__classroom_id=user.classroom_id
+                )
+
+            # 全テスト定義を取得
+            test_definitions = TestDefinition.objects.filter(schedule=schedule)
+
+            # 大問グループ情報を事前に取得
+            question_groups_by_test = {}
+            for test_def in test_definitions:
+                question_groups = list(QuestionGroup.objects.filter(test=test_def).order_by('group_number'))
+                question_groups_by_test[test_def.id] = question_groups
+
+            # CSVのカラムを動的に生成
+            columns = ['塾ID', '塾名', '教室ID', '教室名', '生徒ID', '生徒名', '学年', '年度', '期間', '出席']
+
+            # 教科ごとの大問列を追加（大問数が最も多いテストを使用して重複を防ぐ）
+            subject_columns = {}
+            subject_max_questions = {}  # 各教科の最大大問数を記録
+
+            for test_def in test_definitions:
+                subject_display = test_def.get_subject_display()
+                question_groups = question_groups_by_test[test_def.id]
+
+                # 各教科で最も大問数が多いテスト構造を使用
+                if subject_display not in subject_max_questions or len(question_groups) > subject_max_questions[subject_display]:
+                    subject_max_questions[subject_display] = len(question_groups)
+                    subject_columns[subject_display] = []
+
+                    for qg in question_groups:
+                        subject_columns[subject_display].append(f'{subject_display}_大問{qg.group_number}')
+                    subject_columns[subject_display].append(f'{subject_display}_合計点')
+
+            # カラムを追加（国語、算数の順）
+            for subject in ['国語', '算数', '英語', '数学']:
+                if subject in subject_columns:
+                    columns.extend(subject_columns[subject])
+
+            columns.append('全体合計点')
+
+            # 全ての生徒IDを取得
+            student_ids = [enrollment.student.id for enrollment in enrollments]
+
+            # 全生徒の全スコアを一括取得（N+1問題を解決）
+            all_scores = Score.objects.filter(
+                student__id__in=student_ids,
+                test__schedule=schedule
+            ).select_related('student', 'test', 'question_group').values(
+                'student_id',
+                'test_id',
+                'question_group_id',
+                'score',
+                'attendance',
+                'question_group__group_number'
+            )
+
+            # スコアを辞書形式で整理: student_id -> test_id -> question_group_id -> score_data
+            scores_dict = {}
+            for score_data in all_scores:
+                student_id = score_data['student_id']
+                test_id = score_data['test_id']
+                qg_id = score_data['question_group_id']
+
+                if student_id not in scores_dict:
+                    scores_dict[student_id] = {}
+                if test_id not in scores_dict[student_id]:
+                    scores_dict[student_id][test_id] = {}
+
+                scores_dict[student_id][test_id][qg_id] = score_data
+
+            # データ行を生成
+            data_rows = []
+
+            for enrollment in enrollments:
+                student = enrollment.student
+
+                row_data = {
+                    '塾ID': student.classroom.school.school_id if student.classroom else '',
+                    '塾名': student.classroom.school.name if student.classroom else '',
+                    '教室ID': student.classroom.classroom_id if student.classroom else '',
+                    '教室名': student.classroom.name if student.classroom else '',
+                    '生徒ID': student.student_id,
+                    '生徒名': student.name,
+                    '学年': student.grade,
+                    '年度': year,
+                    '期間': {'spring': '春期', 'summer': '夏期', 'winter': '冬期'}.get(period, period),
+                    '出席': '出席',  # デフォルトは出席
+                }
+
+                total_score = 0
+                student_scores = scores_dict.get(student.id, {})
+
+                # 各教科の点数を取得
+                for test_def in test_definitions:
+                    subject_display = test_def.get_subject_display()
+                    question_groups = question_groups_by_test[test_def.id]
+                    subject_total = 0
+                    test_scores = student_scores.get(test_def.id, {})
+
+                    # 生徒のこの教科のテストの全スコアを取得
+                    for qg in question_groups:
+                        col_name = f'{subject_display}_大問{qg.group_number}'
+
+                        # 既存の点数を辞書から取得（キーはquestion_group_id）
+                        score_data = test_scores.get(qg.id)
+
+                        if score_data:
+                            row_data[col_name] = score_data['score']
+                            subject_total += score_data['score']
+                            if not score_data['attendance']:
+                                row_data['出席'] = '欠席'
+                        else:
+                            row_data[col_name] = ''  # 未入力は空欄
+
+                    row_data[f'{subject_display}_合計点'] = subject_total if subject_total > 0 else ''
+                    total_score += subject_total
+
+                row_data['全体合計点'] = total_score if total_score > 0 else ''
+                data_rows.append(row_data)
+
+            # DataFrameを作成
+            df = pd.DataFrame(data_rows, columns=columns)
+
+            # CSVファイルとしてHTTPレスポンスを生成（BOM付きUTF-8）
+            with tempfile.NamedTemporaryFile(delete=False, suffix='.csv', mode='w', encoding='utf-8-sig') as tmp_file:
+                df.to_csv(tmp_file, index=False)
+                tmp_file_path = tmp_file.name
+
+            try:
+                # ファイル名を生成
+                period_display = {'spring': '春期', 'summer': '夏期', 'winter': '冬期'}.get(period, period)
+                filename = f"生徒データ_得点入り_{year}年{period_display}.csv"
+
+                with open(tmp_file_path, 'rb') as f:
+                    response = HttpResponse(
+                        f.read(),
+                        content_type='text/csv; charset=utf-8-sig'
+                    )
+                    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+
+                return response
+            finally:
+                os.unlink(tmp_file_path)
+
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            return Response({
+                'success': False,
+                'error': str(e)
+            }, status=500)
+
     @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated])
     def import_excel(self, request):
         """ExcelまたはCSVファイルからスコアを一括インポート"""

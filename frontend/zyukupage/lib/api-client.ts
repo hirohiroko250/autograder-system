@@ -430,37 +430,112 @@ export const testApi = {
 
   // 全学年対応スコアテンプレート生成（CSV形式）
   generateAllGradesTemplate: async (params: { year: number; period: string }): Promise<any> => {
-    const response = await apiClient.get('/scores/generate_all_grades_template/', { 
-      params,
-      responseType: 'blob'
-    });
-    
-    // Blobレスポンスをファイルダウンロード用に処理
-    const blob = new Blob([response.data], { 
-      type: 'text/csv; charset=utf-8-sig' 
-    });
-    
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    
-    // レスポンスヘッダーからファイル名を取得
-    const contentDisposition = response.headers['content-disposition'] || response.headers['Content-Disposition'];
-    let filename = `スコア入力テンプレート_${params.year}_${params.period}.csv`;
-    
-    if (contentDisposition) {
-      const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
-      if (filenameMatch && filenameMatch[1]) {
-        filename = filenameMatch[1].replace(/['"]/g, '');
+    try {
+      const response = await apiClient.get('/scores/generate_all_grades_template/', {
+        params,
+        responseType: 'blob'
+      });
+
+      // エラーレスポンスの場合（BlobがJSONエラーの場合）
+      if (response.data.type === 'application/json') {
+        const text = await response.data.text();
+        const error = JSON.parse(text);
+        return {
+          success: false,
+          message: error.error || error.detail || '不明なエラー',
+          error: error.error || error.detail
+        };
       }
+
+      // Blobレスポンスをファイルダウンロード用に処理
+      const blob = new Blob([response.data], {
+        type: 'text/csv; charset=utf-8-sig'
+      });
+
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+
+      // レスポンスヘッダーからファイル名を取得
+      const contentDisposition = response.headers['content-disposition'] || response.headers['Content-Disposition'];
+      let filename = `スコア入力テンプレート_${params.year}_${params.period}.csv`;
+
+      if (contentDisposition) {
+        const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+        if (filenameMatch && filenameMatch[1]) {
+          filename = filenameMatch[1].replace(/['"]/g, '');
+        }
+      }
+
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(link.href);
+
+      return { success: true, message: 'CSVファイルをダウンロードしました' };
+    } catch (error: any) {
+      console.error('generateAllGradesTemplate error:', error);
+      return {
+        success: false,
+        message: error.response?.data?.error || error.message || '不明なエラー',
+        error: error.response?.data?.error || error.message
+      };
     }
-    
-    link.download = filename;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(link.href);
-    
-    return { success: true, message: 'CSVファイルをダウンロードしました' };
+  },
+
+  // 実際の生徒データと既存の点数を含むCSVエクスポート
+  exportScoresWithStudents: async (params: { year: number; period: string }): Promise<any> => {
+    try {
+      const response = await apiClient.get('/scores/export_scores_with_students/', {
+        params,
+        responseType: 'blob'
+      });
+
+      // エラーレスポンスの場合（BlobがJSONエラーの場合）
+      if (response.data.type === 'application/json') {
+        const text = await response.data.text();
+        const error = JSON.parse(text);
+        return {
+          success: false,
+          message: error.error || error.detail || '不明なエラー',
+          error: error.error || error.detail
+        };
+      }
+
+      // Blobレスポンスをファイルダウンロード用に処理
+      const blob = new Blob([response.data], {
+        type: 'text/csv; charset=utf-8-sig'
+      });
+
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+
+      // レスポンスヘッダーからファイル名を取得
+      const contentDisposition = response.headers['content-disposition'] || response.headers['Content-Disposition'];
+      let filename = `生徒データ_得点入り_${params.year}_${params.period}.csv`;
+
+      if (contentDisposition) {
+        const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+        if (filenameMatch && filenameMatch[1]) {
+          filename = filenameMatch[1].replace(/['"]/g, '');
+        }
+      }
+
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(link.href);
+
+      return { success: true, message: 'CSVファイルをダウンロードしました' };
+    } catch (error: any) {
+      console.error('exportScoresWithStudents error:', error);
+      return {
+        success: false,
+        message: error.response?.data?.error || error.message || '不明なエラー',
+        error: error.response?.data?.error || error.message
+      };
+    }
   },
 
   // スコアデータファイルインポート
@@ -629,6 +704,21 @@ export const commentApi = {
 
   deleteCommentTemplateV2: async (id: string): Promise<void> => {
     await apiClient.delete(`/comment-templates/${id}/`);
+  },
+
+  // 教科別コメントテンプレート関連
+  getSubjectCommentTemplates: async (subject: string): Promise<any[]> => {
+    const response = await apiClient.get<any[]>(`/comment-templates-v2/subject-comments/?subject=${subject}`);
+    return response.data;
+  },
+
+  updateSubjectCommentTemplate: async (data: {
+    subject: string;
+    score_range: string;
+    content: string;
+  }): Promise<any> => {
+    const response = await apiClient.post<any>('/comment-templates-v2/update-subject-comment/', data);
+    return response.data;
   },
 
   // 個別問題関連

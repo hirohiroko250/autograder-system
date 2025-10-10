@@ -515,6 +515,61 @@ export const testApi = {
     const response = await apiClient.post<any>('/individual-problem-scores/get_score_based_comments/', params);
     return response.data;
   },
+
+  // 生徒データと既存点数のエクスポート
+  exportScoresWithStudents: async (params: { year: number; period: string }): Promise<any> => {
+    try {
+      const response = await apiClient.get('/scores/export_scores_with_students/', {
+        params,
+        responseType: 'blob'
+      });
+
+      // Check if Blob is actually a JSON error
+      if (response.data.type === 'application/json') {
+        const text = await response.data.text();
+        const error = JSON.parse(text);
+        return {
+          success: false,
+          message: error.error || error.detail || '不明なエラー',
+          error: error.error || error.detail
+        };
+      }
+
+      // Download the Blob as a file
+      const blob = new Blob([response.data], {
+        type: 'text/csv; charset=utf-8-sig'
+      });
+
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+
+      // Get filename from Content-Disposition header
+      const contentDisposition = response.headers['content-disposition'] || response.headers['Content-Disposition'];
+      let filename = `生徒データ_得点入り_${params.year}_${params.period}.csv`;
+
+      if (contentDisposition) {
+        const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+        if (filenameMatch && filenameMatch[1]) {
+          filename = filenameMatch[1].replace(/['"]/g, '');
+        }
+      }
+
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(link.href);
+
+      return { success: true, message: 'CSVファイルをダウンロードしました' };
+    } catch (error: any) {
+      console.error('exportScoresWithStudents error:', error);
+      return {
+        success: false,
+        message: error.response?.data?.error || error.message || '不明なエラー',
+        error: error.response?.data?.error || error.message
+      };
+    }
+  },
 };
 
 export const commentApi = {
@@ -629,6 +684,21 @@ export const commentApi = {
 
   deleteCommentTemplateV2: async (id: string): Promise<void> => {
     await apiClient.delete(`/comment-templates-v2/${id}/`);
+  },
+
+  // 教科別コメントテンプレート関連
+  getSubjectCommentTemplates: async (subject: string): Promise<any[]> => {
+    const response = await apiClient.get<any[]>(`/comment-templates/subject-comments/?subject=${subject}`);
+    return response.data;
+  },
+
+  updateSubjectCommentTemplate: async (data: {
+    subject: string;
+    score_range: string;
+    content: string;
+  }): Promise<any> => {
+    const response = await apiClient.post<any>('/comment-templates/update-subject-comment/', data);
+    return response.data;
   },
 
   // 個別問題関連

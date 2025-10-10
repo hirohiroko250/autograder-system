@@ -6,7 +6,8 @@ class StudentSerializer(serializers.ModelSerializer):
     year = serializers.IntegerField(write_only=True, required=False)
     period = serializers.CharField(write_only=True, required=False)
     latest_enrollment = serializers.SerializerMethodField()
-    
+    student_id = serializers.CharField(required=False, allow_blank=True)
+
     class Meta:
         model = Student
         fields = ['id', 'student_id', 'classroom', 'classroom_name', 'name', 'grade', 'is_active', 'created_at', 'updated_at', 'year', 'period', 'latest_enrollment']
@@ -22,11 +23,19 @@ class StudentSerializer(serializers.ModelSerializer):
         return None
 
     def create(self, validated_data):
+        from .utils import generate_student_id
+
         year = validated_data.pop('year', None)
         period = validated_data.pop('period', None)
-        
+
+        # student_idが指定されていない場合、自動生成
+        if 'student_id' not in validated_data or not validated_data.get('student_id'):
+            classroom = validated_data.get('classroom')
+            if classroom:
+                validated_data['student_id'] = generate_student_id(classroom)
+
         student = Student.objects.create(**validated_data)
-        
+
         # 年度と期間が指定されている場合、StudentEnrollmentを作成
         if year and period:
             StudentEnrollment.objects.create(
@@ -34,7 +43,7 @@ class StudentSerializer(serializers.ModelSerializer):
                 year=year,
                 period=period
             )
-        
+
         return student
 
 class StudentEnrollmentSerializer(serializers.ModelSerializer):

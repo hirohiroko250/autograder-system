@@ -8,13 +8,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowLeft, User, GraduationCap, Calendar, BookOpen, Trophy, TrendingUp, MessageSquare } from 'lucide-react';
+import { ArrowLeft, User, GraduationCap, Calendar, BookOpen, Trophy, TrendingUp } from 'lucide-react';
 import { useState } from 'react';
 import { studentApi, testApi } from '@/lib/api-client';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { CommentManager } from '@/components/comments';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 interface StudentDetailPageProps {
   params: {
@@ -396,20 +394,8 @@ export default function StudentDetailPage({ params }: StudentDetailPageProps) {
           </CardContent>
         </Card>
 
-        {/* タブ式コンテンツ */}
-        <Tabs defaultValue="test-results" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="test-results">
-              <Trophy className="h-4 w-4 mr-2" />
-              テスト結果
-            </TabsTrigger>
-            <TabsTrigger value="comments">
-              <MessageSquare className="h-4 w-4 mr-2" />
-              コメント管理
-            </TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="test-results">
+        {/* テスト結果 */}
+        <div className="space-y-6">
             {/* 教科別最新成績カード */}
             {Object.entries(subjectData).map(([key, data]: [string, any]) => 
               data.results.length > 0 && (
@@ -648,18 +634,7 @@ export default function StudentDetailPage({ params }: StudentDetailPageProps) {
                 )}
               </CardContent>
             </Card>
-          </TabsContent>
-
-          <TabsContent value="comments">
-            {student && (
-              <CommentManager
-                studentId={student.id.toString()}
-                studentName={student.name}
-                showTestComments={true}
-              />
-            )}
-          </TabsContent>
-        </Tabs>
+        </div>
       </div>
     </DashboardLayout>
   );

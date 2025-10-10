@@ -685,7 +685,7 @@ class CommentTemplateV2(models.Model):
         """使用回数をインクリメント"""
         self.usage_count += 1
         self.save(update_fields=['usage_count'])
-    
+
     def is_applicable_for_score(self, score, max_score):
         """得点に対して適用可能かチェック"""
         if self.score_range_min is not None and score < self.score_range_min:
@@ -784,3 +784,111 @@ class PastDataImport(models.Model):
         timestamp = timezone.now().strftime('%Y-%m-%d %H:%M:%S')
         new_log = f"[{timestamp}] {message}\n"
         self.processing_log = (self.processing_log or '') + new_log
+
+
+class SubjectGeneralComment(models.Model):
+    """教科別総評コメント"""
+    SUBJECT_CHOICES = [
+        ('japanese', '国語'),
+        ('math', '算数'),
+    ]
+
+    SCORE_RANGE_CHOICES = [
+        ('0-20', '0-20点'),
+        ('21-40', '21-40点'),
+        ('41-60', '41-60点'),
+        ('61-80', '61-80点'),
+        ('81-100', '81-100点'),
+    ]
+
+    student = models.ForeignKey(Student, on_delete=models.CASCADE, related_name='subject_general_comments')
+    test = models.ForeignKey(TestDefinition, on_delete=models.CASCADE, related_name='subject_general_comments')
+    subject = models.CharField(max_length=20, choices=SUBJECT_CHOICES, verbose_name='教科')
+    score = models.IntegerField(verbose_name='得点')
+    score_range = models.CharField(max_length=10, choices=SCORE_RANGE_CHOICES, verbose_name='点数範囲', blank=True)
+    comment_text = models.TextField(verbose_name='総評コメント')
+    template_used = models.ForeignKey(
+        CommentTemplateV2,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='subject_comments',
+        verbose_name='使用テンプレート'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'subject_general_comments'
+        verbose_name = '教科別総評コメント'
+        verbose_name_plural = '教科別総評コメント'
+        unique_together = ['student', 'test', 'subject']
+        indexes = [
+            models.Index(fields=['student', 'test']),
+            models.Index(fields=['subject']),
+            models.Index(fields=['score_range']),
+        ]
+
+    def save(self, *args, **kwargs):
+        """保存時に点数範囲を自動設定"""
+        if self.score is not None:
+            if 0 <= self.score <= 20:
+                self.score_range = '0-20'
+            elif 21 <= self.score <= 40:
+                self.score_range = '21-40'
+            elif 41 <= self.score <= 60:
+                self.score_range = '41-60'
+            elif 61 <= self.score <= 80:
+                self.score_range = '61-80'
+            elif 81 <= self.score <= 100:
+                self.score_range = '81-100'
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.student.student_name} - {self.test} - {self.get_subject_display()} ({self.score}点)"
+
+    @classmethod
+    def get_or_create_from_score(cls, student, test, subject, score):
+        """得点から自動的にコメントを取得または作成"""
+        comment, created = cls.objects.get_or_create(
+            student=student,
+            test=test,
+            subject=subject,
+            defaults={'score': score, 'comment_text': ''}
+        )
+
+        if created or not comment.comment_text:
+            # テンプレートから自動選択
+            template = cls.get_template_for_score(subject, score)
+            if template:
+                comment.comment_text = template.template_text
+                comment.template_used = template
+                comment.save()
+
+        return comment
+
+    @classmethod
+    def get_template_for_score(cls, subject, score):
+        """点数に応じた適切なテンプレートを取得"""
+        from django.db.models import Q
+
+        # 教科と点数範囲に合致するテンプレートを検索
+        templates = CommentTemplateV2.objects.filter(
+            Q(subject_filter=subject) | Q(subject_filter=''),
+            is_active=True
+        )
+
+        # 点数範囲でフィルタリング
+        applicable_templates = []
+        for template in templates:
+            if template.score_range_min is not None and score < template.score_range_min:
+                continue
+            if template.score_range_max is not None and score > template.score_range_max:
+                continue
+            applicable_templates.append(template)
+
+        # 使用回数が少ないテンプレートを優先
+        if applicable_templates:
+            return sorted(applicable_templates, key=lambda t: t.usage_count)[0]
+
+        return None

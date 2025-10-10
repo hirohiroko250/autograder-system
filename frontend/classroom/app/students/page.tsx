@@ -210,7 +210,7 @@ export default function StudentsPage() {
         const url = window.URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = url;
-        link.download = `student_template_${new Date().toISOString().split('T')[0]}.xlsx`;
+        link.download = `student_template_${new Date().toISOString().split('T')[0]}.csv`;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
@@ -261,31 +261,34 @@ export default function StudentsPage() {
     <DashboardLayout>
       <PermissionGuard permission="can_register_students">
         <div className="space-y-6 animate-fade-in">
-        <div className="flex items-center justify-between">
-          <h1 className="text-3xl font-bold">生徒管理</h1>
-          <div className="flex items-center gap-2">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <h1 className="text-2xl sm:text-3xl font-bold">生徒管理</h1>
+          <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
             <Button
               variant="outline"
               onClick={() => setImportModalOpen(true)}
-              className="rounded-xl"
+              className="rounded-xl flex-1 sm:flex-none"
+              size="sm"
             >
-              <Upload className="h-4 w-4 mr-2" />
-              インポート
+              <Upload className="h-4 w-4 sm:mr-2" />
+              <span className="hidden sm:inline">インポート</span>
             </Button>
             <Button
               variant="outline"
               onClick={handleExport}
-              className="rounded-xl"
+              className="rounded-xl flex-1 sm:flex-none"
+              size="sm"
             >
-              <Download className="h-4 w-4 mr-2" />
-              テンプレートダウンロード
+              <Download className="h-4 w-4 sm:mr-2" />
+              <span className="hidden sm:inline">テンプレート</span>
             </Button>
             <Button
               onClick={() => setRegistrationModalOpen(true)}
-              className="rounded-xl bg-primary hover:bg-primary/90"
+              className="rounded-xl bg-primary hover:bg-primary/90 flex-1 sm:flex-none"
+              size="sm"
             >
-              <Plus className="h-4 w-4 mr-2" />
-              生徒登録
+              <Plus className="h-4 w-4 sm:mr-2" />
+              <span className="sm:inline">生徒登録</span>
             </Button>
           </div>
         </div>
@@ -320,37 +323,25 @@ export default function StudentsPage() {
               <p className="text-xs text-muted-foreground">登録済み教室</p>
             </CardContent>
           </Card>
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base">表示中</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                {hasActiveFilters && totalItems > 0 ? currentStudents.length : 0}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                現在のページ
-                {totalPages > 1 && ` (${currentPage}/${totalPages})`}
-              </p>
-            </CardContent>
-          </Card>
         </div>
 
         {/* 高度検索 */}
         <Card>
           <CardHeader className="pb-4">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col gap-4">
               <div>
                 <CardTitle>生徒検索・フィルター</CardTitle>
                 <CardDescription>
                   生徒を名前、IDなどで検索できます
                 </CardDescription>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
                 <Select value={classroom} onValueChange={handleClassroomChange}>
-                  <SelectTrigger className="w-48 rounded-xl">
-                    <Filter className="h-4 w-4 mr-2" />
-                    <SelectValue placeholder="教室で絞り込み" />
+                  <SelectTrigger className="w-full sm:w-48 rounded-xl">
+                    <div className="flex items-center gap-2 w-full overflow-hidden">
+                      <Filter className="h-4 w-4 flex-shrink-0" />
+                      <SelectValue placeholder="教室で絞り込み" />
+                    </div>
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">すべての教室</SelectItem>
@@ -362,7 +353,7 @@ export default function StudentsPage() {
                   </SelectContent>
                 </Select>
                 <Select value={year} onValueChange={handleYearChange}>
-                  <SelectTrigger className="w-32 rounded-xl">
+                  <SelectTrigger className="w-full sm:w-32 rounded-xl">
                     <SelectValue placeholder="年度" />
                   </SelectTrigger>
                   <SelectContent>
@@ -374,7 +365,7 @@ export default function StudentsPage() {
                   </SelectContent>
                 </Select>
                 <Select value={period} onValueChange={handlePeriodChange}>
-                  <SelectTrigger className="w-24 rounded-xl">
+                  <SelectTrigger className="w-full sm:w-24 rounded-xl">
                     <SelectValue placeholder="期間" />
                   </SelectTrigger>
                   <SelectContent>
@@ -411,9 +402,14 @@ export default function StudentsPage() {
                 </CardDescription>
               </div>
               {hasActiveFilters && totalItems > 0 && (
-                <div className="text-sm text-muted-foreground">
-                  {totalItems}件中 {startIndex + 1}-{Math.min(endIndex, totalItems)}件を表示 
-                  (ページ {currentPage}/{totalPages})
+                <div className="text-xs sm:text-sm text-muted-foreground">
+                  <span className="hidden sm:inline">
+                    {totalItems}件中 {startIndex + 1}-{Math.min(endIndex, totalItems)}件を表示
+                    (ページ {currentPage}/{totalPages})
+                  </span>
+                  <span className="sm:hidden">
+                    {currentPage}/{totalPages}ページ
+                  </span>
                 </div>
               )}
             </div>
@@ -431,17 +427,18 @@ export default function StudentsPage() {
                 
                 {/* ページネーション */}
                 {totalPages > 1 && (
-                  <div className="flex justify-center items-center gap-2">
+                  <div className="flex flex-col sm:flex-row justify-center items-center gap-2">
                     <Button
                       variant="outline"
                       size="sm"
                       onClick={() => handlePageChange(currentPage - 1)}
                       disabled={currentPage === 1}
+                      className="w-full sm:w-auto"
                     >
                       前へ
                     </Button>
-                    
-                    <div className="flex gap-1">
+
+                    <div className="flex gap-1 overflow-x-auto max-w-full py-2">
                       {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
                         // 現在のページの前後3ページのみ表示
                         if (
@@ -454,7 +451,7 @@ export default function StudentsPage() {
                               key={page}
                               variant={currentPage === page ? "default" : "outline"}
                               size="sm"
-                              className="w-8 h-8 p-0"
+                              className="w-8 h-8 p-0 flex-shrink-0"
                               onClick={() => handlePageChange(page)}
                             >
                               {page}
@@ -469,12 +466,13 @@ export default function StudentsPage() {
                         return null;
                       })}
                     </div>
-                    
+
                     <Button
                       variant="outline"
                       size="sm"
                       onClick={() => handlePageChange(currentPage + 1)}
                       disabled={currentPage === totalPages}
+                      className="w-full sm:w-auto"
                     >
                       次へ
                     </Button>

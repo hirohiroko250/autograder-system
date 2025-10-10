@@ -51,28 +51,31 @@ export function ScoreImportModal({ open, onOpenChange, testId }: ScoreImportModa
   // 全学年統合テンプレートダウンロード
   const handleDownloadAllGradesTemplate = async () => {
     try {
+      console.log('Starting template download...', { year: parseInt(year), period });
       const response = await testApi.generateAllGradesTemplate({
         year: parseInt(year),
         period: period
       });
 
-      if (response.success && response.csv_data) {
-        const csv = response.csv_data;
-        const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
-        const link = document.createElement('a');
-        link.href = URL.createObjectURL(blob);
-        
-        const subjectsDisplay = response.subjects.map((s: any) => s.subject_display).join('_');
-        link.download = `全国学力向上テスト_${year}_${period}_全学年_${subjectsDisplay}.csv`;
-        link.click();
-        
-        toast.success(`全学年対応テンプレートファイルをダウンロードしました（${response.total_subjects}教科対応）`);
+      console.log('Template download response:', response);
+      console.log('Response type:', typeof response);
+      console.log('Response.success:', response?.success);
+      console.log('Response.success === true:', response?.success === true);
+      console.log('Response.success === false:', response?.success === false);
+
+      if (response && response.success === true) {
+        console.log('Showing success toast');
+        toast.success('全学年対応テンプレートファイルをダウンロードしました');
+      } else if (response && response.success === false) {
+        console.error('Template generation failed:', response);
+        toast.error(`テンプレート生成に失敗しました: ${response.message || response.error || '不明なエラー'}`);
       } else {
-        toast.error(`テンプレート生成に失敗しました: ${response.error || '不明なエラー'}`);
+        console.warn('Unexpected response format:', response);
+        toast.warning('テンプレートのダウンロード状態が不明です');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Template download error:', error);
-      toast.error('テンプレートのダウンロードに失敗しました');
+      toast.error(`全学年対応テンプレートのダウンロードに失敗しました: ${error.message || ''}`);
     }
   };
 

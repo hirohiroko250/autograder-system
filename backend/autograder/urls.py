@@ -130,7 +130,7 @@ def bulk_add_school_billing(request):
             except Exception as e:
                 messages.error(request, f'処理中にエラーが発生しました: {str(e)}')
 
-        return redirect('admin:classrooms_schoolbillingreport_changelist')
+        return redirect('admin:schools_schoolbillingreport_changelist')
 
     # GET リクエストの場合、フォームを表示
     current_year = datetime.now().year
@@ -164,7 +164,7 @@ def redirect_billing_to_school_billing(request, **kwargs):
         return redirect('bulk_add_school_billing')
     else:
         messages.info(request, '課金レポートは塾ベースの管理に統一されました。')
-        return redirect('admin:classrooms_schoolbillingreport_changelist')
+        return redirect('admin:schools_schoolbillingreport_changelist')
 
 # 教室ベース課金レポートへのアクセスを強制的に塾ベースにリダイレクト（admin URLより優先）
 billing_redirect_patterns = [

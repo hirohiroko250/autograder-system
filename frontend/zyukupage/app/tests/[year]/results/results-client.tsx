@@ -481,12 +481,12 @@ export function ResultsClient({ year }: ResultsClientProps) {
               </div>
               
               {/* フィルタリングとソートコントロール */}
-              <div className="flex flex-wrap items-center gap-4 pt-4 border-t">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-4 border-t">
                 <div className="flex items-center gap-2">
-                  <Filter className="h-4 w-4 text-gray-500" />
-                  <Label className="text-sm font-medium">フィルター:</Label>
+                  <Filter className="h-4 w-4 text-gray-500 hidden sm:block" />
+                  <Label className="text-xs sm:text-sm font-medium whitespace-nowrap">フィルター:</Label>
                   <Select value={filterStatus} onValueChange={setFilterStatus}>
-                    <SelectTrigger className="w-40">
+                    <SelectTrigger className="w-full sm:w-40 text-xs sm:text-sm">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -498,11 +498,11 @@ export function ResultsClient({ year }: ResultsClientProps) {
                     </SelectContent>
                   </Select>
                 </div>
-                
+
                 <div className="flex items-center gap-2">
-                  <Label className="text-sm font-medium">並び順:</Label>
+                  <Label className="text-xs sm:text-sm font-medium whitespace-nowrap">並び順:</Label>
                   <Select value={sortOrder} onValueChange={setSortOrder}>
-                    <SelectTrigger className="w-32">
+                    <SelectTrigger className="w-full sm:w-32 text-xs sm:text-sm">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -516,14 +516,15 @@ export function ResultsClient({ year }: ResultsClientProps) {
                     variant="ghost"
                     size="sm"
                     onClick={() => setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')}
+                    className="shrink-0"
                   >
                     {sortDirection === 'asc' ? <SortAsc className="h-4 w-4" /> : <SortDesc className="h-4 w-4" />}
                   </Button>
                 </div>
-                
-                <div className="flex items-center gap-2 ml-auto">
-                  <Users className="h-4 w-4 text-gray-500" />
-                  <span className="text-sm text-gray-600">
+
+                <div className="flex items-center gap-2 col-span-1 sm:col-span-2 lg:col-span-1">
+                  <Users className="h-4 w-4 text-gray-500 hidden sm:block" />
+                  <span className="text-xs sm:text-sm text-gray-600 whitespace-nowrap">
                     選択中: {selectedStudents.length}名
                   </span>
                 </div>
@@ -552,31 +553,56 @@ export function ResultsClient({ year }: ResultsClientProps) {
                     return (
                       <div
                         key={result.student_id}
-                        className={`flex items-center gap-4 p-4 border rounded-lg transition-colors ${
-                          selectedStudents.includes(result.student_id) 
-                            ? 'bg-blue-50 border-blue-200 dark:bg-blue-900/20 dark:border-blue-700' 
+                        className={`flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4 p-3 sm:p-4 border rounded-lg transition-colors ${
+                          selectedStudents.includes(result.student_id)
+                            ? 'bg-blue-50 border-blue-200 dark:bg-blue-900/20 dark:border-blue-700'
                             : 'hover:bg-gray-50 dark:hover:bg-gray-800'
                         } ${statusConfig.border}`}
                       >
-                        <Checkbox
-                          checked={selectedStudents.includes(result.student_id)}
-                          onCheckedChange={(checked) => handleSelectStudent(result.student_id, checked as boolean)}
-                        />
-                        
-                        {/* 入力状況インジケーター */}
-                        <div className={`flex items-center gap-2 px-3 py-1 rounded-full ${statusConfig.bg} ${statusConfig.border} border`}>
-                          <StatusIcon className={`h-4 w-4 ${statusConfig.color}`} />
-                          <span className={`text-xs font-medium ${statusConfig.color}`}>
-                            {statusConfig.text}
-                          </span>
-                        </div>
-                        
-                        <div className="flex items-center gap-4 flex-1">
-                          <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-bold">
+                        {/* Top row: checkbox, status, student info (mobile) */}
+                        <div className="flex items-center gap-3 w-full sm:w-auto">
+                          <Checkbox
+                            checked={selectedStudents.includes(result.student_id)}
+                            onCheckedChange={(checked) => handleSelectStudent(result.student_id, checked as boolean)}
+                          />
+
+                          {/* 入力状況インジケーター */}
+                          <div className={`flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1 rounded-full ${statusConfig.bg} ${statusConfig.border} border shrink-0`}>
+                            <StatusIcon className={`h-3 sm:h-4 w-3 sm:w-4 ${statusConfig.color}`} />
+                            <span className={`text-xs font-medium ${statusConfig.color} hidden sm:inline`}>
+                              {statusConfig.text}
+                            </span>
+                          </div>
+
+                          {/* Rank badge */}
+                          <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-bold text-xs sm:text-base shrink-0">
                             {result.rank || '-'}
                           </div>
+
+                          {/* Student info (mobile-first layout) */}
+                          <div className="flex-1 min-w-0 sm:hidden">
+                            <div className="flex items-center gap-1 flex-wrap">
+                              <p className="font-medium text-sm truncate">{result.student_name}</p>
+                              <Badge variant="outline" className="text-xs">{result.grade}</Badge>
+                            </div>
+                            <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                              {result.classroom_name}
+                            </p>
+                          </div>
+
+                          {/* Score display (mobile) */}
+                          <div className="text-right sm:hidden shrink-0">
+                            <p className="text-xl font-bold">{result.total_score || '-'}</p>
+                            <p className="text-xs text-gray-500 dark:text-gray-400">
+                              {result.rank ? `${result.rank}位` : '-'}
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Desktop layout */}
+                        <div className="hidden sm:flex items-center gap-4 flex-1">
                           <div>
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2 flex-wrap">
                               <p className="font-medium">{result.student_name}</p>
                               <Badge variant="outline">{result.grade}</Badge>
                               <Badge variant="outline">{result.classroom_name}</Badge>
@@ -599,9 +625,10 @@ export function ResultsClient({ year }: ResultsClientProps) {
                             </p>
                           </div>
                         </div>
-                        
-                        <div className="flex items-center gap-8">
-                          <div className={`grid ${gridColsClass} gap-2 text-sm`}>
+
+                        {/* Scores and actions */}
+                        <div className="flex items-center gap-3 sm:gap-8 w-full sm:w-auto">
+                          <div className={`hidden sm:grid ${gridColsClass} gap-2 text-sm`}>
                             {Object.entries(result.scores).map(([question, score]) => (
                               <div key={question} className="text-center">
                                 <p className="text-gray-500 dark:text-gray-400 text-xs">{question.replace('q', '大問')}</p>
@@ -609,29 +636,31 @@ export function ResultsClient({ year }: ResultsClientProps) {
                               </div>
                             ))}
                           </div>
-                          <div className="text-right">
+                          <div className="hidden sm:block text-right">
                             <p className="text-2xl font-bold">{result.total_score || '-'}</p>
                             <p className="text-sm text-gray-500 dark:text-gray-400">
                               {result.rank ? `${result.rank}位` : '-'}
                             </p>
                           </div>
-                          <div className="flex flex-col gap-1">
+                          <div className="flex sm:flex-col gap-2 sm:gap-1 ml-auto">
                             <Button
                               size="sm"
                               variant="outline"
                               onClick={() => handleDownloadIndividualReport(result.student_id)}
                               disabled={inputStatus === 'not_started' || inputStatus === 'absent'}
+                              className="flex-1 sm:flex-none text-xs sm:text-sm"
                             >
-                              <Download className="h-3 w-3 mr-1" />
-                              帳票
+                              <Download className="h-3 w-3 sm:mr-1" />
+                              <span className="hidden sm:inline">帳票</span>
                             </Button>
                             <Button
                               size="sm"
                               variant="ghost"
                               onClick={() => handleStudentCommentClick(result)}
+                              className="flex-1 sm:flex-none text-xs sm:text-sm"
                             >
-                              <MessageSquare className="h-3 w-3 mr-1" />
-                              コメント
+                              <MessageSquare className="h-3 w-3 sm:mr-1" />
+                              <span className="hidden sm:inline">コメント</span>
                             </Button>
                           </div>
                         </div>

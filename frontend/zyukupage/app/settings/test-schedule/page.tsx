@@ -11,13 +11,17 @@ export default function TestSchedulePage() {
   const { data: schedules } = useQuery({
     queryKey: ['test-schedule-info'],
     queryFn: async () => {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/test-schedules-info/`, {
+      const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || '/api';
+      const response = await fetch(`${apiBaseUrl}/test-schedules-info/`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
         },
       });
+      if (!response.ok) {
+        throw new Error(`Failed to fetch: ${response.status}`);
+      }
       const data = await response.json();
-      return data.results;
+      return data.results || [];
     },
   });
 

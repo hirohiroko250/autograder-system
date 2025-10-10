@@ -189,63 +189,51 @@ export default function ClassroomsPage() {
     return true;
   });
   
-  console.log('Current user:', user);
-  console.log('School data:', school);
-  console.log('Classrooms data:', classrooms);
+  // console.log('Current user:', user);
+  // console.log('School data:', school);
+  // console.log('Classrooms data:', classrooms);
 
   return (
     <DashboardLayout>
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
+      <div className="space-y-4 sm:space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4">
           <div>
-            <h1 className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold whitespace-nowrap">教室管理</h1>
-            <p className="text-muted-foreground">
+            <h1 className="text-xl sm:text-2xl md:text-3xl font-bold">教室管理</h1>
+            <p className="text-sm sm:text-base text-muted-foreground">
               教室の登録・管理を行います
             </p>
           </div>
-          <Button onClick={() => setIsModalOpen(true)}>
+          <Button onClick={() => setIsModalOpen(true)} className="w-full sm:w-auto">
             <Plus className="mr-2 h-4 w-4" />
-            新しい教室を登録
+            <span className="hidden sm:inline">新しい教室を登録</span>
+            <span className="sm:hidden">教室を登録</span>
           </Button>
         </div>
 
         {/* 教室統計 */}
-        <div className="grid gap-6 md:grid-cols-3">
+        <div className="grid gap-4 sm:gap-6 grid-cols-1 sm:grid-cols-2">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">登録教室数</CardTitle>
-              <Users className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-sm sm:text-base font-medium">登録教室数</CardTitle>
+              <Users className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{classrooms.filter(c => c.is_active).length}</div>
-              <p className="text-xs text-muted-foreground">
+              <div className="text-xl sm:text-2xl font-bold">{classrooms.filter(c => c.is_active).length}</div>
+              <p className="text-xs sm:text-sm text-muted-foreground">
                 アクティブな教室
-              </p>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">総生徒数</CardTitle>
-              <Users className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{classrooms.reduce((sum, c: any) => sum + (c.student_count || 0), 0)}</div>
-              <p className="text-xs text-muted-foreground">
-                全教室合計
               </p>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">登録教室数</CardTitle>
-              <Calendar className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-sm sm:text-base font-medium">総生徒数</CardTitle>
+              <Users className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{classrooms.length}</div>
-              <p className="text-xs text-muted-foreground">
-                全教室数
+              <div className="text-xl sm:text-2xl font-bold">{classrooms.reduce((sum, c: any) => sum + (c.student_count || 0), 0)}</div>
+              <p className="text-xs sm:text-sm text-muted-foreground">
+                全教室合計
               </p>
             </CardContent>
           </Card>
@@ -253,18 +241,18 @@ export default function ClassroomsPage() {
 
         {/* 基本検索 */}
         <Card>
-          <CardHeader className="pb-4">
+          <CardHeader className="pb-3 sm:pb-4">
             <div className="flex items-center justify-between">
               <div>
-                <CardTitle>教室検索</CardTitle>
-                <CardDescription>
+                <CardTitle className="text-base sm:text-lg">教室検索</CardTitle>
+                <CardDescription className="text-xs sm:text-sm">
                   教室を名前、ID、学校名などで検索できます
                 </CardDescription>
               </div>
             </div>
           </CardHeader>
           <CardContent>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
                 <input
@@ -272,17 +260,19 @@ export default function ClassroomsPage() {
                   placeholder="教室名、教室ID、学校名で検索..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full pl-10 pr-4 py-2 text-sm sm:text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 />
               </div>
-              <Button onClick={() => handleSearch(searchQuery, {})}>
-                検索
-              </Button>
-              <Button variant="outline" onClick={handleClearSearch}>
-                クリア
-              </Button>
+              <div className="flex gap-2">
+                <Button onClick={() => handleSearch(searchQuery, {})} className="flex-1 sm:flex-none">
+                  検索
+                </Button>
+                <Button variant="outline" onClick={handleClearSearch} className="flex-1 sm:flex-none">
+                  クリア
+                </Button>
+              </div>
             </div>
-            <div className="mt-2 text-sm text-gray-600">
+            <div className="mt-2 text-xs sm:text-sm text-gray-600">
               {filteredClassrooms.length}件の結果
             </div>
           </CardContent>
@@ -292,23 +282,24 @@ export default function ClassroomsPage() {
         {school && (
           <Card>
             <CardHeader>
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4">
                 <div>
-                  <CardTitle className="flex items-center gap-2">
-                    <School className="h-5 w-5" />
+                  <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+                    <School className="h-4 w-4 sm:h-5 sm:w-5" />
                     学校権限設定
                   </CardTitle>
-                  <CardDescription>
+                  <CardDescription className="text-xs sm:text-sm mt-1">
                     {school.name} - この学校の全教室管理者に適用される権限設定
                   </CardDescription>
                 </div>
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   size="sm"
                   onClick={() => {
                     setSelectedSchool(school);
                     setIsEditModalOpen(true);
                   }}
+                  className="w-full sm:w-auto"
                 >
                   <Settings className="h-4 w-4 mr-2" />
                   詳細設定
@@ -316,12 +307,12 @@ export default function ClassroomsPage() {
               </div>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="flex flex-col items-center gap-2 p-4 border rounded-lg">
-                  <div className="text-sm font-medium">生徒登録権限</div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4">
+                <div className="flex flex-col items-center gap-2 p-3 sm:p-4 border rounded-lg">
+                  <div className="text-xs sm:text-sm font-medium">生徒登録権限</div>
                   <Switch
                     checked={school.can_register_students ?? school.permissions?.can_register_students ?? true}
-                    onCheckedChange={(checked) => 
+                    onCheckedChange={(checked) =>
                       handlePermissionChange('can_register_students', checked)
                     }
                   />
@@ -329,11 +320,11 @@ export default function ClassroomsPage() {
                     生徒の新規登録・編集・削除を許可
                   </div>
                 </div>
-                <div className="flex flex-col items-center gap-2 p-4 border rounded-lg">
-                  <div className="text-sm font-medium">点数入力権限</div>
+                <div className="flex flex-col items-center gap-2 p-3 sm:p-4 border rounded-lg">
+                  <div className="text-xs sm:text-sm font-medium">点数入力権限</div>
                   <Switch
                     checked={school.can_input_scores ?? school.permissions?.can_input_scores ?? true}
-                    onCheckedChange={(checked) => 
+                    onCheckedChange={(checked) =>
                       handlePermissionChange('can_input_scores', checked)
                     }
                   />
@@ -341,11 +332,11 @@ export default function ClassroomsPage() {
                     テスト結果の入力・編集を許可
                   </div>
                 </div>
-                <div className="flex flex-col items-center gap-2 p-4 border rounded-lg">
-                  <div className="text-sm font-medium">結果出力権限</div>
+                <div className="flex flex-col items-center gap-2 p-3 sm:p-4 border rounded-lg">
+                  <div className="text-xs sm:text-sm font-medium">結果出力権限</div>
                   <Switch
                     checked={school.can_view_reports ?? school.permissions?.can_view_reports ?? true}
-                    onCheckedChange={(checked) => 
+                    onCheckedChange={(checked) =>
                       handlePermissionChange('can_view_reports', checked)
                     }
                   />
@@ -361,50 +352,49 @@ export default function ClassroomsPage() {
         {/* 教室一覧 */}
         <Card>
           <CardHeader>
-            <CardTitle>教室一覧</CardTitle>
-            <CardDescription>
+            <CardTitle className="text-base sm:text-lg">教室一覧</CardTitle>
+            <CardDescription className="text-xs sm:text-sm">
               登録されている教室とその詳細情報（権限は学校レベルで一括管理されます）
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
+            <div className="space-y-3 sm:space-y-4">
               {filteredClassrooms.map((classroom) => (
                 <div
                   key={classroom.id}
-                  className="p-4 border rounded-lg hover:bg-gray-50 transition-colors"
+                  className="p-3 sm:p-4 border rounded-lg hover:bg-gray-50 transition-colors"
                 >
-                  <div className="flex items-center justify-between">
-                    <Link 
-                      href={`/classrooms/${classroom.id}`}
-                      className="flex items-center space-x-4 flex-1 cursor-pointer"
-                    >
-                      <div>
-                        <h3 className="font-semibold hover:text-blue-600 transition-colors">
+                  <Link
+                    href={`/classrooms/${classroom.id}`}
+                    className="block"
+                  >
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                      <div className="flex-1">
+                        <h3 className="font-semibold text-sm sm:text-base hover:text-blue-600 transition-colors">
                           {classroom.name}
                         </h3>
-                        <p className="text-sm text-muted-foreground">
+                        <p className="text-xs sm:text-sm text-muted-foreground">
                           教室ID: {classroom.classroom_id}
                         </p>
-                        <p className="text-sm text-muted-foreground">
+                        <p className="text-xs sm:text-sm text-muted-foreground">
                           学校: {classroom.school_name}
                         </p>
                       </div>
-                      <div className="flex items-center">
-                        <ChevronRight className="h-4 w-4 text-muted-foreground" />
+
+                      <div className="flex items-center justify-between sm:justify-end gap-3 sm:gap-4">
+                        <div className="text-left sm:text-right">
+                          <p className="font-medium text-sm sm:text-base">{(classroom as any).student_count || 0}名</p>
+                          <p className="text-xs sm:text-sm text-muted-foreground">生徒数</p>
+                        </div>
+
+                        <Badge variant={classroom.is_active ? 'default' : 'secondary'} className="text-xs sm:text-sm">
+                          {classroom.is_active ? 'アクティブ' : '非アクティブ'}
+                        </Badge>
+
+                        <ChevronRight className="hidden sm:block h-4 w-4 text-muted-foreground" />
                       </div>
-                    </Link>
-                    
-                    <div className="flex items-center space-x-4">
-                      <div className="text-right">
-                        <p className="font-medium">{(classroom as any).student_count || 0}名</p>
-                        <p className="text-sm text-muted-foreground">生徒数</p>
-                      </div>
-                      
-                      <Badge variant={classroom.is_active ? 'default' : 'secondary'}>
-                        {classroom.is_active ? 'アクティブ' : '非アクティブ'}
-                      </Badge>
                     </div>
-                  </div>
+                  </Link>
                 </div>
               ))}
             </div>

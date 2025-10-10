@@ -2,11 +2,12 @@ from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.contrib.admin import AdminSite
 from django import forms
+from django.db import models
 from accounts.models import User
 from schools.models import School
 from classrooms.models import Classroom, ClassroomPermission, MembershipType, SchoolBillingReport
 from students.models import Student
-from scores.models import Score, TestResult, CommentTemplate, TestSummary, SchoolTestSummary
+from scores.models import Score, TestResult, CommentTemplate, CommentTemplateV2, TestSummary, SchoolTestSummary
 from tests.models import TestSchedule, TestDefinition, QuestionGroup, Question, AnswerKey
 
 
@@ -1163,35 +1164,55 @@ class AnswerKeyInline(admin.StackedInline):
     fields = ('correct_answer', 'explanation')
 
 class QuestionGroupAdmin(admin.ModelAdmin):
-    list_display = ('get_test_info', 'group_number', 'title', 'max_score', 'get_question_count')
+    list_display = ('get_test_info', 'group_number', 'title', 'max_score', 'get_question_count', 'get_total_score')
     list_filter = ('test__subject', 'test__schedule__year', 'test__schedule__period')
     search_fields = ('title', 'test__name')
     inlines = [QuestionInlineForGroup]
     ordering = ('test', 'group_number')
-    
+
     fieldsets = (
-        ('大問基本情報', {
+        ('大問設定', {
             'fields': ('test', 'group_number', 'title', 'max_score'),
-            'description': '大問の基本情報を設定します。保存後、下記で小問を追加できます。'
+            'description': '⚠️ 重要: 同じテストの全大問の合計点が必ず100点になるように設定してください。'
         }),
     )
-    
+
     def get_test_info(self, obj):
         return f"{obj.test.schedule.year}年度 {obj.test.schedule.get_period_display()} {obj.test.get_subject_display()}"
     get_test_info.short_description = 'テスト情報'
     get_test_info.admin_order_field = 'test__schedule__year'
-    
+
     def get_question_count(self, obj):
         return obj.questions.count()
     get_question_count.short_description = '小問数'
-    
-    fieldsets = (
-        ('大問設定', {
-            'fields': ('test', 'group_number', 'title', 'max_score'),
-            'description': '大問の基本設定を行います。保存後、下記で小問を追加できます。'
-        }),
-    )
-    
+
+    def get_total_score(self, obj):
+        """同じテストの全大問の合計点を表示"""
+        total = obj.test.question_groups.aggregate(total=models.Sum('max_score'))['total'] or 0
+        if total == 100:
+            return f'✓ {total}点'
+        else:
+            return f'⚠️ {total}点'
+    get_total_score.short_description = 'テスト合計点'
+
+    def save_model(self, request, obj, form, change):
+        """保存時に合計点をチェック"""
+        super().save_model(request, obj, form, change)
+
+        # 保存後に合計点をチェック
+        from django.db.models import Sum
+        total_score = obj.test.question_groups.aggregate(total=Sum('max_score'))['total'] or 0
+
+        if total_score != 100:
+            from django.contrib import messages
+            messages.warning(
+                request,
+                f'注意: 現在の合計点は{total_score}点です。テストの満点は100点である必要があります。'
+            )
+        else:
+            from django.contrib import messages
+            messages.success(request, f'✓ 合計点は100点です。')
+
     def get_queryset(self, request):
         return super().get_queryset(request).select_related('test', 'test__schedule')
 
@@ -1468,6 +1489,35 @@ class CommentTemplateAdmin(admin.ModelAdmin):
     search_fields = ('template_text', 'school__name')
 
 
+class CommentTemplateV2Admin(admin.ModelAdmin):
+    list_display = ('title', 'category', 'subject_filter', 'score_range_min', 'score_range_max', 'is_active', 'usage_count')
+    list_filter = ('category', 'applicable_scope', 'is_active', 'subject_filter')
+    search_fields = ('title', 'template_text', 'category')
+    readonly_fields = ('usage_count', 'created_at', 'updated_at')
+
+    fieldsets = (
+        ('基本情報', {
+            'fields': ('title', 'category', 'template_text')
+        }),
+        ('適用条件', {
+            'fields': ('applicable_scope', 'subject_filter', 'score_range_min', 'score_range_max')
+        }),
+        ('ステータス', {
+            'fields': ('is_active', 'usage_count')
+        }),
+        ('日時情報', {
+            'fields': ('created_at', 'updated_at'),
+            'classes': ('collapse',)
+        }),
+    )
+
+    def get_queryset(self, request):
+        """点数範囲で科目別テンプレートを優先表示"""
+        qs = super().get_queryset(request)
+        # categoryが科目_点数範囲の形式のものを優先表示
+        return qs.order_by('-is_active', 'subject_filter', 'score_range_min')
+
+
 # GUI上で使用していないため管理画面から除外
 # class TestSummaryAdmin(admin.ModelAdmin):
 #     list_display = ('__str__', 'total_students', 'average_score', 'average_correct_rate', 'calculated_at')
@@ -1546,6 +1596,7 @@ admin.site.register(QuestionGroup, QuestionGroupAdmin)
 admin.site.register(Score, ScoreAdmin)
 admin.site.register(TestResult, TestResultAdmin)
 admin.site.register(CommentTemplate, CommentTemplateAdmin)
+admin.site.register(CommentTemplateV2, CommentTemplateV2Admin)
 # テスト集計結果機能は削除されたため、管理画面から除外
 # admin.site.register(TestSummary, TestSummaryAdmin)
 # admin.site.register(SchoolTestSummary, SchoolTestSummaryAdmin)

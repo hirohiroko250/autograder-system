@@ -28,9 +28,9 @@ export default function TestSchedulePage() {
       case 'completed':
         return <Badge className="bg-green-100 text-green-800">完了</Badge>;
       case 'scheduled':
-        return <Badge className="bg-blue-100 text-blue-800">予定</Badge>;
+        return <Badge className="bg-green-100 text-green-800">予定</Badge>;
       case 'in-progress':
-        return <Badge className="bg-orange-100 text-orange-800">実施中</Badge>;
+        return <Badge className="bg-green-100 text-green-800">実施中</Badge>;
       default:
         return <Badge variant="outline">{status}</Badge>;
     }

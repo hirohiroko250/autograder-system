@@ -12,11 +12,28 @@
     <div class="report-page">
         <!-- ヘッダー -->
         <header class="header">
-            <div class="logo">
-                <img src="/static/reports/logo.png" alt="全国学力向上テスト">
+            <p class="issue-date">発行日：{{ issue_date }}</p>
+        </header>
+
+        <!-- 窓あき封筒用エリアとロゴ・テスト情報 -->
+        <div class="top-area">
+            <!-- 窓あき封筒用 -->
+            <div class="window-area">
+                <div class="window-frame">
+                    <div class="window-content">
+                        <div class="window-line"><span class="window-label">塾名</span>{{ school_name }}</div>
+                        <div class="window-line"><span class="window-label">生徒ID</span>{{ student_id }}</div>
+                        <div class="window-line"><span class="window-label">学年</span>{{ student_grade }}</div>
+                        <div class="window-line window-name"><span class="window-label">氏名</span>{{ student_name }}</div>
+                    </div>
+                </div>
             </div>
-            <div class="header-right">
-                <p class="issue-date">発行日：{{ issue_date }}</p>
+
+            <!-- ロゴとテスト情報 -->
+            <div class="header-info">
+                <div class="logo">
+                    <img src="/static/reports/logo.png" alt="全国学力向上テスト">
+                </div>
                 <div class="test-info">
                     <span class="info-label">学年</span>
                     <span class="info-value">{{ student_grade }}</span>
@@ -28,59 +45,23 @@
                 </div>
                 <h1 class="main-title">個人成績表</h1>
             </div>
-        </header>
-
-        <!-- 窓あき封筒用エリアと生徒情報 -->
-        <div class="top-area">
-            <!-- 窓あき封筒用 -->
-            <div class="window-area">
-                <div class="window-frame">
-                    <div class="window-content">
-                        <!-- 空白エリア -->
-                    </div>
-                </div>
-            </div>
-
-            <!-- 生徒情報 -->
-            <div class="student-info">
-                <div class="info-row">
-                    <div class="info-item">
-                        <span class="label">生徒氏名</span>
-                        <span class="value">{{ student_name }}</span>
-                    </div>
-                    <div class="info-item">
-                        <span class="label">学年</span>
-                        <span class="value">{{ student_grade }}</span>
-                    </div>
-                    <div class="info-item">
-                        <span class="label">受験ID</span>
-                        <span class="value">{{ student_id }}</span>
-                    </div>
-                    <div class="info-item">
-                        <span class="label">生徒ID</span>
-                        <span class="value">{{ student_id }}</span>
-                    </div>
-                    <div class="info-item">
-                        <span class="label">塾名</span>
-                        <span class="value">{{ school_name }}</span>
-                    </div>
-                    <div class="info-item">
-                        <span class="label">塾ID</span>
-                        <span class="value">{{ school_id }}</span>
-                    </div>
-                </div>
-            </div>
         </div>
 
         <!-- メインコンテンツ -->
         <div class="main-layout">
-            <!-- 左側カラム -->
-            <div class="left-column">
+            <!-- 上部：得点・偏差値・順位と成績推移 -->
+            <div class="top-row">
                 <!-- 得点・偏差値・順位 -->
                 <section class="score-section">
                     <h2 class="section-title"><span class="diamond">◆</span>得点・偏差値・順位</h2>
 
                     <table class="score-table">
+                        <colgroup>
+                            <col style="width: 22%;">
+                            <col style="width: 26%;">
+                            <col style="width: 26%;">
+                            <col style="width: 26%;">
+                        </colgroup>
                         <thead>
                             <tr>
                                 <th class="label-col">教科</th>
@@ -103,7 +84,7 @@
                                 <td class="math-cell">{{ math_deviation }}</td>
                             </tr>
                             <tr>
-                                <td class="label-cell">学年順位<br><span class="sub-label">(学年受験者数)</span></td>
+                                <td class="label-cell">学年順位<br><span class="sub-label">(全国受験者数)</span></td>
                                 <td class="total-cell">{{ total_grade_rank }}<span class="unit">位</span><br><span class="sub-value">({{ total_grade_total }}人中)</span></td>
                                 <td class="japanese-cell">{{ japanese_grade_rank }}<span class="unit">位</span><br><span class="sub-value">({{ japanese_grade_total }}人中)</span></td>
                                 <td class="math-cell">{{ math_grade_rank }}<span class="unit">位</span><br><span class="sub-value">({{ math_grade_total }}人中)</span></td>
@@ -155,18 +136,7 @@
                         <div class="trend-graph total-graph">
                             <div class="graph-header total-bg">全教科</div>
                             <div class="graph-content">
-                                <svg viewBox="0 0 200 140" class="line-chart" id="totalChart_{{ student_id }}">
-                                    <!-- グリッド線と軸ラベル -->
-                                    <line x1="40" y1="20" x2="40" y2="110" stroke="#bdc3c7" stroke-width="2"/>
-                                    <line x1="40" y1="110" x2="190" y2="110" stroke="#bdc3c7" stroke-width="2"/>
-                                    <!-- Y軸ラベル -->
-                                    <text x="20" y="20" font-size="9" fill="#666">100</text>
-                                    <text x="20" y="65" font-size="9" fill="#666">50</text>
-                                    <text x="28" y="115" font-size="9" fill="#666">0</text>
-                                    <!-- グリッド線 -->
-                                    <line x1="40" y1="20" x2="190" y2="20" stroke="#e0e0e0" stroke-width="1" stroke-dasharray="2,2"/>
-                                    <line x1="40" y1="65" x2="190" y2="65" stroke="#e0e0e0" stroke-width="1" stroke-dasharray="2,2"/>
-                                </svg>
+                                <canvas id="totalChart_{{ student_id }}" class="trend-canvas"></canvas>
                             </div>
                         </div>
 
@@ -174,15 +144,7 @@
                         <div class="trend-graph math-graph">
                             <div class="graph-header math-bg">算数</div>
                             <div class="graph-content">
-                                <svg viewBox="0 0 200 140" class="line-chart" id="mathChart_{{ student_id }}">
-                                    <line x1="40" y1="20" x2="40" y2="110" stroke="#bdc3c7" stroke-width="2"/>
-                                    <line x1="40" y1="110" x2="190" y2="110" stroke="#bdc3c7" stroke-width="2"/>
-                                    <text x="20" y="20" font-size="9" fill="#666">100</text>
-                                    <text x="20" y="65" font-size="9" fill="#666">50</text>
-                                    <text x="28" y="115" font-size="9" fill="#666">0</text>
-                                    <line x1="40" y1="20" x2="190" y2="20" stroke="#e0e0e0" stroke-width="1" stroke-dasharray="2,2"/>
-                                    <line x1="40" y1="65" x2="190" y2="65" stroke="#e0e0e0" stroke-width="1" stroke-dasharray="2,2"/>
-                                </svg>
+                                <canvas id="mathChart_{{ student_id }}" class="trend-canvas"></canvas>
                             </div>
                         </div>
 
@@ -190,23 +152,15 @@
                         <div class="trend-graph japanese-graph">
                             <div class="graph-header japanese-bg">国語</div>
                             <div class="graph-content">
-                                <svg viewBox="0 0 200 140" class="line-chart" id="japaneseChart_{{ student_id }}">
-                                    <line x1="40" y1="20" x2="40" y2="110" stroke="#bdc3c7" stroke-width="2"/>
-                                    <line x1="40" y1="110" x2="190" y2="110" stroke="#bdc3c7" stroke-width="2"/>
-                                    <text x="20" y="20" font-size="9" fill="#666">100</text>
-                                    <text x="20" y="65" font-size="9" fill="#666">50</text>
-                                    <text x="28" y="115" font-size="9" fill="#666">0</text>
-                                    <line x1="40" y1="20" x2="190" y2="20" stroke="#e0e0e0" stroke-width="1" stroke-dasharray="2,2"/>
-                                    <line x1="40" y1="65" x2="190" y2="65" stroke="#e0e0e0" stroke-width="1" stroke-dasharray="2,2"/>
-                                </svg>
+                                <canvas id="japaneseChart_{{ student_id }}" class="trend-canvas"></canvas>
                             </div>
                         </div>
                     </div>
                 </section>
             </div>
 
-            <!-- 右側カラム -->
-            <div class="right-column">
+            <!-- 下部：出題項目別と教科ごとの総評 -->
+            <div class="bottom-row">
                 <!-- 出題項目別の成績 -->
                 <section class="items-section">
                     <h2 class="section-title"><span class="diamond">◆</span>出題項目別の成績</h2>
@@ -305,99 +259,186 @@
     </div>
 
     <script>
-    // 成績推移グラフ描画（棒グラフ版）
+    // 成績推移グラフ描画（棒グラフ+折れ線グラフ版）
     (function() {
-        const trends = {{ trends|safe }};
-        if (!trends || trends.length === 0) return;
+        console.log('Script started');
+        var trends = {{ trends|safe }};
+        console.log('Trends data:', trends);
 
-        function drawBarChart(svgId, scores, avgScore, color, maxScore = 100) {
-            const svg = document.getElementById(svgId);
-            if (!svg) return;
+        function drawCombinedChart(canvasId, scores, avgScores, barColor, maxScore) {
+            console.log('Drawing chart:', canvasId, 'scores:', scores, 'avgScores:', avgScores);
 
-            const ns = "http://www.w3.org/2000/svg";
+            var canvas = document.getElementById(canvasId);
+            if (!canvas) {
+                console.error('Canvas not found:', canvasId);
+                return;
+            }
+            console.log('Canvas found:', canvas);
 
-            // データポイントの計算
-            const minScore = 0;
-            const barWidth = 25;
-            const spacing = 50;
+            // 親要素のサイズを取得
+            var container = canvas.parentElement;
+            console.log('Container:', container, 'width:', container.clientWidth);
+            var w = container.clientWidth || 300;
+            var h = 80;
 
-            scores.forEach((score, index) => {
-                const x = 60 + (index * spacing);
-                const barHeight = ((score - minScore) / (maxScore - minScore)) * 90;
-                const y = 110 - barHeight;
+            canvas.width = w * 2;
+            canvas.height = h * 2;
+            canvas.style.width = w + 'px';
+            canvas.style.height = h + 'px';
 
-                // 棒グラフ
-                const rect = document.createElementNS(ns, 'rect');
-                rect.setAttribute('x', x - barWidth/2);
-                rect.setAttribute('y', y);
-                rect.setAttribute('width', barWidth);
-                rect.setAttribute('height', barHeight);
-                rect.setAttribute('fill', color);
-                rect.setAttribute('opacity', '0.8');
-                svg.appendChild(rect);
+            var ctx = canvas.getContext('2d');
+            ctx.scale(2, 2);
 
-                // 点数表示
-                const scoreText = document.createElementNS(ns, 'text');
-                scoreText.setAttribute('x', x);
-                scoreText.setAttribute('y', y - 5);
-                scoreText.setAttribute('text-anchor', 'middle');
-                scoreText.setAttribute('font-size', '10');
-                scoreText.setAttribute('fill', color);
-                scoreText.setAttribute('font-weight', '700');
-                scoreText.textContent = Math.round(score);
-                svg.appendChild(scoreText);
+            var padding = { top: 15, right: 50, bottom: 10, left: 55 };
+            var chartWidth = w - padding.left - padding.right;
+            var chartHeight = h - padding.top - padding.bottom;
 
-                // 回数ラベル
-                const labelText = document.createElementNS(ns, 'text');
-                labelText.setAttribute('x', x);
-                labelText.setAttribute('y', '130');
-                labelText.setAttribute('text-anchor', 'middle');
-                labelText.setAttribute('font-size', '10');
-                labelText.setAttribute('fill', '#666');
-                labelText.setAttribute('font-weight', '600');
-                labelText.textContent = `${index + 1}回`;
-                svg.appendChild(labelText);
-            });
+            // 背景グラデーション
+            var bgGradient = ctx.createLinearGradient(0, 0, 0, h);
+            bgGradient.addColorStop(0, '#ffffff');
+            bgGradient.addColorStop(1, '#f9fafb');
+            ctx.fillStyle = bgGradient;
+            ctx.fillRect(0, 0, w, h);
 
-            // 学年平均の星印とライン
-            const avgY = 110 - ((avgScore - minScore) / (maxScore - minScore)) * 90;
-            scores.forEach((score, index) => {
-                const x = 60 + (index * spacing);
+            // グリッド線（20%刻み）- 縦線
+            ctx.strokeStyle = '#e5e7eb';
+            ctx.lineWidth = 0.5;
+            for (var i = 0; i <= 5; i++) {
+                var x = padding.left + chartWidth * (i / 5);
+                ctx.beginPath();
+                ctx.moveTo(x, padding.top);
+                ctx.lineTo(x, padding.top + chartHeight);
+                ctx.stroke();
 
-                // 星印
-                const star = document.createElementNS(ns, 'text');
-                star.setAttribute('x', x);
-                star.setAttribute('y', avgY + 4);
-                star.setAttribute('text-anchor', 'middle');
-                star.setAttribute('font-size', '14');
-                star.setAttribute('fill', '#ffd700');
-                star.setAttribute('filter', 'drop-shadow(0 0 2px rgba(0,0,0,0.3))');
-                star.textContent = '★';
-                svg.appendChild(star);
+                // X軸ラベル（スコア）
+                ctx.fillStyle = '#6b7280';
+                ctx.font = 'bold 7px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'top';
+                var value = Math.round(maxScore * i / 5);
+                ctx.fillText(value, x, padding.top + chartHeight + 2);
+            }
 
-                // 星を線で繋ぐ（2回目以降）
-                if (index > 0) {
-                    const prevX = 60 + ((index - 1) * spacing);
-                    const line = document.createElementNS(ns, 'line');
-                    line.setAttribute('x1', prevX);
-                    line.setAttribute('y1', avgY);
-                    line.setAttribute('x2', x);
-                    line.setAttribute('y2', avgY);
-                    line.setAttribute('stroke', '#ffd700');
-                    line.setAttribute('stroke-width', '2');
-                    line.setAttribute('stroke-dasharray', '4,3');
-                    svg.insertBefore(line, svg.firstChild);
+            // Y軸の線
+            ctx.strokeStyle = '#666';
+            ctx.lineWidth = 0.5;
+            ctx.beginPath();
+            ctx.moveTo(padding.left, padding.top);
+            ctx.lineTo(padding.left, padding.top + chartHeight);
+            ctx.stroke();
+
+            if (!scores || scores.length === 0) {
+                ctx.fillStyle = '#666';
+                ctx.font = '10px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText('データなし', w / 2, h / 2);
+                return;
+            }
+
+            // 常に3回分のスペースを確保（横向き）
+            var maxBars = 3;
+            var totalBarArea = chartHeight / maxBars;
+            var barHeight = totalBarArea * 0.5; // 50%を棒に
+            var barSpacing = totalBarArea * 0.5;
+
+            // Y軸ラベルを常に3つ描画
+            var labels = ['1回目', '2回目', '3回目'];
+            for (var i = 0; i < maxBars; i++) {
+                var y = padding.top + i * totalBarArea + totalBarArea / 2;
+                ctx.fillStyle = '#000';
+                ctx.font = 'bold 7px sans-serif';
+                ctx.textAlign = 'right';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(labels[i], padding.left - 3, y);
+            }
+
+            // 横向き棒グラフ描画
+            for (var index = 0; index < scores.length; index++) {
+                var score = scores[index];
+                var y = padding.top + index * totalBarArea + barSpacing / 2;
+                var barWidth = (score / maxScore) * chartWidth;
+                var x = padding.left;
+
+                // シンプルな棒グラフ
+                ctx.fillStyle = barColor;
+                ctx.fillRect(x, y, barWidth, barHeight);
+
+                // 枠線
+                ctx.strokeStyle = 'rgba(0, 0, 0, 0.1)';
+                ctx.lineWidth = 0.5;
+                ctx.strokeRect(x, y, barWidth, barHeight);
+
+                // スコア表示（左端固定）
+                ctx.fillStyle = '#000';
+                ctx.font = 'bold 8px sans-serif';
+                ctx.textAlign = 'right';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(Math.round(score) + '点', padding.left - 25, y + barHeight / 2);
+            }
+
+            // 星マーク（全国平均）
+            if (avgScores && avgScores.length > 0) {
+                for (var i = 0; i < avgScores.length; i++) {
+                    var avgScore = avgScores[i];
+                    var y = padding.top + i * totalBarArea + barSpacing / 2 + barHeight / 2;
+                    var x = padding.left + chartWidth * (avgScore / maxScore);
+
+                    // 赤い星マーク
+                    ctx.fillStyle = '#ff0000';
+                    ctx.font = 'bold 10px sans-serif';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText('★', x, y);
                 }
-            });
+            }
         }
 
-        const totalScores = trends.map(t => t.total_score || 0);
-        const japaneseScores = trends.map(t => t.japanese_score || 0);
-        const mathScores = trends.map(t => t.math_score || 0);
+        // ページ読み込み後に実行
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', init);
+        } else {
+            init();
+        }
 
-        drawBarChart('totalChart_{{ student_id }}', totalScores, {{ total_grade_avg }}, '#3498db', 200);
-        drawBarChart('mathChart_{{ student_id }}', mathScores, {{ math_grade_avg }}, '#27ae60', 100);
-        drawBarChart('japaneseChart_{{ student_id }}', japaneseScores, {{ japanese_grade_avg }}, '#e67e22', 100);
+        function init() {
+            console.log('Init function called');
+
+            // trendsデータが空の場合、現在のテストデータを使用
+            if (!trends || trends.length === 0) {
+                console.warn('No trends data available, using current test data only');
+                trends = [{
+                    total_score: parseFloat('{{ total_score }}') || 0,
+                    japanese_score: parseFloat('{{ japanese_score }}') || 0,
+                    math_score: parseFloat('{{ math_score }}') || 0
+                }];
+            }
+
+            var totalScores = trends.map(function(t) { return t.total_score || 0; });
+            var japaneseScores = trends.map(function(t) { return t.japanese_score || 0; });
+            var mathScores = trends.map(function(t) { return t.math_score || 0; });
+
+            console.log('Scores extracted - total:', totalScores, 'japanese:', japaneseScores, 'math:', mathScores);
+
+            // 全国平均の推移データを作成（仮：各回で同じ平均値を使用）
+            var totalAvg = parseFloat('{{ total_grade_avg }}') || 0;
+            var mathAvg = parseFloat('{{ math_grade_avg }}') || 0;
+            var japaneseAvg = parseFloat('{{ japanese_grade_avg }}') || 0;
+
+            console.log('Averages - total:', totalAvg, 'math:', mathAvg, 'japanese:', japaneseAvg);
+
+            var totalAvgScores = trends.map(function() { return totalAvg; });
+            var mathAvgScores = trends.map(function() { return mathAvg; });
+            var japaneseAvgScores = trends.map(function() { return japaneseAvg; });
+
+            console.log('About to draw charts');
+
+            drawCombinedChart('totalChart_{{ student_id }}', totalScores, totalAvgScores, '#3b82f6', 200);
+            drawCombinedChart('mathChart_{{ student_id }}', mathScores, mathAvgScores, '#10b981', 100);
+            drawCombinedChart('japaneseChart_{{ student_id }}', japaneseScores, japaneseAvgScores, '#f59e0b', 100);
+
+            console.log('Charts drawn');
+        }
     })();
     </script>
 </body>

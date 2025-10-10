@@ -181,28 +181,28 @@ class SchoolViewSet(viewsets.ModelViewSet):
     
     @action(detail=False, methods=['get'])
     def export_template(self, request):
-        """塾登録用Excelテンプレートをダウンロード"""
+        """塾登録用CSVテンプレートをダウンロード"""
         df = export_school_template()
-        
-        # Excelファイルを生成
-        with tempfile.NamedTemporaryFile(delete=False, suffix='.xlsx') as tmp_file:
-            df.to_excel(tmp_file.name, index=False)
+
+        # CSVファイルを生成（BOM付きUTF-8）
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.csv', mode='w', encoding='utf-8-sig') as tmp_file:
+            df.to_csv(tmp_file, index=False)
             tmp_file_path = tmp_file.name
-        
+
         try:
             with open(tmp_file_path, 'rb') as f:
                 response = HttpResponse(
                     f.read(),
-                    content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+                    content_type='text/csv; charset=utf-8-sig'
                 )
-                response['Content-Disposition'] = 'attachment; filename="school_template.xlsx"'
+                response['Content-Disposition'] = 'attachment; filename="school_template.csv"'
                 return response
         finally:
             os.unlink(tmp_file_path)
     
     @action(detail=False, methods=['get'])
     def export_data(self, request):
-        """塾データをExcelファイルでエクスポート"""
+        """塾データをCSVファイルでエクスポート"""
         schools = self.get_queryset()
         
         # データをDataFrameに変換
@@ -219,19 +219,19 @@ class SchoolViewSet(viewsets.ModelViewSet):
             })
         
         df = pd.DataFrame(data)
-        
-        # Excelファイルを生成
-        with tempfile.NamedTemporaryFile(delete=False, suffix='.xlsx') as tmp_file:
-            df.to_excel(tmp_file.name, index=False)
+
+        # CSVファイルを生成（BOM付きUTF-8）
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.csv', mode='w', encoding='utf-8-sig') as tmp_file:
+            df.to_csv(tmp_file, index=False)
             tmp_file_path = tmp_file.name
-        
+
         try:
             with open(tmp_file_path, 'rb') as f:
                 response = HttpResponse(
                     f.read(),
-                    content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+                    content_type='text/csv; charset=utf-8-sig'
                 )
-                response['Content-Disposition'] = 'attachment; filename="schools_data.xlsx"'
+                response['Content-Disposition'] = 'attachment; filename="schools_data.csv"'
                 return response
         finally:
             os.unlink(tmp_file_path)
