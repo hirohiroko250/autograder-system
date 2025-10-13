@@ -15,7 +15,7 @@ from datetime import datetime
 
 import pandas as pd
 
-from .models import Score, TestResult, CommentTemplate, StudentComment, TestComment
+from .models import Score, TestResult, CommentTemplate, CommentTemplateV2, StudentComment, TestComment
 from schools.models import School
 from students.models import Student
 from tests.models import TestDefinition, QuestionGroup
@@ -1405,6 +1405,158 @@ def generate_unified_score_template(year, period, grade_level):
     df = pd.DataFrame(sample_data)
     return df, all_structures
 
+
+def generate_all_grades_unified_template(year, period):
+    """
+    全学年対応のスコア入力テンプレートを生成
+    小1〜小6の国語・算数の大問構成を動的に取得して列を作成
+    """
+    from tests.models import TestSchedule
+
+    # テストスケジュールを取得
+    try:
+        schedule = TestSchedule.objects.get(year=year, period=period)
+    except TestSchedule.DoesNotExist:
+        raise ValidationError(f"{year}年度{period}期のテストスケジュールが見つかりません")
+
+    # 全学年のテスト定義を取得（小1〜小6）
+    all_structures = {}
+    grade_levels = ['elementary_1', 'elementary_2', 'elementary_3', 'elementary_4', 'elementary_5', 'elementary_6']
+    subjects = ['japanese', 'math']
+
+    # 最大大問数を検出（全学年・全科目の中で最も多い大問数）
+    max_questions = {'japanese': 0, 'math': 0}
+
+    for grade_level in grade_levels:
+        for subject in subjects:
+            try:
+                test = TestDefinition.objects.get(
+                    schedule=schedule,
+                    grade_level=grade_level,
+                    subject=subject
+                )
+                question_groups = test.question_groups.all().order_by('group_number')
+
+                if grade_level not in all_structures:
+                    all_structures[grade_level] = {}
+
+                all_structures[grade_level][subject] = {
+                    'test': test,
+                    'question_groups': [
+                        {
+                            'group_number': qg.group_number,
+                            'max_score': qg.max_score,
+                            'title': qg.title
+                        }
+                        for qg in question_groups
+                    ]
+                }
+
+                # 最大大問数を更新
+                if question_groups.count() > max_questions[subject]:
+                    max_questions[subject] = question_groups.count()
+
+            except TestDefinition.DoesNotExist:
+                continue
+
+    if not all_structures:
+        period_display = {'spring': '春期', 'summer': '夏期', 'winter': '冬期'}.get(period, period)
+        raise ValidationError(f"{year}年度{period_display}のテストが見つかりません")
+
+    # 基本情報列
+    columns = [
+        '塾ID', '塾名', '教室ID', '教室名',
+        '生徒ID', '生徒名', '学年', '年度', '期間',
+        '出席'
+    ]
+
+    # 科目ごとに最大大問数分の列を作成
+    for subject in subjects:
+        subject_display = {'japanese': '国語', 'math': '算数'}.get(subject, subject)
+
+        # 大問列を追加
+        for i in range(1, max_questions[subject] + 1):
+            columns.append(f"{subject_display}_大問{i}")
+
+        # 教科別合計点列
+        columns.append(f"{subject_display}_合計点")
+
+    # 全体合計点列
+    columns.append('全体合計点')
+
+    # サンプルデータ
+    sample_data = {col: [] for col in columns}
+
+    # 期間表示を変換
+    period_display_jp = {'spring': '春期', 'summer': '夏期', 'winter': '冬期'}.get(period, period)
+
+    # サンプル行を3つ作成（異なる学年）
+    sample_names = ['田中太郎', '佐藤花子', '鈴木次郎']
+    sample_grades = ['小6', '小5', '小4']
+
+    for i in range(3):
+        sample_data['塾ID'].append('100001')
+        sample_data['塾名'].append('サンプル学習塾')
+        sample_data['教室ID'].append('001001')
+        sample_data['教室名'].append('メイン教室')
+        sample_data['生徒ID'].append(f'{123456 + i}')
+        sample_data['生徒名'].append(sample_names[i])
+        sample_data['学年'].append(sample_grades[i])
+        sample_data['年度'].append(str(year))
+        sample_data['期間'].append(period_display_jp)
+        sample_data['出席'].append('出席')
+
+        overall_total = 0
+
+        # 各科目のサンプル点数を設定
+        for subject in subjects:
+            subject_display = {'japanese': '国語', 'math': '算数'}.get(subject, subject)
+            subject_total = 0
+
+            # サンプルデータ用の学年（小6=elementary_6など）
+            grade_key = f'elementary_{6 - i}'  # 小6, 小5, 小4
+
+            # この学年・科目のテスト構成を取得
+            if grade_key in all_structures and subject in all_structures[grade_key]:
+                structure = all_structures[grade_key][subject]
+
+                for qg in structure['question_groups']:
+                    column_name = f"{subject_display}_大問{qg['group_number']}"
+                    # サンプル点数（満点から徐々に減らす）
+                    score = max(0, qg['max_score'] - i * 2)
+                    sample_data[column_name].append(score)
+                    subject_total += score
+
+                # 未使用の大問列は空白
+                for j in range(len(structure['question_groups']) + 1, max_questions[subject] + 1):
+                    column_name = f"{subject_display}_大問{j}"
+                    sample_data[column_name].append('')
+            else:
+                # テスト構成がない場合は全て空白
+                for j in range(1, max_questions[subject] + 1):
+                    column_name = f"{subject_display}_大問{j}"
+                    sample_data[column_name].append('')
+
+            # 教科別合計点
+            total_column = f"{subject_display}_合計点"
+            sample_data[total_column].append(subject_total if subject_total > 0 else '')
+            overall_total += subject_total
+
+        # 全体合計点
+        sample_data['全体合計点'].append(overall_total if overall_total > 0 else '')
+
+    # 空行を追加（データ入力用）
+    for _ in range(3):
+        for col in columns:
+            if col in ['年度', '期間']:
+                sample_data[col].append(str(year) if col == '年度' else period_display_jp)
+            else:
+                sample_data[col].append('')
+
+    df = pd.DataFrame(sample_data)
+    return df, all_structures
+
+
 def get_available_tests():
     """
     利用可能なテスト一覧を取得
@@ -2037,27 +2189,26 @@ def get_individual_report_data(student_id: str, year: str, period: str) -> dict 
 
 
 def _get_principal_comment(student_id: str, year: int, period: str, subject: str) -> str:
-    """塾長コメントを取得（登録されたコメントを優先、なければデフォルト）"""
+    """塾長コメントを取得（登録されたコメントを優先、なければ点数範囲に応じたテンプレートを使用）"""
     default_comment = '今回の結果は、未来へのヒントです。今の努力が、これからの可能性を広げていきます。'
 
-    # 生徒とテストを取得
+    # 生徒を取得
     student = Student.objects.filter(student_id=student_id).first()
     if not student:
         return default_comment
 
-    # 該当する学年レベルのテストを取得
-    grade_level = get_grade_level_from_student_grade(student.grade)
-    tests = TestDefinition.objects.filter(
-        schedule__year=year,
-        schedule__period=period,
-        subject=subject
-    )
-    if grade_level:
-        tests = tests.filter(grade_level=grade_level)
+    # TestResultから該当するテストを逆算して取得
+    test_result = TestResult.objects.filter(
+        student=student,
+        test__schedule__year=year,
+        test__schedule__period=period,
+        test__subject=subject
+    ).first()
 
-    test = tests.first()
-    if not test:
+    if not test_result:
         return default_comment
+
+    test = test_result.test
 
     # TestCommentからテスト全体のコメントを取得
     test_comment = TestComment.objects.filter(
@@ -2078,6 +2229,30 @@ def _get_principal_comment(student_id: str, year: int, period: str, subject: str
 
     if student_comment and student_comment.content:
         return student_comment.content
+
+    # 点数範囲に応じたテンプレートを使用
+    score = test_result.total_score
+
+    # 点数範囲を決定
+    if 0 <= score <= 20:
+        score_range = '0-20'
+    elif 21 <= score <= 40:
+        score_range = '21-40'
+    elif 41 <= score <= 60:
+        score_range = '41-60'
+    elif 61 <= score <= 80:
+        score_range = '61-80'
+    else:
+        score_range = '81-100'
+
+    # テンプレートを取得
+    template = CommentTemplateV2.objects.filter(
+        category=f"{subject}_{score_range}",
+        is_active=True
+    ).first()
+
+    if template:
+        return template.template_text
 
     return default_comment
 
