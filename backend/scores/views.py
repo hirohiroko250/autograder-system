@@ -322,6 +322,13 @@ class ScoreViewSet(viewsets.ModelViewSet):
 
                 scores_dict[student_id][test_id][qg_id] = score_data
 
+            # 登録がない場合のチェック
+            if not enrollments.exists():
+                return Response({
+                    'success': False,
+                    'error': f'{year}年度{period}期の登録生徒が見つかりません。権限設定を確認してください。'
+                }, status=404)
+
             # データ行を生成
             data_rows = []
 
@@ -398,10 +405,20 @@ class ScoreViewSet(viewsets.ModelViewSet):
 
         except Exception as e:
             import traceback
-            traceback.print_exc()
+            import sys
+
+            # 詳細なエラーログを出力
+            print('='*80, file=sys.stderr)
+            print('ERROR in export_scores_with_students:', file=sys.stderr)
+            print('Error type:', type(e).__name__, file=sys.stderr)
+            print('Error message:', str(e), file=sys.stderr)
+            print('Full traceback:', file=sys.stderr)
+            traceback.print_exc(file=sys.stderr)
+            print('='*80, file=sys.stderr)
+
             return Response({
                 'success': False,
-                'error': str(e)
+                'error': f'{type(e).__name__}: {str(e)}'
             }, status=500)
 
     @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated])

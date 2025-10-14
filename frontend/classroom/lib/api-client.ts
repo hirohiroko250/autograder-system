@@ -265,7 +265,7 @@ export const studentApi = {
 
 export const testApi = {
   getTestSchedules: async (params?: { year?: string; period?: string }): Promise<ApiResponse<TestSchedule>> => {
-    const response = await apiClient.get<ApiResponse<TestSchedule>>('/tests/schedules/', { params });
+    const response = await apiClient.get<ApiResponse<TestSchedule>>('/test-schedules/', { params });
     return response.data;
   },
 
@@ -563,10 +563,49 @@ export const testApi = {
       return { success: true, message: 'CSVファイルをダウンロードしました' };
     } catch (error: any) {
       console.error('exportScoresWithStudents error:', error);
+      console.error('Error response:', error.response);
+      console.error('Error response data type:', error.response?.data?.constructor?.name);
+
+      // Blobレスポンスの場合はテキストとしてエラーを読み取る
+      let errorMessage = '不明なエラー';
+
+      if (error.response && error.response.data) {
+        // Blobの場合
+        if (error.response.data instanceof Blob) {
+          try {
+            const text = await error.response.data.text();
+            console.log('Blob error text:', text);
+
+            try {
+              const errorData = JSON.parse(text);
+              errorMessage = errorData.error || errorData.detail || text;
+            } catch (parseError) {
+              // JSONパースに失敗した場合はそのままテキストを使う
+              errorMessage = text;
+            }
+          } catch (blobReadError) {
+            console.error('Failed to read blob:', blobReadError);
+            errorMessage = 'エラーレスポンスの読み取りに失敗しました';
+          }
+        }
+        // 通常のオブジェクトの場合
+        else if (typeof error.response.data === 'object') {
+          errorMessage = error.response.data.error || error.response.data.detail || JSON.stringify(error.response.data);
+        }
+        // 文字列の場合
+        else {
+          errorMessage = String(error.response.data);
+        }
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+
+      console.error('Final error message:', errorMessage);
+
       return {
         success: false,
-        message: error.response?.data?.error || error.message || '不明なエラー',
-        error: error.response?.data?.error || error.message
+        message: errorMessage,
+        error: errorMessage
       };
     }
   },
@@ -688,7 +727,7 @@ export const commentApi = {
 
   // 教科別コメントテンプレート関連
   getSubjectCommentTemplates: async (subject: string): Promise<any[]> => {
-    const response = await apiClient.get<any[]>(`/comment-templates/subject-comments/?subject=${subject}`);
+    const response = await apiClient.get<any[]>(`/comment-templates-v2/subject-comments/?subject=${subject}`);
     return response.data;
   },
 
@@ -697,7 +736,7 @@ export const commentApi = {
     score_range: string;
     content: string;
   }): Promise<any> => {
-    const response = await apiClient.post<any>('/comment-templates/update-subject-comment/', data);
+    const response = await apiClient.post<any>('/comment-templates-v2/update-subject-comment/', data);
     return response.data;
   },
 
