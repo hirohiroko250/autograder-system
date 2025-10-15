@@ -1,0 +1,66 @@
+{% extends "admin/change_list.html" %}
+{% load i18n admin_urls static %}
+
+{% block object-tools-items %}
+    {{ block.super }}
+    <li>
+        <a href="/admin/students/student/import-students/" class="addlink">
+            👥 生徒インポート
+        </a>
+    </li>
+    <li>
+        <a href="/admin/students/student/export-students/" class="addlink">
+            📤 生徒エクスポート
+        </a>
+    </li>
+{% endblock %}
+
+{% block extrastyle %}
+{{ block.super }}
+<style>
+/* テーブルを横スクロール対応 */
+#changelist-form .results {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+#result_list {
+    min-width: max-content;
+    white-space: nowrap;
+    table-layout: auto;
+}
+
+#result_list th,
+#result_list td {
+    white-space: nowrap !important;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 200px;
+}
+
+#result_list th.action-checkbox-column,
+#result_list td.action-checkbox {
+    max-width: 50px;
+    width: 50px;
+}
+
+/* セル内のテキストも1行に */
+#result_list td * {
+    white-space: nowrap !important;
+}
+
+#result_list td:hover {
+    overflow: visible;
+    white-space: nowrap !important;
+    position: relative;
+    z-index: 10;
+    background: white;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    max-width: none;
+}
+
+#result_list td:hover * {
+    white-space: nowrap !important;
+}
+</style>
+{% endblock %}

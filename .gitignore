@@ -1,0 +1,93 @@
+# 環境変数ファイル
+.env
+.env.*
+!.env.example
+
+# SSH鍵・証明書
+*.pem
+*.key
+*.crt
+ssl/
+certbot/
+
+# データベース
+*.db
+*.sqlite
+*.sqlite3
+postgres_data/
+pgdata/
+
+# Python
+__pycache__/
+*.py[cod]
+*.class
+*.so
+.Python
+venv/
+env/
+ENV/
+.venv
+
+# Django
+*.log
+db.sqlite3
+media/
+staticfiles/
+
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.npm
+.yarn
+dist/
+build/
+
+# Next.js
+.next/
+out/
+.cache/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Docker volumes
+volumes/
+
+# Backup files
+*.bak
+*.backup
+*.dump
+
+# Logs
+logs/
+*.log
+
+# OS
+Thumbs.db
+.Spotlight-V100
+.Trashes
+
+# Mac OS metadata
+._*
+.DS_Store
+
+
+# Python virtual environment
+autograder_env/
+venv/
+env/
+
+
+# Node modules with spaces (Mac OS duplicates)
+node_modules 2/
+node_modules\ 2/
+
+# Django static files
+backend/static/

@@ -441,5 +441,32 @@
         }
     })();
     </script>
+
+    <!-- 印刷ボタン -->
+    <script>
+    window.addEventListener('load', function() {
+        const printButton = document.createElement('button');
+        printButton.textContent = '印刷';
+        printButton.style.cssText = 'position: fixed; top: 10px; right: 10px; z-index: 9999; padding: 10px 20px; background: #3498db; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 14px; box-shadow: 0 2px 5px rgba(0,0,0,0.3);';
+        printButton.onclick = function() { window.print(); };
+        printButton.className = 'no-print';
+        document.body.appendChild(printButton);
+    });
+
+    // Ctrl+P または Cmd+P で印刷可能
+    document.addEventListener('keydown', function(e) {
+        if ((e.ctrlKey || e.metaKey) && e.key === 'p') {
+            e.preventDefault();
+            window.print();
+        }
+    });
+    </script>
+    <style>
+    @media print {
+        .no-print {
+            display: none !important;
+        }
+    }
+    </style>
 </body>
 </html>
