@@ -7,10 +7,7 @@ import django.db.models.deletion
 class Migration(migrations.Migration):
 
     dependencies = [
-        (
-            "schools",
-            "0006_classroom_membershiptype_student_schoolbillingreport_and_more",
-        ),
+        ("schools", "0005_school_can_input_scores_school_can_register_students_and_more"),
         ("tests", "0013_alter_testdefinition_answer_pdf_and_more"),
         ("scores", "0012_testresult_national_total_and_more"),
     ]
@@ -22,7 +19,7 @@ class Migration(migrations.Migration):
             field=models.ForeignKey(
                 on_delete=django.db.models.deletion.CASCADE,
                 related_name="individual_problem_scores",
-                to="schools.student",
+                to="students.student",
             ),
         ),
         migrations.AlterField(
@@ -31,7 +28,7 @@ class Migration(migrations.Migration):
             field=models.ForeignKey(
                 on_delete=django.db.models.deletion.CASCADE,
                 related_name="question_scores",
-                to="schools.student",
+                to="students.student",
             ),
         ),
         migrations.AlterField(
@@ -40,7 +37,7 @@ class Migration(migrations.Migration):
             field=models.ForeignKey(
                 on_delete=django.db.models.deletion.CASCADE,
                 related_name="scores",
-                to="schools.student",
+                to="students.student",
             ),
         ),
         migrations.AlterField(
@@ -49,7 +46,7 @@ class Migration(migrations.Migration):
             field=models.ForeignKey(
                 on_delete=django.db.models.deletion.CASCADE,
                 related_name="comments",
-                to="schools.student",
+                to="students.student",
             ),
         ),
         migrations.AlterField(
@@ -58,7 +55,7 @@ class Migration(migrations.Migration):
             field=models.ForeignKey(
                 on_delete=django.db.models.deletion.CASCADE,
                 related_name="test_attendances",
-                to="schools.student",
+                to="students.student",
             ),
         ),
         migrations.AlterField(
@@ -67,7 +64,7 @@ class Migration(migrations.Migration):
             field=models.ForeignKey(
                 on_delete=django.db.models.deletion.CASCADE,
                 related_name="test_comments",
-                to="schools.student",
+                to="students.student",
             ),
         ),
         migrations.AlterField(
@@ -76,7 +73,7 @@ class Migration(migrations.Migration):
             field=models.ForeignKey(
                 on_delete=django.db.models.deletion.CASCADE,
                 related_name="test_results",
-                to="schools.student",
+                to="students.student",
             ),
         ),
         migrations.CreateModel(
@@ -123,7 +120,7 @@ class Migration(migrations.Migration):
                     models.ForeignKey(
                         on_delete=django.db.models.deletion.CASCADE,
                         related_name="subject_general_comments",
-                        to="schools.student",
+                        to="students.student",
                     ),
                 ),
                 (
