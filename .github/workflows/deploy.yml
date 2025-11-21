@@ -27,18 +27,18 @@ jobs:
 
     - name: Install dependencies
       run: |
-        cd backend
+        cd autograder-system/backend
         python -m pip install --upgrade pip
         pip install -r requirements.txt
 
     - name: Run tests
       run: |
-        cd backend
+        cd autograder-system/backend
         python manage.py test
 
     - name: Check Django configuration
       run: |
-        cd backend
+        cd autograder-system/backend
         python manage.py check
 
   deploy:
@@ -55,15 +55,16 @@ jobs:
         key: ${{ secrets.SSH_KEY }}
         script: |
           # デプロイスクリプト実行
-          cd /opt/autograder-system
+          cd "/home/skyuser/Documents/an 小学生テスト"
           git pull origin main
-          ./deploy/deploy.sh production
+          ./autograder-system/deploy/deploy.sh production
 
     - name: Health Check
       run: |
         # アプリケーションの応答確認
+        sleep 10
         for i in {1..30}; do
-          if curl -s http://${{ secrets.HOST }}/ > /dev/null; then
+          if curl -s https://kouzyoutest.com/ > /dev/null; then
             echo "✅ Application is responding"
             break
           elif [ $i -eq 30 ]; then
@@ -79,5 +80,5 @@ jobs:
       if: success()
       run: |
         echo "🎉 Deployment completed successfully!"
-        echo "📱 Application: http://${{ secrets.HOST }}/"
-        echo "🔧 Admin: http://${{ secrets.HOST }}/admin/"
+        echo "📱 Application: https://kouzyoutest.com/"
+        echo "🔧 Admin: https://kouzyoutest.com/admin/"
