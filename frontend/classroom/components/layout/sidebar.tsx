@@ -63,12 +63,23 @@ const getMenuItems = (permissions: { canRegisterStudents: boolean; canInputScore
   },
 ].filter(item => item.show);
 
-export function Sidebar() {
+interface SidebarProps {
+  onClose?: () => void;
+}
+
+export function Sidebar({ onClose }: SidebarProps = {}) {
   const [collapsed, setCollapsed] = useState(false);
   const pathname = usePathname();
   const { user } = useAuth();
   const permissions = usePermissions();
   const menuItems = getMenuItems(permissions, user);
+
+  const handleLinkClick = () => {
+    // モバイルでメニューをクリックしたら閉じる
+    if (onClose) {
+      onClose();
+    }
+  };
 
   return (
     <div className={cn(
@@ -96,7 +107,7 @@ export function Sidebar() {
           </Button>
         </div>
       </div>
-      
+
       <ScrollArea className="flex-1 py-4">
         <nav className="space-y-2 px-2">
           {menuItems.map((item) => (
@@ -116,6 +127,7 @@ export function Sidebar() {
                         <Link
                           key={child.href}
                           href={child.href}
+                          onClick={handleLinkClick}
                           className={cn(
                             "flex items-center gap-3 px-3 py-2 text-sm rounded-xl transition-colors",
                             pathname === child.href
@@ -133,6 +145,7 @@ export function Sidebar() {
               ) : (
                 <Link
                   href={item.href}
+                  onClick={handleLinkClick}
                   className={cn(
                     "flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-xl transition-colors",
                     collapsed ? "justify-center" : "justify-start",

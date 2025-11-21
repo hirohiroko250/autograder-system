@@ -67,3 +67,5 @@ backup_*.json
 
 # Docker
 docker-compose.override.yml
+._*
+.DS_Store

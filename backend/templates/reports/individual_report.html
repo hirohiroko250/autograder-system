@@ -108,7 +108,7 @@
                                 <td>{{ math_school_highest }}<span class="unit">点</span></td>
                             </tr>
                             <tr>
-                                <td class="label-cell">平均点<br><span class="sub-label">(学年平均)</span></td>
+                                <td class="label-cell">平均点<br><span class="sub-label">(全国平均)</span></td>
                                 <td>{{ total_grade_avg }}<span class="unit">点</span></td>
                                 <td>{{ japanese_grade_avg }}<span class="unit">点</span></td>
                                 <td>{{ math_grade_avg }}<span class="unit">点</span></td>
@@ -440,6 +440,16 @@
             console.log('Charts drawn');
         }
     })();
+    </script>
+
+    <!-- Ctrl+P または Cmd+P で印刷可能 -->
+    <script>
+    document.addEventListener('keydown', function(e) {
+        if ((e.ctrlKey || e.metaKey) && e.key === 'p') {
+            e.preventDefault();
+            window.print();
+        }
+    });
     </script>
 </body>
 </html>

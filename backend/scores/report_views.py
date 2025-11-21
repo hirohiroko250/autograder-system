@@ -52,44 +52,7 @@ def preview_individual_report(request):
     # HTML生成
     html_content = render_to_string('reports/individual_report.html', template_data)
 
-    # 印刷用のJavaScriptを追加（自動印刷なし）
-    print_script = '''
-<script>
-function printReport() {
-    window.print();
-}
-
-// Ctrl+P または Cmd+P で印刷可能
-document.addEventListener('keydown', function(e) {
-    if ((e.ctrlKey || e.metaKey) && e.key === 'p') {
-        e.preventDefault();
-        window.print();
-    }
-});
-
-// 印刷ボタンを追加
-window.addEventListener('load', function() {
-    const printButton = document.createElement('button');
-    printButton.textContent = '印刷';
-    printButton.style.cssText = 'position: fixed; top: 10px; right: 10px; z-index: 9999; padding: 10px 20px; background: #3498db; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 14px; box-shadow: 0 2px 5px rgba(0,0,0,0.3);';
-    printButton.onclick = function() { window.print(); };
-    printButton.className = 'no-print';
-    document.body.appendChild(printButton);
-});
-</script>
-<style>
-@media print {
-    .no-print {
-        display: none !important;
-    }
-}
-</style>
-</body>
-</html>'''
-
-    # HTMLの最後に印刷スクリプトを挿入
-    html_content = html_content.replace('</body>\n</html>', print_script)
-
+    # そのまま返す（印刷ボタンはテンプレート側に含まれている）
     return HttpResponse(html_content, content_type='text/html; charset=utf-8')
 
 
@@ -141,6 +104,8 @@ def preview_bulk_reports(request):
                 **report_data
             }
             html_page = render_to_string('reports/individual_report.html', template_data)
+            # 末尾の </body></html> を削除（最後のページ以外）
+            html_page = html_page.replace('</body>\n</html>', '').replace('</body></html>', '')
             html_pages.append(html_page)
 
     if not html_pages:
@@ -187,12 +152,7 @@ window.addEventListener('load', function() {
 </body>
 </html>'''
 
-    # HTMLの最後に印刷スクリプトを挿入（最後の出現のみ）
-    last_closing = combined_html.rfind('</body>\n</html>')
-    if last_closing != -1:
-        combined_html = combined_html[:last_closing] + print_script
-    else:
-        # 代替パターンを試す
-        combined_html = combined_html.replace('</body></html>', print_script)
+    # HTMLの最後に印刷スクリプトを追加
+    combined_html = combined_html + print_script
 
     return HttpResponse(combined_html, content_type='text/html; charset=utf-8')

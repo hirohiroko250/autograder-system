@@ -12,7 +12,8 @@ from scores.views import (
     ScoreViewSet, TestResultViewSet, CommentTemplateViewSet, CommentTemplateV2ViewSet,
     StudentCommentViewSet, TestCommentViewSet,
     QuestionScoreViewSet, TestAttendanceViewSet,
-    IndividualProblemViewSet, IndividualProblemScoreViewSet, import_csv_scores
+    IndividualProblemViewSet, import_csv_scores
+    # IndividualProblemScoreViewSet removed - use /api/scores/preview-* endpoints instead
 )
 from scores.report_views import preview_individual_report, preview_bulk_reports
 from notifications.views import NotificationViewSet, UserNotificationViewSet
@@ -67,7 +68,7 @@ router.register(r'questions', QuestionViewSet, basename='question')
 router.register(r'question-scores', QuestionScoreViewSet, basename='questionscore')
 router.register(r'test-attendances', TestAttendanceViewSet, basename='testattendance')
 router.register(r'individual-problems', IndividualProblemViewSet, basename='individualproblem')
-router.register(r'individual-problem-scores', IndividualProblemScoreViewSet, basename='individualproblemscore')
+# router.register(r'individual-problem-scores', IndividualProblemScoreViewSet, basename='individualproblemscore')  # DEPRECATED: Use /api/scores/preview-* endpoints instead
 router.register(r'scores', ScoreViewSet, basename='score')
 router.register(r'classrooms', ClassroomViewSet, basename='classroom')
 router.register(r'notifications', NotificationViewSet, basename='notification')

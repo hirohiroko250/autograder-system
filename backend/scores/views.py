@@ -1199,7 +1199,7 @@ class TestResultViewSet(viewsets.ModelViewSet):
                         'total_score': data['subjects'][subject]['total_score'],
                         'rankings': subject_rankings[subject],
                         'averages': subject_averages[subject],
-                        'question_details': detailed_scores[subject],
+                        'question_details': detailed_scores.get(subject, []),
                         'attendance': data['subjects'][subject]['attendance']
                     } for subject in data['subjects'].keys()
                 }
@@ -1569,7 +1569,6 @@ document.addEventListener('keydown', function(e) {
     </style>
 </head>
 <body>
-<button class="print-button" onclick="window.print()">🖨️ 印刷 / PDF保存 (全''' + str(len(all_reports_html)) + '''枚)</button>
 '''
 
             for idx, report_html in enumerate(all_reports_html):
