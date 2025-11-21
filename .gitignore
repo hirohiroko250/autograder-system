@@ -69,3 +69,4 @@ backup_*.json
 docker-compose.override.yml
 ._*
 .DS_Store
+server_logs/
