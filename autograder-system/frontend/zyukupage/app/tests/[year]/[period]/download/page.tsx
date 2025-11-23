@@ -48,6 +48,15 @@ function StudentManagementContent({ year, period }: { year: string; period: stri
   const [availableTemplates, setAvailableTemplates] = useState<{ [key: string]: any[] }>({});
   const [subjectScores, setSubjectScores] = useState<{ [key: string]: number }>({});
 
+  // 総評コメントとテンプレート/オリジナル切り替え用の状態
+  const [principalComment, setPrincipalComment] = useState<string>('');
+  const [principalCommentMode, setPrincipalCommentMode] = useState<'template' | 'original'>('template');
+  const [principalTemplateComment, setPrincipalTemplateComment] = useState<string>('');
+  const [principalOriginalComment, setPrincipalOriginalComment] = useState<string>('');
+  const [commentModes, setCommentModes] = useState<{ [key: string]: 'template' | 'original' }>({});
+  const [templateComments, setTemplateComments] = useState<{ [key: string]: string }>({});
+  const [originalComments, setOriginalComments] = useState<{ [key: string]: string }>({});
+
   const getPeriodLabel = (period: string) => {
     switch (period) {
       case 'spring': return '春期';
@@ -251,7 +260,7 @@ function StudentManagementContent({ year, period }: { year: string; period: stri
   // 生徒名をクリックした時のコメント編集ダイアログを開く
   const handleStudentNameClick = async (student: any) => {
     setSelectedStudent(student);
-    
+
     try {
       // 点数に応じたコメントテンプレートを取得
       const scoreBasedResponse = await testApi.getScoreBasedComments({
@@ -262,34 +271,76 @@ function StudentManagementContent({ year, period }: { year: string; period: stri
 
       if (scoreBasedResponse.success) {
         // 点数に応じて自動生成されたコメントを設定
-        const comments: { [key: string]: string } = {};
+        const templateCommentsData: { [key: string]: string } = {};
+        const originalCommentsData: { [key: string]: string } = {};
+        const modesData: { [key: string]: 'template' | 'original' } = {};
+
         Object.entries(scoreBasedResponse.suggested_comments).forEach(([subject, data]: [string, any]) => {
-          comments[subject] = data.template_text;
+          templateCommentsData[subject] = data.template_text || '';
+          originalCommentsData[subject] = data.original_text || '';
+          modesData[subject] = 'template'; // デフォルトでテンプレート表示
         });
-        setStudentComments(comments);
+
+        setTemplateComments(templateCommentsData);
+        setOriginalComments(originalCommentsData);
+        setCommentModes(modesData);
+        setStudentComments(templateCommentsData); // 初期表示はテンプレート
         setSubjectScores(scoreBasedResponse.subject_scores || {});
+
+        // 総評コメント（テンプレートと既存のオリジナルを取得）
+        const principalData = scoreBasedResponse.principal_comment || {};
+        setPrincipalTemplateComment(principalData.template_text || '総合的な評価をここに記入してください。');
+        setPrincipalOriginalComment(principalData.original_text || '');
+        setPrincipalCommentMode('template');
+        setPrincipalComment(principalData.template_text || '総合的な評価をここに記入してください。');
       } else {
         // フォールバック: 既存のコメント取得方法
-        const comments: { [key: string]: string } = {};
+        const originalCommentsData: { [key: string]: string } = {};
+        const modesData: { [key: string]: 'template' | 'original' } = {};
+
         if (student.subject_results) {
           Object.entries(student.subject_results).forEach(([subject, data]: [string, any]) => {
-            comments[subject] = data.comment || `${subject}の成績についてコメントを入力してください。`;
+            originalCommentsData[subject] = data.comment || `${subject}の成績についてコメントを入力してください。`;
+            modesData[subject] = 'original';
           });
         }
-        setStudentComments(comments);
+
+        setOriginalComments(originalCommentsData);
+        setTemplateComments({});
+        setCommentModes(modesData);
+        setStudentComments(originalCommentsData);
+
+        // 総評コメント
+        setPrincipalOriginalComment(student.principal_comment || '');
+        setPrincipalTemplateComment('');
+        setPrincipalCommentMode('original');
+        setPrincipalComment(student.principal_comment || '');
       }
     } catch (error) {
       console.error('Failed to load score-based comments:', error);
       // エラー時のフォールバック
-      const comments: { [key: string]: string } = {};
+      const originalCommentsData: { [key: string]: string } = {};
+      const modesData: { [key: string]: 'template' | 'original' } = {};
+
       if (student.subject_results) {
         Object.entries(student.subject_results).forEach(([subject, data]: [string, any]) => {
-          comments[subject] = data.comment || `${subject}の成績についてコメントを入力してください。`;
+          originalCommentsData[subject] = data.comment || `${subject}の成績についてコメントを入力してください。`;
+          modesData[subject] = 'original';
         });
       }
-      setStudentComments(comments);
+
+      setOriginalComments(originalCommentsData);
+      setTemplateComments({});
+      setCommentModes(modesData);
+      setStudentComments(originalCommentsData);
+
+      // 総評コメント
+      setPrincipalOriginalComment(student.principal_comment || '');
+      setPrincipalTemplateComment('');
+      setPrincipalCommentMode('original');
+      setPrincipalComment(student.principal_comment || '');
     }
-    
+
     // 科目別のコメントテンプレートを取得（手動選択用）
     const templates: { [key: string]: any[] } = {};
     if (student.subject_results) {
@@ -303,7 +354,7 @@ function StudentManagementContent({ year, period }: { year: string; period: stri
         }
       }
     }
-    
+
     setAvailableTemplates(templates);
     setCommentDialogOpen(true);
   };
@@ -315,9 +366,10 @@ function StudentManagementContent({ year, period }: { year: string; period: stri
         studentId: selectedStudent.student_id,
         year: parseInt(year),
         period: period,
-        comments: studentComments
+        comments: studentComments,
+        principalComment: principalComment // 総評コメントを追加
       });
-      
+
       toast.success('コメントを保存しました');
       setCommentDialogOpen(false);
     } catch (error) {
@@ -332,14 +384,83 @@ function StudentManagementContent({ year, period }: { year: string; period: stri
       ...prev,
       [subject]: comment
     }));
+
+    // 現在のモードに応じて適切なコメントストアを更新
+    const currentMode = commentModes[subject] || 'template';
+    if (currentMode === 'template') {
+      setTemplateComments(prev => ({
+        ...prev,
+        [subject]: comment
+      }));
+    } else {
+      setOriginalComments(prev => ({
+        ...prev,
+        [subject]: comment
+      }));
+    }
   };
 
   // コメントテンプレートを適用
   const handleApplyTemplate = (subject: string, template: any) => {
+    const templateText = template.template_text || template.content || template.name || '';
     setStudentComments(prev => ({
       ...prev,
-      [subject]: template.template_text || template.content || template.name || ''
+      [subject]: templateText
     }));
+    setTemplateComments(prev => ({
+      ...prev,
+      [subject]: templateText
+    }));
+  };
+
+  // テンプレート/オリジナル切り替え（科目別）
+  const handleToggleCommentMode = (subject: string) => {
+    const currentMode = commentModes[subject] || 'template';
+    const newMode = currentMode === 'template' ? 'original' : 'template';
+
+    // モードを切り替え
+    setCommentModes(prev => ({
+      ...prev,
+      [subject]: newMode
+    }));
+
+    // 表示するコメントを切り替え
+    if (newMode === 'template') {
+      setStudentComments(prev => ({
+        ...prev,
+        [subject]: templateComments[subject] || ''
+      }));
+    } else {
+      setStudentComments(prev => ({
+        ...prev,
+        [subject]: originalComments[subject] || ''
+      }));
+    }
+  };
+
+  // 総評コメントを更新
+  const handlePrincipalCommentChange = (comment: string) => {
+    setPrincipalComment(comment);
+
+    // 現在のモードに応じて適切なコメントストアを更新
+    if (principalCommentMode === 'template') {
+      setPrincipalTemplateComment(comment);
+    } else {
+      setPrincipalOriginalComment(comment);
+    }
+  };
+
+  // 総評コメントのテンプレート/オリジナル切り替え
+  const handleTogglePrincipalMode = () => {
+    const newMode = principalCommentMode === 'template' ? 'original' : 'template';
+    setPrincipalCommentMode(newMode);
+
+    // 表示するコメントを切り替え
+    if (newMode === 'template') {
+      setPrincipalComment(principalTemplateComment);
+    } else {
+      setPrincipalComment(principalOriginalComment);
+    }
   };
 
   // ローディング状態
@@ -624,7 +745,7 @@ function StudentManagementContent({ year, period }: { year: string; period: stri
 
       {/* コメント編集ダイアログ */}
       <Dialog open={commentDialogOpen} onOpenChange={setCommentDialogOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>コメント編集</DialogTitle>
             <DialogDescription>
@@ -632,9 +753,45 @@ function StudentManagementContent({ year, period }: { year: string; period: stri
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
+            {/* 総評コメント */}
+            <div className="border-b pb-4">
+              <div className="flex items-center justify-between mb-2">
+                <Label htmlFor="principal-comment" className="text-sm font-medium">
+                  総評コメント
+                </Label>
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    variant={principalCommentMode === 'template' ? 'default' : 'outline'}
+                    onClick={handleTogglePrincipalMode}
+                    className="h-7 text-xs"
+                  >
+                    テンプレート
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant={principalCommentMode === 'original' ? 'default' : 'outline'}
+                    onClick={handleTogglePrincipalMode}
+                    className="h-7 text-xs"
+                  >
+                    オリジナル
+                  </Button>
+                </div>
+              </div>
+              <Textarea
+                id="principal-comment"
+                value={principalComment}
+                onChange={(e) => handlePrincipalCommentChange(e.target.value)}
+                placeholder="総合的な評価をここに記入してください。"
+                rows={4}
+                className="w-full"
+              />
+            </div>
+
+            {/* 科目別コメント */}
             {selectedStudent && Object.entries(selectedStudent.subject_results || {}).map(([subject, data]: [string, any]) => (
-              <div key={subject} className="space-y-3">
-                <div className="space-y-2">
+              <div key={subject} className="space-y-3 border-b pb-4 last:border-b-0">
+                <div className="flex items-center justify-between">
                   <Label htmlFor={`comment-${subject}`} className="text-sm font-medium">
                     {subject}のコメント
                     {subjectScores[subject] && (
@@ -643,39 +800,61 @@ function StudentManagementContent({ year, period }: { year: string; period: stri
                       </span>
                     )}
                   </Label>
-                  {availableTemplates[subject] && availableTemplates[subject].length > 0 && (
-                    <Select onValueChange={(value) => {
-                      const template = availableTemplates[subject].find(t => t.id.toString() === value);
-                      if (template) handleApplyTemplate(subject, template);
-                    }}>
-                      <SelectTrigger className="w-48">
-                        <SelectValue placeholder="テンプレートを選択" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {availableTemplates[subject].map((template) => (
-                          <SelectItem key={template.id} value={template.id.toString()}>
-                            {template.template_text || template.content ? 
-                              ((template.template_text || template.content).length > 40 ? 
-                                (template.template_text || template.content).substring(0, 40) + '...' : 
-                                (template.template_text || template.content)
-                              ) : 
-                              (template.name || 'テンプレート')
-                            }
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  )}
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      variant={(commentModes[subject] || 'template') === 'template' ? 'default' : 'outline'}
+                      onClick={() => handleToggleCommentMode(subject)}
+                      className="h-7 text-xs"
+                    >
+                      テンプレート
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant={(commentModes[subject] || 'template') === 'original' ? 'default' : 'outline'}
+                      onClick={() => handleToggleCommentMode(subject)}
+                      className="h-7 text-xs"
+                    >
+                      オリジナル
+                    </Button>
+                  </div>
                 </div>
+
+                {availableTemplates[subject] && availableTemplates[subject].length > 0 && (commentModes[subject] || 'template') === 'template' && (
+                  <Select onValueChange={(value) => {
+                    const template = availableTemplates[subject].find(t => t.id.toString() === value);
+                    if (template) handleApplyTemplate(subject, template);
+                  }}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="別のテンプレートを選択" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availableTemplates[subject].map((template) => (
+                        <SelectItem key={template.id} value={template.id.toString()}>
+                          {template.template_text || template.content ?
+                            ((template.template_text || template.content).length > 40 ?
+                              (template.template_text || template.content).substring(0, 40) + '...' :
+                              (template.template_text || template.content)
+                            ) :
+                            (template.name || 'テンプレート')
+                          }
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+
                 <Textarea
                   id={`comment-${subject}`}
                   value={studentComments[subject] || ''}
                   onChange={(e) => handleCommentChange(subject, e.target.value)}
                   placeholder={`${subject}の成績についてコメントを入力してください。`}
                   rows={3}
+                  className="w-full"
                 />
               </div>
             ))}
+
             <div className="flex justify-end gap-2 pt-4">
               <Button
                 variant="outline"
