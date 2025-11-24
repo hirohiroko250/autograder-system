@@ -13,7 +13,26 @@ import Link from 'next/link';
 
 export default function TestsPage() {
   const [selectedYear, setSelectedYear] = useState('2025');
-  const [selectedPeriod, setSelectedPeriod] = useState('summer');
+  const [selectedPeriod, setSelectedPeriod] = useState('winter');
+
+  // 利用可能な年度と期間を取得
+  const { data: availablePeriods } = useQuery({
+    queryKey: ['available-periods'],
+    queryFn: async () => {
+      const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || '/api';
+      const response = await fetch(`${apiBaseUrl}/test-results/available_periods/`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+        },
+      });
+      if (!response.ok) {
+        throw new Error('Failed to fetch available periods');
+      }
+      return response.json();
+    },
+    staleTime: 60000, // 1分間はキャッシュを使用
+    refetchOnWindowFocus: true, // ウィンドウフォーカス時に再取得
+  });
 
   const { data: testSchedules } = useQuery({
     queryKey: ['test-schedules', selectedYear, selectedPeriod],
@@ -21,10 +40,12 @@ export default function TestsPage() {
       const params: any = {};
       if (selectedYear !== 'all') params.year = selectedYear;
       if (selectedPeriod !== 'all') params.period = selectedPeriod;
-      
+
       const response = await testApi.getTestSchedules(params);
       return response.results || [];
     },
+    staleTime: 60000, // 1分間はキャッシュを使用
+    refetchOnWindowFocus: true, // ウィンドウフォーカス時に再取得
   });
 
   const getPeriodLabel = (period: string) => {
@@ -71,9 +92,13 @@ export default function TestsPage() {
                   <SelectValue placeholder="年度" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="2025">2025年度</SelectItem>
-                  <SelectItem value="2026">2026年度</SelectItem>
-                  <SelectItem value="2027">2027年度</SelectItem>
+                  {availablePeriods?.years?.map((year: number) => (
+                    <SelectItem key={year} value={String(year)}>{year}年度</SelectItem>
+                  )) || (
+                      <>
+                        <SelectItem value="2025">2025年度</SelectItem>
+                      </>
+                    )}
                 </SelectContent>
               </Select>
               <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
@@ -81,9 +106,17 @@ export default function TestsPage() {
                   <SelectValue placeholder="期間" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="spring">春期</SelectItem>
-                  <SelectItem value="summer">夏期</SelectItem>
-                  <SelectItem value="winter">冬期</SelectItem>
+                  {availablePeriods?.periods?.map((period: string) => (
+                    <SelectItem key={period} value={period}>
+                      {getPeriodLabel(period)}
+                    </SelectItem>
+                  )) || (
+                      <>
+                        <SelectItem value="spring">春期</SelectItem>
+                        <SelectItem value="summer">夏期</SelectItem>
+                        <SelectItem value="winter">冬期</SelectItem>
+                      </>
+                    )}
                 </SelectContent>
               </Select>
             </div>

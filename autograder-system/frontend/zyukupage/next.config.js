@@ -1,5 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  output: 'standalone',
   eslint: {
     ignoreDuringBuilds: true,
   },
@@ -26,8 +27,6 @@ const nextConfig = {
     maxInactiveAge: 25 * 1000,
     pagesBufferLength: 2,
   },
-  // SWC minify が一部依存のテンプレート文字列を壊すため無効化
-  swcMinify: false,
 };
 
 module.exports = nextConfig;

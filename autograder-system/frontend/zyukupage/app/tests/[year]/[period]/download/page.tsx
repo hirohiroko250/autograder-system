@@ -47,15 +47,9 @@ function StudentManagementContent({ year, period }: { year: string; period: stri
   const [studentComments, setStudentComments] = useState<{ [key: string]: string }>({});
   const [availableTemplates, setAvailableTemplates] = useState<{ [key: string]: any[] }>({});
   const [subjectScores, setSubjectScores] = useState<{ [key: string]: number }>({});
-
-  // 総評コメントとテンプレート/オリジナル切り替え用の状態
-  const [principalComment, setPrincipalComment] = useState<string>('');
-  const [principalCommentMode, setPrincipalCommentMode] = useState<'template' | 'original'>('template');
-  const [principalTemplateComment, setPrincipalTemplateComment] = useState<string>('');
-  const [principalOriginalComment, setPrincipalOriginalComment] = useState<string>('');
-  const [commentModes, setCommentModes] = useState<{ [key: string]: 'template' | 'original' }>({});
-  const [templateComments, setTemplateComments] = useState<{ [key: string]: string }>({});
+  const [useTemplate, setUseTemplate] = useState<{ [key: string]: boolean }>({});
   const [originalComments, setOriginalComments] = useState<{ [key: string]: string }>({});
+  const [templateComments, setTemplateComments] = useState<{ [key: string]: string }>({});
 
   const getPeriodLabel = (period: string) => {
     switch (period) {
@@ -151,7 +145,7 @@ function StudentManagementContent({ year, period }: { year: string; period: stri
 
   const availableClassrooms = getAvailableClassrooms();
 
-  // 個別帳票ダウンロード
+  // 個別帳票プレビュー
   const handleDownloadIndividualReport = async (studentId: string) => {
     try {
       const student = results.find((r: any) => r.student_id === studentId);
@@ -160,44 +154,22 @@ function StudentManagementContent({ year, period }: { year: string; period: stri
         return;
       }
 
-      // バックエンドAPIを呼び出して個別帳票を生成
-      const response = await testApi.generateIndividualReport({
-        studentId: studentId,
-        year: parseInt(year),
-        period: period,
-        format: 'pdf'
-      });
+      // HTMLプレビューを新しいタブで開く
+      // const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL?.replace('/api', '') || 'https://kouzyoutest.com';
+      const baseUrl = 'https://kouzyoutest.com';
+      const previewUrl = `${baseUrl}/reports/preview/?studentId=${studentId}&year=${year}&period=${period}`;
 
-      if (response.success) {
-        // ファイルダウンロード処理
-        const link = document.createElement('a');
-        let downloadUrl = response.download_url.startsWith('http')
-          ? response.download_url
-          : `${process.env.NEXT_PUBLIC_API_BASE_URL?.replace('/api', '') || 'https://kouzyoutest.com'}${response.download_url}`;
+      // 新しいタブで開く
+      window.open(previewUrl, '_blank');
 
-        // キャッシュバスティング用のタイムスタンプを追加
-        const timestamp = new Date().getTime();
-        downloadUrl += downloadUrl.includes('?') ? `&t=${timestamp}` : `?t=${timestamp}`;
-
-        link.href = downloadUrl;
-        const fileExt = response.format === 'pdf' ? 'pdf' : 'docx';
-        link.download = `${student.student_name}_成績表_${year}年度${getPeriodLabel(period)}.${fileExt}`;
-        link.target = '_blank';  // 新しいタブで開く
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        
-        toast.success(`${student.student_name}の成績表をダウンロードしました`);
-      } else {
-        toast.error(`帳票生成に失敗しました: ${response.error}`);
-      }
+      toast.success(`${student.student_name}の成績表を表示しました`);
     } catch (error) {
-      console.error('個別帳票ダウンロードエラー:', error);
-      toast.error('帳票のダウンロードに失敗しました');
+      console.error('個別帳票プレビューエラー:', error);
+      toast.error('帳票の表示に失敗しました');
     }
   };
 
-  // 一括帳票ダウンロード
+  // 一括帳票プレビュー
   const handleDownloadBulkReports = async () => {
     if (selectedStudents.length === 0) {
       toast.error('生徒を選択してください');
@@ -205,39 +177,19 @@ function StudentManagementContent({ year, period }: { year: string; period: stri
     }
 
     try {
-      // バックエンドAPIを呼び出して一括帳票を生成
-      const response = await testApi.generateBulkReports({
-        studentIds: selectedStudents,
-        year: parseInt(year),
-        period: period,
-        format: 'pdf'
-      });
+      // HTMLプレビューを新しいタブで開く
+      // const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL?.replace('/api', '') || 'https://kouzyoutest.com';
+      const baseUrl = 'https://kouzyoutest.com';
+      const studentIdsParam = selectedStudents.join(',');
+      const previewUrl = `${baseUrl}/reports/preview-bulk/?year=${year}&period=${period}&studentIds=${studentIdsParam}`;
 
-      if (response.success) {
-        // ZIPファイルダウンロード処理
-        const link = document.createElement('a');
-        let downloadUrl = response.download_url.startsWith('http')
-          ? response.download_url
-          : `${process.env.NEXT_PUBLIC_API_BASE_URL?.replace('/api', '') || 'https://kouzyoutest.com'}${response.download_url}`;
+      // 新しいタブで開く
+      window.open(previewUrl, '_blank');
 
-        // キャッシュバスティング用のタイムスタンプを追加
-        const timestamp = new Date().getTime();
-        downloadUrl += downloadUrl.includes('?') ? `&t=${timestamp}` : `?t=${timestamp}`;
-
-        link.href = downloadUrl;
-        link.download = `成績表一括_${year}年度${getPeriodLabel(period)}_${selectedStudents.length}名.zip`;
-        link.target = '_blank';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        
-        toast.success(`${selectedStudents.length}名の成績表を一括ダウンロードしました`);
-      } else {
-        toast.error(`一括帳票生成に失敗しました: ${response.error}`);
-      }
+      toast.success(`${selectedStudents.length}名の成績表を表示しました`);
     } catch (error) {
-      console.error('一括帳票ダウンロードエラー:', error);
-      toast.error('一括帳票のダウンロードに失敗しました');
+      console.error('一括帳票プレビューエラー:', error);
+      toast.error('一括帳票の表示に失敗しました');
     }
   };
 
@@ -261,6 +213,15 @@ function StudentManagementContent({ year, period }: { year: string; period: stri
   const handleStudentNameClick = async (student: any) => {
     setSelectedStudent(student);
 
+    // 既存のコメントを保存
+    const existingComments: { [key: string]: string } = {};
+    if (student.subject_results) {
+      Object.entries(student.subject_results).forEach(([subject, data]: [string, any]) => {
+        existingComments[subject] = data.comment || '';
+      });
+    }
+    setOriginalComments(existingComments);
+
     try {
       // 点数に応じたコメントテンプレートを取得
       const scoreBasedResponse = await testApi.getScoreBasedComments({
@@ -270,84 +231,59 @@ function StudentManagementContent({ year, period }: { year: string; period: stri
       });
 
       if (scoreBasedResponse.success) {
-        // 点数に応じて自動生成されたコメントを設定
-        const templateCommentsData: { [key: string]: string } = {};
-        const originalCommentsData: { [key: string]: string } = {};
-        const modesData: { [key: string]: 'template' | 'original' } = {};
+        // テンプレートコメントを保存
+        const templateComms: { [key: string]: string } = {};
+        const useTemplateFlags: { [key: string]: boolean } = {};
 
         Object.entries(scoreBasedResponse.suggested_comments).forEach(([subject, data]: [string, any]) => {
-          templateCommentsData[subject] = data.template_text || '';
-          originalCommentsData[subject] = data.original_text || '';
-          modesData[subject] = 'template'; // デフォルトでテンプレート表示
+          templateComms[subject] = data.template_text;
+          // 既存のコメントがあればオリジナル、なければテンプレートを使用
+          useTemplateFlags[subject] = !existingComments[subject];
         });
 
-        setTemplateComments(templateCommentsData);
-        setOriginalComments(originalCommentsData);
-        setCommentModes(modesData);
-        setStudentComments(templateCommentsData); // 初期表示はテンプレート
+        setTemplateComments(templateComms);
+        setUseTemplate(useTemplateFlags);
+
+        // 初期表示用のコメントを設定
+        const initialComments: { [key: string]: string } = {};
+        Object.keys(templateComms).forEach(subject => {
+          initialComments[subject] = useTemplateFlags[subject]
+            ? templateComms[subject]
+            : existingComments[subject];
+        });
+        setStudentComments(initialComments);
         setSubjectScores(scoreBasedResponse.subject_scores || {});
-
-        // 総評コメント（テンプレートと既存のオリジナルを取得）
-        const principalData = scoreBasedResponse.principal_comment || {};
-        setPrincipalTemplateComment(principalData.template_text || '総合的な評価をここに記入してください。');
-        setPrincipalOriginalComment(principalData.original_text || '');
-        setPrincipalCommentMode('template');
-        setPrincipalComment(principalData.template_text || '総合的な評価をここに記入してください。');
       } else {
-        // フォールバック: 既存のコメント取得方法
-        const originalCommentsData: { [key: string]: string } = {};
-        const modesData: { [key: string]: 'template' | 'original' } = {};
-
-        if (student.subject_results) {
-          Object.entries(student.subject_results).forEach(([subject, data]: [string, any]) => {
-            originalCommentsData[subject] = data.comment || `${subject}の成績についてコメントを入力してください。`;
-            modesData[subject] = 'original';
-          });
-        }
-
-        setOriginalComments(originalCommentsData);
-        setTemplateComments({});
-        setCommentModes(modesData);
-        setStudentComments(originalCommentsData);
-
-        // 総評コメント
-        setPrincipalOriginalComment(student.principal_comment || '');
-        setPrincipalTemplateComment('');
-        setPrincipalCommentMode('original');
-        setPrincipalComment(student.principal_comment || '');
+        // フォールバック
+        setStudentComments(existingComments);
+        const useTemplateFlags: { [key: string]: boolean } = {};
+        Object.keys(existingComments).forEach(subject => {
+          useTemplateFlags[subject] = false;
+        });
+        setUseTemplate(useTemplateFlags);
       }
     } catch (error) {
       console.error('Failed to load score-based comments:', error);
-      // エラー時のフォールバック
-      const originalCommentsData: { [key: string]: string } = {};
-      const modesData: { [key: string]: 'template' | 'original' } = {};
-
-      if (student.subject_results) {
-        Object.entries(student.subject_results).forEach(([subject, data]: [string, any]) => {
-          originalCommentsData[subject] = data.comment || `${subject}の成績についてコメントを入力してください。`;
-          modesData[subject] = 'original';
-        });
-      }
-
-      setOriginalComments(originalCommentsData);
-      setTemplateComments({});
-      setCommentModes(modesData);
-      setStudentComments(originalCommentsData);
-
-      // 総評コメント
-      setPrincipalOriginalComment(student.principal_comment || '');
-      setPrincipalTemplateComment('');
-      setPrincipalCommentMode('original');
-      setPrincipalComment(student.principal_comment || '');
+      setStudentComments(existingComments);
+      const useTemplateFlags: { [key: string]: boolean } = {};
+      Object.keys(existingComments).forEach(subject => {
+        useTemplateFlags[subject] = false;
+      });
+      setUseTemplate(useTemplateFlags);
     }
 
-    // 科目別のコメントテンプレートを取得（手動選択用）
+    // 科目別のコメントテンプレート（点数範囲別）を取得
     const templates: { [key: string]: any[] } = {};
     if (student.subject_results) {
       for (const subject of Object.keys(student.subject_results)) {
         try {
-          const templateResponse = await commentApi.getCommentTemplates({ subject });
-          templates[subject] = templateResponse.results || [];
+          const subjectTemplates = await commentApi.getSubjectCommentTemplates(subject);
+          // 各テンプレートにIDを追加（score_rangeをIDとして使用）
+          templates[subject] = subjectTemplates.map((t: any, idx: number) => ({
+            ...t,
+            id: `${subject}_${t.score_range}`,
+            name: `${t.score_range}点`,
+          }));
         } catch (error) {
           console.error(`Failed to load templates for ${subject}:`, error);
           templates[subject] = [];
@@ -366,10 +302,9 @@ function StudentManagementContent({ year, period }: { year: string; period: stri
         studentId: selectedStudent.student_id,
         year: parseInt(year),
         period: period,
-        comments: studentComments,
-        principalComment: principalComment // 総評コメントを追加
+        comments: studentComments
       });
-
+      
       toast.success('コメントを保存しました');
       setCommentDialogOpen(false);
     } catch (error) {
@@ -384,83 +319,43 @@ function StudentManagementContent({ year, period }: { year: string; period: stri
       ...prev,
       [subject]: comment
     }));
-
-    // 現在のモードに応じて適切なコメントストアを更新
-    const currentMode = commentModes[subject] || 'template';
-    if (currentMode === 'template') {
-      setTemplateComments(prev => ({
-        ...prev,
-        [subject]: comment
-      }));
-    } else {
-      setOriginalComments(prev => ({
-        ...prev,
-        [subject]: comment
-      }));
-    }
   };
 
   // コメントテンプレートを適用
   const handleApplyTemplate = (subject: string, template: any) => {
-    const templateText = template.template_text || template.content || template.name || '';
-    setStudentComments(prev => ({
-      ...prev,
-      [subject]: templateText
-    }));
+    const templateText = template.content || template.template_text || template.name || '';
     setTemplateComments(prev => ({
       ...prev,
       [subject]: templateText
     }));
+    setStudentComments(prev => ({
+      ...prev,
+      [subject]: templateText
+    }));
   };
 
-  // テンプレート/オリジナル切り替え（科目別）
-  const handleToggleCommentMode = (subject: string) => {
-    const currentMode = commentModes[subject] || 'template';
-    const newMode = currentMode === 'template' ? 'original' : 'template';
-
-    // モードを切り替え
-    setCommentModes(prev => ({
+  // テンプレート/オリジナル切り替え
+  const handleToggleCommentType = (subject: string, useTemplateMode: boolean) => {
+    setUseTemplate(prev => ({
       ...prev,
-      [subject]: newMode
+      [subject]: useTemplateMode
     }));
 
-    // 表示するコメントを切り替え
-    if (newMode === 'template') {
-      setStudentComments(prev => ({
-        ...prev,
-        [subject]: templateComments[subject] || ''
-      }));
-    } else {
-      setStudentComments(prev => ({
-        ...prev,
-        [subject]: originalComments[subject] || ''
-      }));
-    }
+    setStudentComments(prev => ({
+      ...prev,
+      [subject]: useTemplateMode
+        ? (templateComments[subject] || '')
+        : (originalComments[subject] || '')
+    }));
   };
 
-  // 総評コメントを更新
-  const handlePrincipalCommentChange = (comment: string) => {
-    setPrincipalComment(comment);
-
-    // 現在のモードに応じて適切なコメントストアを更新
-    if (principalCommentMode === 'template') {
-      setPrincipalTemplateComment(comment);
-    } else {
-      setPrincipalOriginalComment(comment);
-    }
-  };
-
-  // 総評コメントのテンプレート/オリジナル切り替え
-  const handleTogglePrincipalMode = () => {
-    const newMode = principalCommentMode === 'template' ? 'original' : 'template';
-    setPrincipalCommentMode(newMode);
-
-    // 表示するコメントを切り替え
-    if (newMode === 'template') {
-      setPrincipalComment(principalTemplateComment);
-    } else {
-      setPrincipalComment(principalOriginalComment);
-    }
+  // 科目名の日本語マッピング
+  const SUBJECT_MAP: { [key: string]: string } = {
+    'math': '算数',
+    'japanese': '国語',
+    'science': '理科',
+    'social': '社会',
+    'english': '英語'
   };
 
   // ローディング状態
@@ -691,7 +586,7 @@ function StudentManagementContent({ year, period }: { year: string; period: stri
                         <div className="flex gap-1 sm:gap-2 mt-1 flex-wrap">
                           {Object.entries(result.subject_results || {}).map(([subject, data]: [string, any]) => (
                             <Badge key={subject} variant="secondary" className="text-xs">
-                              {subject}: {data.total_score}点 (学年{data.rankings.grade_rank}位)
+                              {SUBJECT_MAP[subject] || subject}: {data.total_score}点 (学年{data.rankings.grade_rank}位)
                             </Badge>
                           ))}
                         </div>
@@ -745,7 +640,7 @@ function StudentManagementContent({ year, period }: { year: string; period: stri
 
       {/* コメント編集ダイアログ */}
       <Dialog open={commentDialogOpen} onOpenChange={setCommentDialogOpen}>
-        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+        <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>コメント編集</DialogTitle>
             <DialogDescription>
@@ -753,48 +648,12 @@ function StudentManagementContent({ year, period }: { year: string; period: stri
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
-            {/* 総評コメント */}
-            <div className="border-b pb-4">
-              <div className="flex items-center justify-between mb-2">
-                <Label htmlFor="principal-comment" className="text-sm font-medium">
-                  総評コメント
-                </Label>
-                <div className="flex gap-2">
-                  <Button
-                    size="sm"
-                    variant={principalCommentMode === 'template' ? 'default' : 'outline'}
-                    onClick={handleTogglePrincipalMode}
-                    className="h-7 text-xs"
-                  >
-                    テンプレート
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant={principalCommentMode === 'original' ? 'default' : 'outline'}
-                    onClick={handleTogglePrincipalMode}
-                    className="h-7 text-xs"
-                  >
-                    オリジナル
-                  </Button>
-                </div>
-              </div>
-              <Textarea
-                id="principal-comment"
-                value={principalComment}
-                onChange={(e) => handlePrincipalCommentChange(e.target.value)}
-                placeholder="総合的な評価をここに記入してください。"
-                rows={4}
-                className="w-full"
-              />
-            </div>
-
-            {/* 科目別コメント */}
             {selectedStudent && Object.entries(selectedStudent.subject_results || {}).map(([subject, data]: [string, any]) => (
-              <div key={subject} className="space-y-3 border-b pb-4 last:border-b-0">
-                <div className="flex items-center justify-between">
-                  <Label htmlFor={`comment-${subject}`} className="text-sm font-medium">
+              <div key={subject} className="space-y-3 p-4 border rounded-lg">
+                <div className="flex items-center justify-between mb-2">
+                  <Label className="text-sm font-medium">
                     {subject}のコメント
-                    {subjectScores[subject] && (
+                    {subjectScores[subject] !== undefined && (
                       <span className="ml-2 text-xs text-gray-500">
                         (得点: {subjectScores[subject]}点)
                       </span>
@@ -802,41 +661,42 @@ function StudentManagementContent({ year, period }: { year: string; period: stri
                   </Label>
                   <div className="flex gap-2">
                     <Button
+                      type="button"
                       size="sm"
-                      variant={(commentModes[subject] || 'template') === 'template' ? 'default' : 'outline'}
-                      onClick={() => handleToggleCommentMode(subject)}
-                      className="h-7 text-xs"
+                      variant={useTemplate[subject] ? "default" : "outline"}
+                      onClick={() => handleToggleCommentType(subject, true)}
                     >
                       テンプレート
                     </Button>
                     <Button
+                      type="button"
                       size="sm"
-                      variant={(commentModes[subject] || 'template') === 'original' ? 'default' : 'outline'}
-                      onClick={() => handleToggleCommentMode(subject)}
-                      className="h-7 text-xs"
+                      variant={!useTemplate[subject] ? "default" : "outline"}
+                      onClick={() => handleToggleCommentType(subject, false)}
                     >
                       オリジナル
                     </Button>
                   </div>
                 </div>
 
-                {availableTemplates[subject] && availableTemplates[subject].length > 0 && (commentModes[subject] || 'template') === 'template' && (
+                {useTemplate[subject] && availableTemplates[subject] && availableTemplates[subject].length > 0 && (
                   <Select onValueChange={(value) => {
                     const template = availableTemplates[subject].find(t => t.id.toString() === value);
                     if (template) handleApplyTemplate(subject, template);
                   }}>
                     <SelectTrigger className="w-full">
-                      <SelectValue placeholder="別のテンプレートを選択" />
+                      <SelectValue placeholder="別の点数範囲のテンプレートを選択" />
                     </SelectTrigger>
                     <SelectContent>
                       {availableTemplates[subject].map((template) => (
                         <SelectItem key={template.id} value={template.id.toString()}>
-                          {template.template_text || template.content ?
-                            ((template.template_text || template.content).length > 40 ?
-                              (template.template_text || template.content).substring(0, 40) + '...' :
-                              (template.template_text || template.content)
-                            ) :
-                            (template.name || 'テンプレート')
+                          {template.name || template.score_range} - {
+                            template.content ?
+                              (template.content.length > 30 ?
+                                template.content.substring(0, 30) + '...' :
+                                template.content
+                              ) :
+                              'テンプレート'
                           }
                         </SelectItem>
                       ))}
@@ -848,13 +708,14 @@ function StudentManagementContent({ year, period }: { year: string; period: stri
                   id={`comment-${subject}`}
                   value={studentComments[subject] || ''}
                   onChange={(e) => handleCommentChange(subject, e.target.value)}
-                  placeholder={`${subject}の成績についてコメントを入力してください。`}
-                  rows={3}
-                  className="w-full"
+                  placeholder={useTemplate[subject]
+                    ? `${subject}のテンプレートコメント（編集可能）`
+                    : `${subject}のオリジナルコメントを入力してください`}
+                  rows={4}
+                  className={useTemplate[subject] ? 'bg-blue-50/50' : ''}
                 />
               </div>
             ))}
-
             <div className="flex justify-end gap-2 pt-4">
               <Button
                 variant="outline"

@@ -1,0 +1,180 @@
+{% extends "admin/base_site.html" %}
+{% load i18n admin_urls static admin_modify %}
+
+{% block title %}{{ title }} | {{ site_title|default:_('Django site admin') }}{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+    <a href="{% url 'admin:index' %}">{% trans 'Home' %}</a>
+    &rsaquo; <a href="{% url 'admin:app_list' app_label=opts.app_label %}">{{ opts.app_config.verbose_name }}</a>
+    &rsaquo; <a href="{% url 'admin:classrooms_billingreport_changelist' %}">{{ opts.verbose_name_plural|capfirst }}</a>
+    &rsaquo; {{ title }}
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="module aligned" style="max-width: 800px; margin: 0 auto;">
+    <h1>📊 請求情報一括エクスポート</h1>
+    
+    <div class="help" style="margin-bottom: 20px;">
+        <p><strong>得点・テスト結果データから、実際に出席した生徒の請求情報を塾ごとに集計してエクスポートできます。</strong></p>
+        <ul>
+            <li>年度と期間を選択して、該当する塾の出席済み生徒の請求情報をダウンロードします</li>
+            <li>得点データ（attendance=True）をベースに実際の出席者のみを対象とします</li>
+            <li>サマリーシートには会員種別ごとの塾数・出席生徒数・金額が含まれます</li>
+            <li>詳細シートには各塾の情報と受験科目別の生徒詳細が含まれます</li>
+            <li>Excel形式またはCSV形式を選択できます</li>
+        </ul>
+    </div>
+
+    {% if messages %}
+        <ul class="messagelist">
+            {% for message in messages %}
+                <li{% if message.tags %} class="{{ message.tags }}"{% endif %}>{{ message|capfirst }}</li>
+            {% endfor %}
+        </ul>
+    {% endif %}
+
+    <form method="post" class="form-horizontal">
+        {% csrf_token %}
+        
+        <fieldset class="module aligned">
+            <h2>エクスポート設定</h2>
+            
+            <div class="form-row">
+                <div>
+                    <label class="required" for="id_year">年度:</label>
+                    <select name="year" id="id_year" required>
+                        <option value="">----年度を選択----</option>
+                        {% for year in years %}
+                            <option value="{{ year }}">{{ year }}年度</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+            
+            <div class="form-row">
+                <div>
+                    <label class="required" for="id_period">期間:</label>
+                    <select name="period" id="id_period" required>
+                        <option value="">----期間を選択----</option>
+                        {% for period in periods %}
+                            <option value="{{ period.value }}">{{ period.label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+            
+            <div class="form-row">
+                <div>
+                    <label class="required" for="id_export_format">ファイル形式:</label>
+                    <select name="export_format" id="id_export_format">
+                        <option value="excel">Excel (.xlsx)</option>
+                        <option value="csv">CSV (.csv)</option>
+                    </select>
+                    <p class="help">Excel形式をお勧めします（サマリー情報とスタイリングが含まれます）</p>
+                </div>
+            </div>
+        </fieldset>
+        
+        <div class="submit-row">
+            <input type="submit" value="エクスポート実行" class="default" />
+            <a href="{% url 'admin:classrooms_billingreport_changelist' %}" class="button">戻る</a>
+        </div>
+    </form>
+    
+    <div class="help" style="margin-top: 30px; padding: 15px; border: 1px solid #ddd; background: #f9f9f9;">
+        <h3>エクスポートされる情報</h3>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+            <div>
+                <h4>📋 サマリーシート</h4>
+                <ul>
+                    <li>会員種別ごとの集計</li>
+                    <li>塾数</li>
+                    <li>出席生徒数</li>
+                    <li>単価と合計金額</li>
+                    <li>全体合計</li>
+                </ul>
+            </div>
+            <div>
+                <h4>📝 詳細データシート</h4>
+                <ul>
+                    <li>塾ID、塾名、会員種別</li>
+                    <li>担当者・連絡先・住所情報</li>
+                    <li>出席生徒数と料金情報</li>
+                    <li>受験生徒詳細（科目別）</li>
+                </ul>
+            </div>
+        </div>
+        
+        <div style="margin-top: 15px; padding: 10px; background: #e7f3ff; border-left: 4px solid #2196f3;">
+            <strong>💡 ヒント:</strong> この機能は得点データ（Scoreテーブル）から直接出席済み生徒を抽出します。
+            得点入力が完了している年度・期間のテストデータが対象となります。
+        </div>
+    </div>
+</div>
+
+<style>
+.form-horizontal .form-row {
+    margin-bottom: 15px;
+}
+
+.form-horizontal label {
+    display: inline-block;
+    width: 120px;
+    font-weight: bold;
+}
+
+.form-horizontal select {
+    width: 200px;
+    padding: 5px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+}
+
+.help ul {
+    margin-left: 20px;
+}
+
+.submit-row {
+    margin-top: 20px;
+    padding: 10px 0;
+    border-top: 1px solid #ddd;
+}
+
+.submit-row .default {
+    background: #417690;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    margin-right: 10px;
+}
+
+.submit-row .default:hover {
+    background: #205067;
+}
+
+.submit-row .button {
+    background: #f8f8f8;
+    color: #333;
+    border: 1px solid #ccc;
+    padding: 10px 20px;
+    border-radius: 4px;
+    text-decoration: none;
+    font-size: 14px;
+}
+
+.submit-row .button:hover {
+    background: #e8e8e8;
+}
+
+h3, h4 {
+    color: #333;
+    margin-top: 15px;
+    margin-bottom: 10px;
+}
+</style>
+{% endblock %}

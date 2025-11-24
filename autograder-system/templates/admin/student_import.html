@@ -1,0 +1,244 @@
+{% extends "admin/base_site.html" %}
+{% load i18n admin_urls static admin_modify %}
+
+{% block title %}{{ title }} | {{ site_title|default:_('Django site admin') }}{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+<a href="{% url 'admin:index' %}">{% trans 'Home' %}</a>
+&rsaquo; <a href="{% url 'admin:app_list' app_label=opts.app_label %}">{{ opts.app_config.verbose_name }}</a>
+&rsaquo; <a href="{% url 'admin:'|add:opts.app_label|add:'_'|add:opts.model_name|add:'_changelist' %}">{{ opts.verbose_name_plural|capfirst }}</a>
+&rsaquo; {{ title }}
+</div>
+{% endblock %}
+
+{% block content %}
+<div style="max-width: 800px; margin: 0 auto; padding: 20px;">
+    <h1 style="color: #333; margin-bottom: 30px;">👥 生徒データ一括インポート</h1>
+    
+    <!-- WordPress風インポートエリア -->
+    <div style="background: white; border-radius: 10px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); overflow: hidden;">
+        
+        <!-- ヘッダー -->
+        <div style="
+            background: linear-gradient(135deg, #17a2b8 0%, #138496 100%);
+            color: white;
+            padding: 25px;
+            text-align: center;
+        ">
+            <h2 style="margin: 0; font-size: 24px;">👥 生徒データインポート</h2>
+            <p style="margin: 10px 0 0 0; opacity: 0.9;">Excelファイルを選択またはドラッグ&ドロップしてください</p>
+        </div>
+        
+        <!-- メインコンテンツ -->
+        <div style="padding: 40px;">
+            
+            <!-- Step 1: テンプレートダウンロード -->
+            <div style="margin-bottom: 30px; padding: 20px; background: #f8f9fa; border-radius: 8px; border-left: 4px solid #17a2b8;">
+                <h3 style="color: #17a2b8; margin-top: 0; margin-bottom: 15px;">📋 Step 1: テンプレートダウンロード</h3>
+                <p style="margin-bottom: 15px; color: #6c757d;">まずは生徒登録用Excelテンプレートをダウンロードしてください</p>
+                <form method="post" style="display: inline;">
+                    {% csrf_token %}
+                    <button type="submit" name="download_template" style="
+                        background: #17a2b8;
+                        color: white;
+                        border: none;
+                        padding: 12px 24px;
+                        border-radius: 6px;
+                        font-weight: bold;
+                        cursor: pointer;
+                        transition: all 0.3s ease;
+                    " onmouseover="this.style.background='#138496'" onmouseout="this.style.background='#17a2b8'">
+                        📥 テンプレートダウンロード
+                    </button>
+                </form>
+            </div>
+            
+            <!-- Step 2: ファイルアップロード -->
+            <div style="margin-bottom: 30px;">
+                <h3 style="color: #495057; margin-bottom: 20px;">📤 Step 2: ファイルアップロード</h3>
+                
+                <form id="uploadForm" method="post" enctype="multipart/form-data">
+                    {% csrf_token %}
+                    
+                    <!-- WordPress風ドロップゾーン -->
+                    <div id="dropZone" style="
+                        border: 3px dashed #ddd;
+                        border-radius: 12px;
+                        padding: 60px 40px;
+                        text-align: center;
+                        background: #fafafa;
+                        cursor: pointer;
+                        transition: all 0.3s ease;
+                        position: relative;
+                    " 
+                    ondrop="handleDrop(event)" 
+                    ondragover="handleDragOver(event)" 
+                    ondragleave="handleDragLeave(event)" 
+                    onclick="document.getElementById('fileInput').click()">
+                        
+                        <div id="dropText">
+                            <div style="font-size: 64px; margin-bottom: 20px; color: #17a2b8;">📁</div>
+                            <h3 style="color: #333; margin-bottom: 15px; font-size: 20px;">ファイルを選択またはここにドロップ</h3>
+                            <p style="color: #666; margin-bottom: 20px; font-size: 16px;">
+                                .xlsx または .xls ファイル（最大10MB）
+                            </p>
+                            <div style="
+                                background: #17a2b8;
+                                color: white;
+                                padding: 15px 30px;
+                                border-radius: 6px;
+                                display: inline-block;
+                                font-weight: bold;
+                                font-size: 16px;
+                                margin-top: 10px;
+                            ">
+                                📂 ファイルを選択
+                            </div>
+                        </div>
+                        
+                        <div id="fileInfo" style="display: none;">
+                            <div style="font-size: 64px; margin-bottom: 20px; color: #28a745;">✅</div>
+                            <h3 style="color: #28a745; margin-bottom: 15px;">ファイルが選択されました</h3>
+                            <p id="fileName" style="color: #666; margin-bottom: 25px; font-size: 16px;"></p>
+                            <button type="submit" style="
+                                background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+                                color: white;
+                                border: none;
+                                padding: 15px 30px;
+                                border-radius: 6px;
+                                cursor: pointer;
+                                font-size: 18px;
+                                font-weight: bold;
+                                box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+                                transition: all 0.3s ease;
+                            " 
+                            onmouseover="this.style.transform='translateY(-2px)'"
+                            onmouseout="this.style.transform='translateY(0)'">
+                                🚀 インポート実行
+                            </button>
+                            <p style="margin-top: 15px; color: #666; font-size: 14px;">
+                                クリックしてインポートを開始します
+                            </p>
+                        </div>
+                    </div>
+                    
+                    <input type="file" id="fileInput" name="excel_file" accept=".xlsx,.xls" style="display: none;" onchange="handleFileSelect(event)">
+                </form>
+            </div>
+            
+            <!-- Step 3: 注意事項 -->
+            <div style="background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%); border-radius: 8px; padding: 25px; border-left: 4px solid #ffc107;">
+                <h4 style="color: #856404; margin-top: 0; margin-bottom: 15px;">⚠️ インポートに関する重要な注意事項</h4>
+                <ul style="color: #856404; margin-bottom: 0; padding-left: 25px; line-height: 1.6;">
+                    <li>生徒IDは自動生成されます（教室ID + 連番3桁）</li>
+                    <li>教室IDが存在しない場合はエラーになります</li>
+                    <li>必須項目: 教室ID、生徒名、学年</li>
+                    <li>エラーがある行は処理をスキップし、他の行は正常に処理されます</li>
+                </ul>
+            </div>
+            
+            <!-- 戻るボタン -->
+            <div style="text-align: center; margin-top: 30px;">
+                <a href="{% url 'admin:'|add:opts.app_label|add:'_'|add:opts.model_name|add:'_changelist' %}" 
+                   style="
+                       background: #6c757d;
+                       color: white;
+                       text-decoration: none;
+                       padding: 12px 24px;
+                       border-radius: 6px;
+                       display: inline-block;
+                       transition: all 0.3s ease;
+                   "
+                   onmouseover="this.style.background='#5a6268'"
+                   onmouseout="this.style.background='#6c757d'">
+                    ← 生徒一覧に戻る
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// WordPress風のドラッグ&ドロップ機能
+function handleDragOver(e) {
+    e.preventDefault();
+    const dropZone = document.getElementById('dropZone');
+    dropZone.style.borderColor = '#17a2b8';
+    dropZone.style.backgroundColor = '#f0f8ff';
+    dropZone.style.transform = 'scale(1.02)';
+}
+
+function handleDragLeave(e) {
+    e.preventDefault();
+    const dropZone = document.getElementById('dropZone');
+    dropZone.style.borderColor = '#ddd';
+    dropZone.style.backgroundColor = '#fafafa';
+    dropZone.style.transform = 'scale(1)';
+}
+
+function handleDrop(e) {
+    e.preventDefault();
+    const dropZone = document.getElementById('dropZone');
+    dropZone.style.borderColor = '#ddd';
+    dropZone.style.backgroundColor = '#fafafa';
+    dropZone.style.transform = 'scale(1)';
+    
+    const files = e.dataTransfer.files;
+    if (files.length > 0) {
+        const file = files[0];
+        if (file.name.endsWith('.xlsx') || file.name.endsWith('.xls')) {
+            document.getElementById('fileInput').files = files;
+            showFileInfo(file);
+        } else {
+            alert('⚠️ Excelファイル（.xlsx または .xls）をアップロードしてください。');
+        }
+    }
+}
+
+function handleFileSelect(e) {
+    if (e.target.files.length > 0) {
+        showFileInfo(e.target.files[0]);
+    }
+}
+
+function showFileInfo(file) {
+    document.getElementById('dropText').style.display = 'none';
+    document.getElementById('fileInfo').style.display = 'block';
+    document.getElementById('fileName').textContent = file.name + ' (' + formatFileSize(file.size) + ')';
+    
+    // アニメーション効果
+    const fileInfo = document.getElementById('fileInfo');
+    fileInfo.style.opacity = '0';
+    fileInfo.style.transform = 'translateY(20px)';
+    setTimeout(() => {
+        fileInfo.style.transition = 'all 0.5s ease';
+        fileInfo.style.opacity = '1';
+        fileInfo.style.transform = 'translateY(0)';
+    }, 100);
+}
+
+function formatFileSize(bytes) {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+}
+
+// フォーム送信時の処理
+document.getElementById('uploadForm').addEventListener('submit', function(e) {
+    const fileInput = document.getElementById('fileInput');
+    if (!fileInput.files.length) {
+        e.preventDefault();
+        alert('⚠️ ファイルを選択してください。');
+        return;
+    }
+    
+    // 送信中の表示
+    const submitButton = document.querySelector('button[type="submit"]');
+    submitButton.innerHTML = '⏳ インポート中...';
+    submitButton.disabled = true;
+});
+</script>
+{% endblock %}

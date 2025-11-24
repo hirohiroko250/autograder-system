@@ -1,0 +1,13 @@
+node_modules
+npm-debug.log*
+.next
+out
+.DS_Store
+*.tgz
+*.tar.gz
+.env*.local
+.vercel
+.vscode
+.git
+.gitignore
+README.md

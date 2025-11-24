@@ -7,6 +7,7 @@ from django.conf import settings
 from django.utils import timezone
 from decimal import Decimal
 import io
+import json
 import os
 import zipfile
 import statistics
@@ -15,7 +16,7 @@ from datetime import datetime
 
 import pandas as pd
 
-from .models import Score, TestResult, CommentTemplate, StudentComment, TestComment
+from .models import Score, TestResult, CommentTemplate, StudentComment, TestComment, SubjectGeneralComment
 from schools.models import School
 from students.models import Student
 from tests.models import TestDefinition, QuestionGroup
@@ -1830,6 +1831,13 @@ def _collect_individual_report_data(student_id: str, year: int, period: str) -> 
     subject_entries = []
     subjects_data = {}
 
+    # 手動保存されたコメントを一括取得
+    from .models import SubjectGeneralComment
+    manual_comments = {
+        c.test_id: c.comment_text
+        for c in SubjectGeneralComment.objects.filter(student=student, test__in=tests)
+    }
+
     for test in tests:
         result = results_map.get(test.id)
         subject_code = test.subject
@@ -1852,7 +1860,7 @@ def _collect_individual_report_data(student_id: str, year: int, period: str) -> 
         # 問題ごとの学年平均
         grade_group_averages = {
             item['question_group_id']: item['avg']
-            for item in Score.objects.filter(test=test, student__grade=student.grade)
+            for item in Score.objects.filter(test=test, student__grade=student.grade, attendance=True)
             .values('question_group_id')
             .annotate(avg=Avg('score'))
         }
@@ -1925,7 +1933,8 @@ def _collect_individual_report_data(student_id: str, year: int, period: str) -> 
                 'school_lowest': school_low,
             },
             'question_details': question_details,
-            'comment': result.comment or '',
+            'question_details': question_details,
+            'comment': manual_comments.get(test.id) or result.comment or '',
         }
         subject_entries.append(subject_code)
 
@@ -2037,7 +2046,7 @@ def get_individual_report_data(student_id: str, year: str, period: str) -> dict 
 
 
 def _get_principal_comment(student_id: str, year: int, period: str, subject: str) -> str:
-    """塾長コメントを取得（登録されたコメントを優先、なければデフォルト）"""
+    """塾長コメントを取得（登録されたコメントを優先、なければテンプレート、最後にデフォルト）"""
     default_comment = '今回の結果は、未来へのヒントです。今の努力が、これからの可能性を広げていきます。'
 
     # 生徒とテストを取得
@@ -2059,7 +2068,18 @@ def _get_principal_comment(student_id: str, year: int, period: str, subject: str
     if not test:
         return default_comment
 
-    # TestCommentからテスト全体のコメントを取得
+    # 1. SubjectGeneralCommentから保存されたオリジナルコメントを取得
+    from .models import SubjectGeneralComment, CommentTemplateV2
+    subject_comment = SubjectGeneralComment.objects.filter(
+        student=student,
+        test=test,
+        subject=subject
+    ).first()
+
+    if subject_comment and subject_comment.comment_text:
+        return subject_comment.comment_text
+
+    # 2. TestCommentからテスト全体のコメントを取得（後方互換性）
     test_comment = TestComment.objects.filter(
         student=student,
         test=test,
@@ -2069,7 +2089,35 @@ def _get_principal_comment(student_id: str, year: int, period: str, subject: str
     if test_comment and test_comment.content:
         return test_comment.content
 
-    # StudentCommentから総合コメントを取得（フォールバック）
+    # 3. 点数に応じたCommentTemplateV2を取得
+    # まず得点を取得
+    from .models import Score
+    from django.db.models import Sum
+    score_total = Score.objects.filter(
+        student=student,
+        test=test,
+        attendance=True
+    ).aggregate(total=Sum('score'))['total'] or 0
+
+    # subject を日本語に変換（CommentTemplateV2のsubject_filterは日本語）
+    subject_jp_map = {
+        'japanese': '国語',
+        'math': '算数'
+    }
+    subject_jp = subject_jp_map.get(subject, subject)
+
+    # テンプレートを取得（得点範囲でフィルタ）
+    template = CommentTemplateV2.objects.filter(
+        subject_filter=subject_jp,
+        score_range_min__lte=score_total,
+        score_range_max__gte=score_total,
+        is_active=True
+    ).first()
+
+    if template and template.template_text:
+        return template.template_text
+
+    # 4. StudentCommentから総合コメントを取得（フォールバック）
     student_comment = StudentComment.objects.filter(
         student=student,
         test=test,
@@ -2080,6 +2128,76 @@ def _get_principal_comment(student_id: str, year: int, period: str, subject: str
         return student_comment.content
 
     return default_comment
+
+
+def _generate_svg_bar_chart(scores: list[float], avg_score: float, color: str, chart_id: str, max_score: float = 100) -> str:
+    """成績推移の棒グラフをSVGで生成"""
+    if not scores:
+        return ''
+
+    svg_parts = [
+        f'<svg viewBox="0 0 200 140" class="line-chart" id="{chart_id}" xmlns="http://www.w3.org/2000/svg">',
+        '<!-- グリッド線と軸ラベル -->',
+        '<line x1="40" y1="20" x2="40" y2="110" stroke="#bdc3c7" stroke-width="2"/>',
+        '<line x1="40" y1="110" x2="190" y2="110" stroke="#bdc3c7" stroke-width="2"/>',
+        '<!-- Y軸ラベル -->',
+        '<text x="20" y="20" font-size="9" fill="#666">100</text>',
+        '<text x="20" y="65" font-size="9" fill="#666">50</text>',
+        '<text x="28" y="115" font-size="9" fill="#666">0</text>',
+        '<!-- グリッド線 -->',
+        '<line x1="40" y1="20" x2="190" y2="20" stroke="#e0e0e0" stroke-width="1" stroke-dasharray="2,2"/>',
+        '<line x1="40" y1="65" x2="190" y2="65" stroke="#e0e0e0" stroke-width="1" stroke-dasharray="2,2"/>',
+    ]
+
+    min_score = 0
+    bar_width = 25
+    spacing = 50
+
+    # 棒グラフとラベルを生成
+    for index, score in enumerate(scores):
+        x = 60 + (index * spacing)
+        bar_height = ((score - min_score) / (max_score - min_score)) * 90
+        y = 110 - bar_height
+
+        # 棒グラフ
+        svg_parts.append(
+            f'<rect x="{x - bar_width/2}" y="{y}" width="{bar_width}" height="{bar_height}" '
+            f'fill="{color}" opacity="0.8"/>'
+        )
+
+        # 点数表示
+        svg_parts.append(
+            f'<text x="{x}" y="{y - 5}" text-anchor="middle" font-size="10" fill="{color}" '
+            f'font-weight="700">{round(score)}</text>'
+        )
+
+        # 回数ラベル
+        svg_parts.append(
+            f'<text x="{x}" y="130" text-anchor="middle" font-size="10" fill="#666" '
+            f'font-weight="600">{index + 1}回</text>'
+        )
+
+    # 学年平均の星印とライン
+    avg_y = 110 - ((avg_score - min_score) / (max_score - min_score)) * 90
+    for index in range(len(scores)):
+        x = 60 + (index * spacing)
+
+        # 星印
+        svg_parts.append(
+            f'<text x="{x}" y="{avg_y + 4}" text-anchor="middle" font-size="14" fill="#ffd700" '
+            f'filter="drop-shadow(0 0 2px rgba(0,0,0,0.3))">★</text>'
+        )
+
+        # 星を線で繋ぐ（2回目以降）
+        if index > 0:
+            prev_x = 60 + ((index - 1) * spacing)
+            svg_parts.insert(11,  # グリッド線の後に挿入
+                f'<line x1="{prev_x}" y1="{avg_y}" x2="{x}" y2="{avg_y}" '
+                f'stroke="#ffd700" stroke-width="2" stroke-dasharray="4,3"/>'
+            )
+
+    svg_parts.append('</svg>')
+    return '\n'.join(svg_parts)
 
 
 def _prepare_template_data(report_data: dict, logo_path: str) -> dict:
@@ -2134,6 +2252,21 @@ def _prepare_template_data(report_data: dict, logo_path: str) -> dict:
             'japanese_score': japanese_trends[i].get('score', 0) if i < len(japanese_trends) else 0,
         })
 
+    # SVGグラフを生成
+    total_scores = [t.get('score', 0) for t in overall_trends]
+    math_scores = [t.get('score', 0) for t in math_trends]
+    japanese_scores = [t.get('score', 0) for t in japanese_trends]
+
+    # 学年平均を計算（複数回の平均）
+    total_avg = sum([t.get('average', 0) for t in overall_trends]) / len(overall_trends) if overall_trends else 0
+    math_avg = sum([t.get('average', 0) for t in math_trends]) / len(math_trends) if math_trends else 0
+    japanese_avg = sum([t.get('average', 0) for t in japanese_trends]) / len(japanese_trends) if japanese_trends else 0
+
+    # 各教科のSVGグラフを生成
+    total_chart_svg = _generate_svg_bar_chart(total_scores, total_avg, '#3498db', f'totalChart_{student_info["id"]}', 200)
+    math_chart_svg = _generate_svg_bar_chart(math_scores, math_avg, '#27ae60', f'mathChart_{student_info["id"]}', 100)
+    japanese_chart_svg = _generate_svg_bar_chart(japanese_scores, japanese_avg, '#e67e22', f'japaneseChart_{student_info["id"]}', 100)
+
     # Read CSS content
     css_path = os.path.join(settings.BASE_DIR, 'static', 'reports', 'report.css')
     try:
@@ -2187,11 +2320,17 @@ def _prepare_template_data(report_data: dict, logo_path: str) -> dict:
         # 統計データ
         'math_national_highest': math_data.get('statistics', {}).get('school_highest', 100),  # Note: using school_highest as national is not in current data
         'japanese_national_highest': japanese_data.get('statistics', {}).get('school_highest', 100),
-        'total_national_highest': combined.get('national_highest', 100) if 'national_highest' in combined else 100,
+        'total_national_highest': combined.get('national_highest') if 'national_highest' in combined else (
+            math_data.get('statistics', {}).get('school_highest', 100) +
+            japanese_data.get('statistics', {}).get('school_highest', 100)
+        ),
 
         'math_school_highest': math_data.get('statistics', {}).get('school_highest', 100),
         'japanese_school_highest': japanese_data.get('statistics', {}).get('school_highest', 100),
-        'total_school_highest': combined.get('school_highest', 100) if 'school_highest' in combined else 100,
+        'total_school_highest': combined.get('school_highest') if 'school_highest' in combined else (
+            math_data.get('statistics', {}).get('school_highest', 100) +
+            japanese_data.get('statistics', {}).get('school_highest', 100)
+        ),
 
         # 学年平均
         'math_grade_avg': f"{math_data.get('statistics', {}).get('grade_average', 0):.1f}",
@@ -2214,7 +2353,12 @@ def _prepare_template_data(report_data: dict, logo_path: str) -> dict:
         'principal_japanese_comment': _get_principal_comment(student_info['id'], test_info['year'], test_info['period'], 'japanese'),
 
         # 推移
-        'trends': trends,
+        'trends': json.dumps(trends),
+
+        # SVGグラフ
+        'total_chart_svg': total_chart_svg,
+        'math_chart_svg': math_chart_svg,
+        'japanese_chart_svg': japanese_chart_svg,
     }
 
 

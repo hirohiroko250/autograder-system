@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>個人成績表 - 全国学力向上テスト</title>
+    <style>
+{{ css_content|safe }}
+    </style>
+</head>
+<body>
+    <div class="report-page">
+        <!-- ヘッダー -->
+        <header class="header">
+            <div class="logo">
+                <img src="/static/reports/logo.png" alt="全国学力向上テスト">
+            </div>
+            <div class="header-right">
+                <p class="issue-date">発行日：{{ issue_date }}</p>
+                <div class="test-info">
+                    <span class="info-label">学年</span>
+                    <span class="info-value">{{ student_grade }}</span>
+                    <span class="info-label">第</span>
+                    <span class="info-value">{{ test_iteration }}</span>
+                    <span class="info-label">回</span>
+                    <span class="info-label">年度</span>
+                    <span class="info-value">{{ test_year }}</span>
+                </div>
+                <h1 class="main-title">個人成績表</h1>
+            </div>
+        </header>
+
+        <!-- 窓あき封筒用エリアと生徒情報 -->
+        <div class="top-area">
+            <!-- 窓あき封筒用 -->
+            <div class="window-area">
+                <div class="window-frame">
+                    <div class="window-content">
+                        <!-- 空白エリア -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- 生徒情報 -->
+            <div class="student-info">
+                <div class="info-row">
+                    <div class="info-item">
+                        <span class="label">生徒氏名</span>
+                        <span class="value">{{ student_name }}</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="label">学年</span>
+                        <span class="value">{{ student_grade }}</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="label">受験ID</span>
+                        <span class="value">{{ student_id }}</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="label">生徒ID</span>
+                        <span class="value">{{ student_id }}</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="label">塾名</span>
+                        <span class="value">{{ school_name }}</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="label">塾ID</span>
+                        <span class="value">{{ school_id }}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- メインコンテンツ -->
+        <div class="main-layout">
+            <!-- 上部行：得点・偏差値・順位 + 成績推移 -->
+            <div class="top-row">
+                <!-- 得点・偏差値・順位 -->
+                <section class="score-section">
+                    <h2 class="section-title"><span class="diamond">◆</span>得点・偏差値・順位</h2>
+
+                    <table class="score-table">
+                        <thead>
+                            <tr>
+                                <th class="label-col">教科</th>
+                                <th class="total-col">合計</th>
+                                <th class="japanese-col">国語</th>
+                                <th class="math-col">算数</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td class="label-cell">得点</td>
+                                <td class="total-cell">{{ total_score }}<span class="unit">点</span></td>
+                                <td class="japanese-cell">{{ japanese_score }}<span class="unit">点</span></td>
+                                <td class="math-cell">{{ math_score }}<span class="unit">点</span></td>
+                            </tr>
+                            <tr>
+                                <td class="label-cell">偏差値</td>
+                                <td class="total-cell">{{ total_deviation }}</td>
+                                <td class="japanese-cell">{{ japanese_deviation }}</td>
+                                <td class="math-cell">{{ math_deviation }}</td>
+                            </tr>
+                            <tr>
+                                <td class="label-cell">学年順位<br><span class="sub-label">(学年受験者数)</span></td>
+                                <td class="total-cell">{{ total_grade_rank }}<span class="unit">位</span><br><span class="sub-value">({{ total_grade_total }}人中)</span></td>
+                                <td class="japanese-cell">{{ japanese_grade_rank }}<span class="unit">位</span><br><span class="sub-value">({{ japanese_grade_total }}人中)</span></td>
+                                <td class="math-cell">{{ math_grade_rank }}<span class="unit">位</span><br><span class="sub-value">({{ math_grade_total }}人中)</span></td>
+                            </tr>
+                            <tr>
+                                <td class="label-cell">塾内順位<br><span class="sub-label">(受験者数)</span></td>
+                                <td class="total-cell">{{ total_school_rank }}<span class="unit">位</span><br><span class="sub-value">({{ total_school_total }}人中)</span></td>
+                                <td class="japanese-cell">{{ japanese_school_rank }}<span class="unit">位</span><br><span class="sub-value">({{ japanese_school_total }}人中)</span></td>
+                                <td class="math-cell">{{ math_school_rank }}<span class="unit">位</span><br><span class="sub-value">({{ math_school_total }}人中)</span></td>
+                            </tr>
+                            <tr>
+                                <td class="label-cell">最高点<br><span class="sub-label">(全国)</span></td>
+                                <td>{{ total_national_highest }}<span class="unit">点</span></td>
+                                <td>{{ japanese_national_highest }}<span class="unit">点</span></td>
+                                <td>{{ math_national_highest }}<span class="unit">点</span></td>
+                            </tr>
+                            <tr>
+                                <td class="label-cell">最高点<br><span class="sub-label">(塾内)</span></td>
+                                <td>{{ total_school_highest }}<span class="unit">点</span></td>
+                                <td>{{ japanese_school_highest }}<span class="unit">点</span></td>
+                                <td>{{ math_school_highest }}<span class="unit">点</span></td>
+                            </tr>
+                            <tr>
+                                <td class="label-cell">平均点<br><span class="sub-label">(学年平均)</span></td>
+                                <td>{{ total_grade_avg }}<span class="unit">点</span></td>
+                                <td>{{ japanese_grade_avg }}<span class="unit">点</span></td>
+                                <td>{{ math_grade_avg }}<span class="unit">点</span></td>
+                            </tr>
+                            <tr>
+                                <td class="label-cell">平均点<br><span class="sub-label">(塾内)</span></td>
+                                <td>{{ total_school_avg }}<span class="unit">点</span></td>
+                                <td>{{ japanese_school_avg }}<span class="unit">点</span></td>
+                                <td>{{ math_school_avg }}<span class="unit">点</span></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </section>
+
+                <!-- 成績の推移 -->
+                <section class="trend-section">
+                    <h2 class="section-title"><span class="diamond">◆</span>成績の推移</h2>
+                    <p class="trend-legend">
+                        <span class="legend-item"><span class="legend-bar"></span>あなたの得点</span>
+                        <span class="legend-item"><span class="legend-star">★</span>全国平均</span>
+                    </p>
+
+                    <div class="trend-graphs">
+                        <!-- 全教科 -->
+                        <div class="trend-graph total-graph">
+                            <div class="graph-header total-bg">全教科</div>
+                            <div class="graph-content">
+                                {{ total_chart_svg|safe }}
+                            </div>
+                        </div>
+
+                        <!-- 算数 -->
+                        <div class="trend-graph math-graph">
+                            <div class="graph-header math-bg">算数</div>
+                            <div class="graph-content">
+                                {{ math_chart_svg|safe }}
+                            </div>
+                        </div>
+
+                        <!-- 国語 -->
+                        <div class="trend-graph japanese-graph">
+                            <div class="graph-header japanese-bg">国語</div>
+                            <div class="graph-content">
+                                {{ japanese_chart_svg|safe }}
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            </div>
+
+            <!-- 下部行：出題項目別 + 教科ごとの総評 -->
+            <div class="bottom-row">
+                <!-- 出題項目別の成績 -->
+                <section class="items-section">
+                    <h2 class="section-title"><span class="diamond">◆</span>出題項目別の成績</h2>
+
+                    <!-- 算数 -->
+                    <div class="subject-block">
+                        <div class="subject-header math-bg">
+                            <span class="subject-name">算数</span>
+                        </div>
+                        <table class="items-table">
+                            <thead>
+                                <tr>
+                                    <th class="q-col">大問</th>
+                                    <th class="item-col">出題項目名</th>
+                                    <th class="score-col">得点/配点</th>
+                                    <th class="avg-col">全国平均点</th>
+                                    <th class="rate-col">正答率</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for question in math_questions %}
+                                <tr>
+                                    <td>{{ question.number }}</td>
+                                    <td>{{ question.title }}</td>
+                                    <td>{{ question.score }}/{{ question.max_score }}<span class="unit">点</span></td>
+                                    <td>{{ question.grade_avg }}<span class="unit">点</span></td>
+                                    <td class="rate-cell">
+                                        <div class="rate-container">
+                                            <div class="rate-bar math-bar" style="width: {{ question.correct_rate }}%;"></div>
+                                            <div class="avg-star" style="left: {{ question.grade_avg_rate }}%;">★</div>
+                                            <span class="rate-text">{{ question.correct_rate }}%</span>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                        <p class="chart-note">は出題項目別の正答率です。<span class="note-star">★</span>は全国平均正答率です。</p>
+                    </div>
+
+                    <!-- 国語 -->
+                    <div class="subject-block">
+                        <div class="subject-header japanese-bg">
+                            <span class="subject-name">国語</span>
+                        </div>
+                        <table class="items-table">
+                            <thead>
+                                <tr>
+                                    <th class="q-col">大問</th>
+                                    <th class="item-col">出題項目名</th>
+                                    <th class="score-col">得点/配点</th>
+                                    <th class="avg-col">全国平均点</th>
+                                    <th class="rate-col">正答率</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for question in japanese_questions %}
+                                <tr>
+                                    <td>{{ question.number }}</td>
+                                    <td>{{ question.title }}</td>
+                                    <td>{{ question.score }}/{{ question.max_score }}<span class="unit">点</span></td>
+                                    <td>{{ question.grade_avg }}<span class="unit">点</span></td>
+                                    <td class="rate-cell">
+                                        <div class="rate-container">
+                                            <div class="rate-bar japanese-bar" style="width: {{ question.correct_rate }}%;"></div>
+                                            <div class="avg-star" style="left: {{ question.grade_avg_rate }}%;">★</div>
+                                            <span class="rate-text">{{ question.correct_rate }}%</span>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                        <p class="chart-note">は出題項目別の正答率です。<span class="note-star">★</span>は全国平均正答率です。</p>
+                    </div>
+                </section>
+
+                <!-- 教科ごとの総評 -->
+                <section class="comment-section">
+                    <h2 class="section-title"><span class="diamond">◆</span>教科ごとの総評</h2>
+
+                    <div class="comment-grid">
+                        <div class="comment-box math-comment">
+                            <div class="comment-header math-bg">算数</div>
+                            <p class="comment-text">{{ principal_math_comment }}</p>
+                        </div>
+
+                        <div class="comment-box japanese-comment">
+                            <div class="comment-header japanese-bg">国語</div>
+                            <p class="comment-text">{{ principal_japanese_comment }}</p>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

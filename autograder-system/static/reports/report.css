@@ -1,0 +1,696 @@
+@charset "UTF-8";
+
+/* フォント */
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&display=swap');
+
+/* 印刷設定 */
+@page {
+    size: A4 portrait;
+    margin: 0;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Noto Sans JP', sans-serif;
+    color: #231815;
+    background: #f5f5f5;
+}
+
+.report-page {
+    width: 210mm;
+    height: 297mm;
+    max-height: 297mm;
+    background: white;
+    padding: 10mm 6mm 6mm 6mm;
+    overflow: hidden;
+    box-sizing: border-box;
+}
+
+/* カラー定義 */
+:root {
+    --math-color: #10b981;
+    --math-light: #34d399;
+    --math-dark: #059669;
+    --math-bg: #d1fae5;
+    --japanese-color: #f59e0b;
+    --japanese-light: #fbbf24;
+    --japanese-dark: #d97706;
+    --japanese-bg: #fef3c7;
+    --total-color: #3b82f6;
+    --total-light: #60a5fa;
+    --total-dark: #2563eb;
+    --total-bg: #dbeafe;
+    --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+}
+
+/* ヘッダー */
+.header {
+    text-align: right;
+    margin-bottom: 1mm;
+}
+
+.issue-date {
+    font-size: 6pt;
+    color: #666;
+}
+
+/* 窓あき封筒エリアとロゴ */
+.top-area {
+    display: flex;
+    gap: 3mm;
+    margin-bottom: 2mm;
+    padding-bottom: 2mm;
+    border-bottom: 2px solid #e0e0e0;
+}
+
+.window-area {
+    width: 90mm;
+    height: 35mm;
+    flex-shrink: 0;
+    display: flex;
+    align-items: flex-end;
+}
+
+.window-frame {
+    width: 100%;
+    height: 100%;
+    border: 2px dashed #bdc3c7;
+    border-radius: 3px;
+    background: linear-gradient(135deg, rgba(52, 152, 219, 0.03) 0%, rgba(52, 152, 219, 0.08) 100%);
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    padding: 2mm 2mm 4mm 2mm;
+}
+
+.window-content {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 1mm;
+}
+
+.window-line {
+    font-size: 9pt;
+    line-height: 1.4;
+    color: #231815;
+    display: flex;
+    align-items: baseline;
+}
+
+.window-label {
+    font-size: 7pt;
+    color: #666;
+    margin-right: 1.5mm;
+    min-width: 16mm;
+    font-weight: 400;
+}
+
+.window-name {
+    font-size: 12pt;
+    font-weight: 700;
+    margin-top: 0.5mm;
+}
+
+/* ロゴとテスト情報 */
+.header-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+}
+
+.logo {
+    margin-bottom: 1.5mm;
+}
+
+.logo img {
+    height: 50px;
+}
+
+.test-info {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    margin-bottom: 1mm;
+}
+
+.info-label {
+    font-size: 8pt;
+    color: #666;
+}
+
+.info-value {
+    font-size: 10pt;
+    font-weight: 700;
+    color: #231815;
+}
+
+.main-title {
+    font-size: 16pt;
+    font-weight: 700;
+    color: #231815;
+}
+
+/* メインレイアウト */
+.main-layout {
+    display: flex;
+    flex-direction: column;
+    gap: 0.8mm;
+}
+
+/* 上部行：得点・偏差値・順位 + 成績推移 */
+.top-row {
+    display: grid;
+    grid-template-columns: 2.3fr 0.7fr;
+    gap: 1mm;
+    align-items: stretch;
+}
+
+/* 下部行：出題項目別 + 教科ごとの総評 */
+.bottom-row {
+    display: flex;
+    flex-direction: column;
+    gap: 1mm;
+}
+
+/* セクションタイトル */
+.section-title {
+    font-size: 10pt;
+    font-weight: 700;
+    margin-bottom: 0.8mm;
+    padding-bottom: 0.4mm;
+    border-bottom: 2px solid #e0e0e0;
+}
+
+.diamond {
+    color: #3498db;
+    margin-right: 0.3em;
+}
+
+/* 得点・偏差値・順位 */
+.score-section {
+    margin-bottom: 0;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    justify-content: stretch;
+}
+
+.score-table {
+    width: 100%;
+    height: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    overflow: hidden;
+    box-shadow: var(--shadow-sm);
+}
+
+.score-table thead {
+    background: linear-gradient(135deg, #1f2937 0%, #111827 100%);
+}
+
+.score-table th {
+    padding: 1mm;
+    color: white;
+    font-size: 10pt;
+    font-weight: 700;
+    text-align: center;
+}
+
+.score-table .label-col {
+    background: #2c3e50;
+    text-align: left;
+    padding-left: 3mm;
+}
+
+.score-table .total-col {
+    background: var(--total-color);
+}
+
+.score-table .japanese-col {
+    background: var(--japanese-color);
+}
+
+.score-table .math-col {
+    background: var(--math-color);
+}
+
+.score-table td {
+    padding: 1mm 0.8mm;
+    text-align: center;
+    border-bottom: 1px solid #f0f0f0;
+    font-size: 8pt;
+    font-variant-numeric: tabular-nums;
+}
+
+.score-table .label-cell {
+    background: #f8f9fa;
+    font-weight: 700;
+    text-align: left;
+    padding-left: 2mm;
+    font-size: 8pt;
+    width: 25%;
+}
+
+.score-table .total-cell {
+    background: var(--total-bg);
+    color: var(--total-color);
+    font-weight: 700;
+    font-size: 13pt;
+}
+
+.score-table .japanese-cell {
+    background: var(--japanese-bg);
+    color: var(--japanese-color);
+    font-weight: 700;
+    font-size: 13pt;
+}
+
+.score-table .math-cell {
+    background: var(--math-bg);
+    color: var(--math-color);
+    font-weight: 700;
+    font-size: 13pt;
+}
+
+.score-table .unit {
+    font-size: 11pt;
+    font-weight: 400;
+    color: #666;
+}
+
+.score-table .sub-label {
+    font-size: 6pt;
+    color: #999;
+    font-weight: 400;
+}
+
+.score-table .sub-value {
+    font-size: 7pt;
+    color: #666;
+    font-weight: 400;
+}
+
+/* 成績の推移 */
+.trend-section {
+    margin-bottom: 0;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    margin-left: 0;
+}
+
+.trend-legend {
+    font-size: 6pt;
+    color: #6b7280;
+    margin-bottom: 0.5mm;
+    display: flex;
+    gap: 3mm;
+    padding: 0.5mm 1mm;
+    background: #f9fafb;
+    border-radius: 3px;
+}
+
+.legend-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 1mm;
+}
+
+.legend-bar {
+    display: inline-block;
+    width: 10px;
+    height: 8px;
+    background: linear-gradient(135deg, #4b5563 0%, #374151 100%);
+    border-radius: 2px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+}
+
+.legend-star {
+    display: inline-block;
+    color: #ef4444;
+    font-size: 9pt;
+    line-height: 1;
+    filter: drop-shadow(0 1px 1px rgba(0,0,0,0.2));
+}
+
+.trend-graphs {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5mm;
+    flex: 1;
+}
+
+.trend-graph {
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    box-shadow: var(--shadow-sm);
+    transition: box-shadow 0.2s;
+}
+
+.graph-header {
+    padding: 0.8mm 2mm;
+    color: white;
+    text-align: center;
+    font-size: 9pt;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+}
+
+.total-bg {
+    background: linear-gradient(135deg, var(--total-dark) 0%, var(--total-color) 50%, var(--total-light) 100%);
+}
+
+.japanese-bg {
+    background: linear-gradient(135deg, var(--japanese-dark) 0%, var(--japanese-color) 50%, var(--japanese-light) 100%);
+}
+
+.math-bg {
+    background: linear-gradient(135deg, var(--math-dark) 0%, var(--math-color) 50%, var(--math-light) 100%);
+}
+
+.graph-content {
+    padding: 0.3mm;
+    background: linear-gradient(to bottom, #ffffff 0%, #f9fafb 100%);
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.trend-canvas {
+    display: block;
+}
+
+/* 出題項目別の成績 */
+.items-section {
+    margin-bottom: 0.8mm;
+}
+
+.items-section > h2.section-title {
+    font-size: 9pt;
+    margin-bottom: 0.8mm;
+}
+
+/* 教科別サマリー表 */
+.subject-summary {
+    margin-bottom: 2mm;
+}
+
+.summary-table {
+    width: 100%;
+    border-collapse: collapse;
+    border: 1px solid #e0e0e0;
+    font-size: 7pt;
+}
+
+.summary-table thead {
+    background: #f5f5f5;
+}
+
+.summary-table th {
+    padding: 1mm;
+    border: 1px solid #e0e0e0;
+    font-weight: 700;
+    text-align: center;
+}
+
+.summary-table td {
+    padding: 1mm;
+    border: 1px solid #e0e0e0;
+    text-align: center;
+}
+
+.summary-table .subject-name-cell {
+    font-weight: 700;
+    text-align: left;
+    padding-left: 2mm;
+}
+
+.summary-table .math-text {
+    color: var(--math-color);
+}
+
+.summary-table .japanese-text {
+    color: var(--japanese-color);
+}
+
+.summary-table .total-text {
+    color: var(--total-color);
+}
+
+.summary-table .total-row {
+    background: #fafafa;
+    font-weight: 700;
+}
+
+.summary-table .score-cell {
+    font-size: 8pt;
+    font-weight: 700;
+}
+
+.summary-table .unit {
+    font-size: 6pt;
+    color: #999;
+    font-weight: 400;
+}
+
+.subject-block {
+    margin-bottom: 1mm;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    overflow: hidden;
+    box-shadow: var(--shadow-sm);
+}
+
+.subject-block:last-child {
+    margin-bottom: 0;
+}
+
+.subject-header {
+    padding: 0.6mm 1.5mm;
+    color: white;
+    letter-spacing: 0.5px;
+}
+
+.subject-name {
+    font-size: 8pt;
+    font-weight: 700;
+}
+
+.items-table {
+    width: 100%;
+    border-collapse: collapse;
+    border: none;
+}
+
+.items-table thead {
+    background: linear-gradient(to bottom, #f9fafb 0%, #f3f4f6 100%);
+}
+
+.items-table th {
+    padding: 0.5mm;
+    font-size: 6pt;
+    font-weight: 700;
+    text-align: center;
+    border-bottom: 1px solid #d1d5db;
+    color: #374151;
+    line-height: 1.2;
+}
+
+.items-table .q-col {
+    width: 8%;
+}
+
+.items-table .item-col {
+    width: 28%;
+}
+
+.items-table .score-col {
+    width: 16%;
+}
+
+.items-table .avg-col {
+    width: 16%;
+}
+
+.items-table .rate-col {
+    width: 32%;
+}
+
+.items-table td {
+    padding: 0.3mm;
+    text-align: center;
+    border-bottom: 1px solid #f5f5f5;
+    font-size: 6pt;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.2;
+}
+
+.items-table .unit {
+    font-size: 5pt;
+    color: #999;
+}
+
+/* 正答率バーと星マーク */
+.rate-cell {
+    padding: 0.5mm;
+}
+
+.rate-container {
+    position: relative;
+    width: 100%;
+    height: 14px;
+    background:
+        repeating-linear-gradient(
+            90deg,
+            transparent,
+            transparent 19.5%,
+            #d0d0d0 19.5%,
+            #d0d0d0 20%,
+            transparent 20%,
+            transparent 39.5%,
+            #d0d0d0 39.5%,
+            #d0d0d0 40%,
+            transparent 40%,
+            transparent 59.5%,
+            #d0d0d0 59.5%,
+            #d0d0d0 60%,
+            transparent 60%,
+            transparent 79.5%,
+            #d0d0d0 79.5%,
+            #d0d0d0 80%,
+            transparent 80%,
+            transparent 99.5%,
+            #d0d0d0 99.5%,
+            #d0d0d0 100%
+        ),
+        #f0f0f0;
+    border-radius: 2px;
+    overflow: visible;
+}
+
+.rate-bar {
+    height: 100%;
+    border-radius: 2px;
+    transition: width 0.3s ease;
+}
+
+.math-bar {
+    background: linear-gradient(90deg, var(--math-color) 0%, var(--math-light) 100%);
+}
+
+.japanese-bar {
+    background: linear-gradient(90deg, var(--japanese-color) 0%, var(--japanese-light) 100%);
+}
+
+.avg-star {
+    position: absolute;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    color: #ffd700;
+    font-size: 9pt;
+    line-height: 1;
+    text-shadow: 0 0 2px rgba(0,0,0,0.3);
+    z-index: 2;
+}
+
+.rate-text {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 6pt;
+    font-weight: 700;
+    color: #231815;
+    text-shadow:
+        -1px -1px 0 white,
+        1px -1px 0 white,
+        -1px 1px 0 white,
+        1px 1px 0 white;
+    z-index: 3;
+}
+
+.chart-note {
+    font-size: 6pt;
+    color: white;
+    background: linear-gradient(135deg, #357abd 0%, #4a90e2 100%);
+    padding: 0.6mm;
+    margin-top: -1px;
+}
+
+.note-star {
+    color: #ffd700;
+}
+
+/* 塾長からのコメント */
+.comment-section {
+    margin-bottom: 0;
+}
+
+.comment-section > h2.section-title {
+    font-size: 9pt;
+    margin-bottom: 0.6mm;
+}
+
+.comment-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5mm;
+}
+
+.comment-box {
+    border: 1px solid #e0e0e0;
+    border-radius: 2px;
+    overflow: hidden;
+}
+
+.comment-header {
+    padding: 0.6mm 1.2mm;
+    color: white;
+    font-size: 8pt;
+    font-weight: 700;
+}
+
+.comment-text {
+    padding: 1mm;
+    font-size: 6pt;
+    line-height: 1.5;
+    min-height: 15mm;
+    overflow: hidden;
+}
+
+/* 印刷最適化 */
+@media print {
+    body {
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+    }
+
+    .report-page {
+        page-break-inside: avoid;
+        page-break-after: always;
+        max-height: 297mm;
+        overflow: hidden;
+    }
+
+    @page {
+        size: A4 portrait;
+        margin: 0;
+    }
+}
